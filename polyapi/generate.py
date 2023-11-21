@@ -20,7 +20,7 @@ def get_specs() -> List:
 def parse_specs(specs: List) -> List[List[str]]:
     api_functions = []
     for spec in specs:
-        if spec['type'] != 'apiFunction':
+        if spec['type'] != 'apiFunction' and spec['type'] != 'serverFunction':
             # for now we only support api functions
             continue
 

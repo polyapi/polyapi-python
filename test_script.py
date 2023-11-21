@@ -5,3 +5,4 @@ import os
 from polyapi import poly
 
 print(poly.polyapi.functions.api.list("develop-k8s", os.environ.get("HACKY_SECRET")))
+# print(poly.test.testServerFunction(2, 2, "hi world"))
