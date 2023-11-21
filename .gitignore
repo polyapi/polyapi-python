@@ -1,0 +1,28 @@
+.env
+.env*
+.DS_Store
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+*/.vscode
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# pycache
+__pycache__
+.mypy_cache/
+
+# poly
+.config.env
+polyapi/poly/
+

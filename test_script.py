@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+""" please run `python3 -m polyapi generate` before running this script!
+"""
+import os
+from polyapi import poly
+
+print(poly.polyapi.functions.api.list("develop-k8s", os.environ.get("HACKY_SECRET")))
