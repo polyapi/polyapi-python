@@ -13,7 +13,7 @@ def {function_name}({args}):
     data = {data}
     resp = requests.post(url, data=data, headers=headers)
     assert resp.status_code == 201, resp.content
-    return resp.text
+    return resp.json()
 """
 
 
