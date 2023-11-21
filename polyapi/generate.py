@@ -24,10 +24,11 @@ def parse_specs(specs: List) -> List[List[str]]:
             # for now we only support api functions
             continue
 
+        function_type = spec['type']
         function_name = f"poly.{spec['context']}.{spec['name']}"
         function_id = spec['id']
         args = [arg['name'] for arg in spec['function']['arguments']]
-        api_functions.append([function_name, function_id] + args)
+        api_functions.append([function_type, function_name, function_id] + args)
     return api_functions
 
 
@@ -46,9 +47,9 @@ def remove_old_library():
 
 def generate() -> None:
     remove_old_library()
-    api_functions = get_specs_and_parse()
-    if not api_functions:
-        print("No Api Functions retrieved from specs endpoint, exiting!")
+    functions = get_specs_and_parse()
+    if not functions:
+        print("No supported functions (api or server) retrieved from specs endpoint, exiting!")
         exit(1)
 
-    generate_api(api_functions)
+    generate_api(functions)
