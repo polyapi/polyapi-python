@@ -19,11 +19,12 @@ def {function_name}({args}):
 
 def append_init(full_path: str, next: str) -> None:
     init_path = os.path.join(full_path, "__init__.py")
-    with open(init_path, "a") as f:
-        if next:
-            f.write("from . import {}\n".format(next))
-        else:
-            f.write("")
+    with open(init_path, "a+") as f:
+        import_stmt = "from . import {}\n".format(next)
+        f.seek(0)
+        lines = f.readlines()
+        if import_stmt not in set(lines):
+            f.write(import_stmt)
 
 
 def add_function(full_path: str, function_name: str, function_id: str, *args):
@@ -56,8 +57,10 @@ def create_function(path: str, function_id, *args) -> None:
             full_path = os.path.join(full_path, folder)
             if not os.path.exists(full_path):
                 os.makedirs(full_path)
-                # add the __init__.py file with special handling if it's the 2nd-to-last or last level
-                next = folders[idx + 1] if idx + 2 < len(folders) else ""
+
+            # append to __init__.py file if nested folders
+            next = folders[idx + 1] if idx + 2 < len(folders) else ""
+            if next:
                 append_init(full_path, next)
 
 
