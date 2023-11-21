@@ -16,7 +16,6 @@ POLY_API_BASE_URL='your_server'  # e.g. na1.polyapi.io
 Then run the following
 
 ```bash
-pip3 install requests  # any somewhat update-to-date version will work fine
 pip3 install git+https://github.com/polyapi/polyapi-python.git
 ```
 
