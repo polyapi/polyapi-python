@@ -3,6 +3,7 @@ import os
 import shutil
 from typing import List, Tuple
 from .api import generate_api
+from .variables import generate_variables
 from .config import get_api_key, get_api_base_url
 
 
@@ -38,9 +39,38 @@ def get_specs_and_parse():
     return api_functions
 
 
+def get_variables_and_parse() -> List[Tuple[str, str, bool]]:
+    raw = get_variables()
+    variables = parse_variables(raw)
+    return variables
+
+
+def get_variables():
+    api_key = get_api_key()
+    headers = {"Authorization": f"Bearer {api_key}"}
+    url = f"{get_api_base_url()}/variables"
+    resp = requests.get(url, headers=headers)
+    if resp.status_code == 200:
+        return resp.json()
+    else:
+        raise NotImplementedError(resp.content)
+
+
+def parse_variables(variables: List) -> List[Tuple[str, str, bool]]:
+    rv = []
+    for v in variables:
+        path = f"vari.{v['context']}.{v['name']}"
+        rv.append((path, v['id'], v['secret']))
+    return rv
+
+
 def remove_old_library():
     currdir = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(currdir, "poly")
+    if os.path.exists(path):
+        shutil.rmtree(path)
+
+    path = os.path.join(currdir, "vari")
     if os.path.exists(path):
         shutil.rmtree(path)
 
@@ -48,8 +78,9 @@ def remove_old_library():
 def generate() -> None:
     remove_old_library()
     functions = get_specs_and_parse()
-    if not functions:
-        print("No supported functions (api or server) retrieved from specs endpoint, exiting!")
-        exit(1)
+    if functions:
+        generate_api(functions)
 
-    generate_api(functions)
+    variables = get_variables_and_parse()
+    if variables:
+        generate_variables(variables)

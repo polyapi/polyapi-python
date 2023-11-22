@@ -1,6 +1,8 @@
 import os
 from typing import List
 
+from polyapi.utils import append_init
+
 # map the function type from the spec type to the function execute type
 TEMPLATE_FUNCTION_TYPE_MAP = {
     "apiFunction": "api",
@@ -23,7 +25,7 @@ def {function_name}({args}):
 """
 
 
-def add_function(
+def add_function_file(
     function_type: str, full_path: str, function_name: str, function_id: str, *args
 ):
     # first lets add the import to the __init__
@@ -54,7 +56,7 @@ def create_function(function_type: str, path: str, function_id: str, *args) -> N
     for idx, folder in enumerate(folders):
         if idx + 1 == len(folders):
             # special handling for final level
-            add_function(function_type, full_path, folder, function_id, *args)
+            add_function_file(function_type, full_path, folder, function_id, *args)
         else:
             full_path = os.path.join(full_path, folder)
             if not os.path.exists(full_path):
@@ -66,17 +68,7 @@ def create_function(function_type: str, path: str, function_id: str, *args) -> N
                 append_init(full_path, next)
 
 
-def append_init(full_path: str, next: str) -> None:
-    init_path = os.path.join(full_path, "__init__.py")
-    with open(init_path, "a+") as f:
-        import_stmt = "from . import {}\n".format(next)
-        f.seek(0)
-        lines = f.readlines()
-        if import_stmt not in set(lines):
-            f.write(import_stmt)
-
-
 def generate_api(api_functions: List) -> None:
-    for t in api_functions:
-        create_function(*t)
+    for func in api_functions:
+        create_function(*func)
     print("API functions generated!")
