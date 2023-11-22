@@ -12,6 +12,7 @@ TEMPLATE_FUNCTION_TYPE_MAP = {
 TEMPLATE = """
 import requests
 from polyapi.config import get_api_key, get_api_base_url
+from polyapi.exceptions import PolyApiException
 
 
 def {function_name}({args}):
@@ -20,7 +21,8 @@ def {function_name}({args}):
     url = f"{{get_api_base_url()}}/functions/{function_type}/{function_id}/execute"
     data = {data}
     resp = requests.post(url, data=data, headers=headers)
-    assert resp.status_code == 200 or resp.status_code == 201, resp.content
+    if resp.status_code != 200 and resp.status_code != 201:
+        raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
     return resp.text
 """
 

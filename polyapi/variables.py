@@ -6,6 +6,7 @@ from polyapi.utils import append_init
 TEMPLATE = """
 import requests
 from polyapi.config import get_api_key, get_api_base_url
+from polyapi.exceptions import PolyApiException
 
 
 class {variable_name}:
@@ -20,7 +21,8 @@ class {variable_name}:
             headers = {{"Authorization": f"Bearer {{api_key}}"}}
             url = f"{{base_url}}/variables/{variable_id}/value"
             resp = requests.get(url, headers=headers)
-            assert resp.status_code == 200, resp.content
+            if resp.status_code != 200 and resp.status_code != 201:
+                raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
             return resp.text
 
     @staticmethod
@@ -30,7 +32,8 @@ class {variable_name}:
         headers = {{"Authorization": f"Bearer {{api_key}}"}}
         url = f"{{base_url}}/variables/{variable_id}"
         resp = requests.patch(url, data={{"value": value}}, headers=headers)
-        assert resp.status_code == 200, f"{{resp.status_code}}: {{resp.content}}"
+        if resp.status_code != 200 and resp.status_code != 201:
+            raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
         return resp.json()
 
     def inject(path=None):
