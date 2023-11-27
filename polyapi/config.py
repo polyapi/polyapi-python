@@ -38,9 +38,9 @@ def get_api_key_and_url() -> Tuple[str | None, str | None]:
         if not url:
             url = config.get("polyapi", "poly_api_base_url", fallback=None)
 
-    # cache values so we only read from disk once
-    API_KEY = key
-    API_URL = url
+        # cache values so we only read from disk once
+        API_KEY = key
+        API_URL = url
 
     return key, url
 
