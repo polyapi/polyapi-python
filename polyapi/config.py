@@ -33,10 +33,10 @@ def get_api_key_and_url() -> Tuple[str | None, str | None]:
         with open(path, "r") as f:
             config.read_file(f)
 
-    if not key:
-        key = config.get("polyapi", "poly_api_key", fallback=None)
-    if not url:
-        url = config.get("polyapi", "poly_api_base_url", fallback=None)
+        if not key:
+            key = config.get("polyapi", "poly_api_key", fallback=None)
+        if not url:
+            url = config.get("polyapi", "poly_api_base_url", fallback=None)
 
     # cache values so we only read from disk once
     API_KEY = key
