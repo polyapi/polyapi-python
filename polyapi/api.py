@@ -11,14 +11,14 @@ TEMPLATE_FUNCTION_TYPE_MAP = {
 
 TEMPLATE = """
 import requests
-from polyapi.config import get_api_key, get_api_base_url
+from polyapi.config import get_api_key_and_url
 from polyapi.exceptions import PolyApiException
 
 
 def {function_name}({args}):
-    api_key = get_api_key()
+    api_key, api_url = get_api_key_and_url()
     headers = {{"Authorization": f"Bearer {{api_key}}"}}
-    url = f"{{get_api_base_url()}}/functions/{function_type}/{function_id}/execute"
+    url = f"{{api_url}}/functions/{function_type}/{function_id}/execute"
     data = {data}
     resp = requests.post(url, data=data, headers=headers)
     if resp.status_code != 200 and resp.status_code != 201:

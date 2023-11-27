@@ -4,13 +4,13 @@ import shutil
 from typing import List, Tuple
 from .api import generate_api
 from .variables import generate_variables
-from .config import get_api_key, get_api_base_url
+from .config import get_api_key_and_url, initialize_config
 
 
 def get_specs() -> List:
-    api_key = get_api_key()
+    api_key, api_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}
-    url = f"{get_api_base_url()}/specs"
+    url = f"{api_url}/specs"
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
         return resp.json()
@@ -46,9 +46,9 @@ def get_variables_and_parse() -> List[Tuple[str, str, bool]]:
 
 
 def get_variables():
-    api_key = get_api_key()
+    api_key, api_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}
-    url = f"{get_api_base_url()}/variables"
+    url = f"{api_url}/variables"
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
         return resp.json()
@@ -76,10 +76,9 @@ def remove_old_library():
 
 
 def generate() -> None:
-    remove_old_library()
+    initialize_config()
 
-    # check for api key
-    # check for api base url
+    remove_old_library()
 
     functions = get_specs_and_parse()
     if functions:

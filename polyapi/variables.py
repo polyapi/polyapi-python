@@ -5,7 +5,7 @@ from polyapi.utils import append_init
 
 TEMPLATE = """
 import requests
-from polyapi.config import get_api_key, get_api_base_url
+from polyapi.config import get_api_key_and_url
 from polyapi.exceptions import PolyApiException
 
 
@@ -16,8 +16,7 @@ class {variable_name}:
         if secret:
             raise ValueError('Cannot access secret variable from client. Use .inject() instead within Poly function.')
         else:
-            base_url = get_api_base_url()
-            api_key = get_api_key()
+            api_key, base_url = get_api_key_and_url()
             headers = {{"Authorization": f"Bearer {{api_key}}"}}
             url = f"{{base_url}}/variables/{variable_id}/value"
             resp = requests.get(url, headers=headers)
@@ -27,8 +26,7 @@ class {variable_name}:
 
     @staticmethod
     def update(value):
-        base_url = get_api_base_url()
-        api_key = get_api_key()
+        api_key, base_url = get_api_key_and_url()
         headers = {{"Authorization": f"Bearer {{api_key}}"}}
         url = f"{{base_url}}/variables/{variable_id}"
         resp = requests.patch(url, data={{"value": value}}, headers=headers)
