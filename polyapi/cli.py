@@ -9,6 +9,9 @@ def execute_from_cli():
         subcommand = "help"  # Display help if no arguments were given.
 
     if subcommand == "help":
-        print("Please email support@polyapi.io for help.")
+        print("Use `python3 -m polyapi generate` to generate the PolyAPI library.")
     elif subcommand == "generate":
         generate()
+    else:
+        print("Invalid command {subcommand}. Available commands are 'generate' and 'help'.")
+        exit(1)

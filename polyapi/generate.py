@@ -77,6 +77,10 @@ def remove_old_library():
 
 def generate() -> None:
     remove_old_library()
+
+    # check for api key
+    # check for api base url
+
     functions = get_specs_and_parse()
     if functions:
         generate_api(functions)
