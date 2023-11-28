@@ -2,5 +2,5 @@
 name = "polyapi"
 version = "0.0.1"
 description = "The PolyAPI Python Client"
-dependencies = ["requests"]
+dependencies = ["requests", "typing_extensions"]
 readme = "README.md"

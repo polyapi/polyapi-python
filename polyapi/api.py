@@ -1,6 +1,6 @@
 import os
 from typing import List
-
+from polyapi.typedefs import PropertySpecification, PropertyType
 from polyapi.utils import append_init
 
 # map the function type from the spec type to the function execute type
@@ -11,6 +11,7 @@ TEMPLATE_FUNCTION_TYPE_MAP = {
 
 TEMPLATE = """
 import requests
+from typing import List, Dict, Any
 from polyapi.config import get_api_key_and_url
 from polyapi.exceptions import PolyApiException
 
@@ -27,8 +28,53 @@ def {function_name}({args}):
 """
 
 
+PRIMITIVE_TYPE_MAP = {
+    "integer": "int",
+    "number": "float",
+    "string": "str",
+    "boolean": "bool",
+}
+
+
+def _map_primitive_types(type_: str) -> str:
+    # Define your mapping logic here
+    return PRIMITIVE_TYPE_MAP.get(type_, "Any")
+
+
+def _get_type(type_spec: PropertyType) -> str:
+    if type_spec["kind"] == "primitive":
+        return _map_primitive_types(type_spec["type"])
+    elif type_spec["kind"] == "array":
+        # return f"List[{_get_type(type_spec['type'])}]"
+        return "List"
+    elif type_spec["kind"] == "object":
+        return "Dict"
+    elif type_spec["kind"] == "any":
+        return "Any"
+    else:
+        return "Any"
+
+
+def _get_arg_string(arguments: List[PropertySpecification]) -> str:
+    arg_strings = [f"{a['name']}: {_get_type(a['type'])}" for a in arguments]
+    return ", ".join(arg_strings)
+
+
+def render_function(function_type: str, function_name: str, function_id: str, arguments: List[PropertySpecification]) -> str:
+    arg_names = [a['name'] for a in arguments]
+    arg_string = _get_arg_string(arguments)
+    data = "{" + ", ".join([f"'{arg}': {arg}" for arg in arg_names]) + "}"
+    return TEMPLATE.format(
+        function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
+        function_name=function_name,
+        function_id=function_id,
+        args=arg_string,
+        data=data,
+    )
+
+
 def add_function_file(
-    function_type: str, full_path: str, function_name: str, function_id: str, *args
+    function_type: str, full_path: str, function_name: str, function_id: str, arguments: List[PropertySpecification]
 ):
     # first lets add the import to the __init__
     init_path = os.path.join(full_path, "__init__.py")
@@ -37,28 +83,18 @@ def add_function_file(
 
     # now lets add the code!
     file_path = os.path.join(full_path, f"_{function_name}.py")
-    arg_string = ", ".join(args)
-    data = "{" + ", ".join([f"'{arg}': {arg}" for arg in args]) + "}"
     with open(file_path, "w") as f:
-        f.write(
-            TEMPLATE.format(
-                function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
-                function_name=function_name,
-                function_id=function_id,
-                args=arg_string,
-                data=data,
-            )
-        )
+        f.write(render_function(function_type, function_name, function_id, arguments))
 
 
-def create_function(function_type: str, path: str, function_id: str, *args) -> None:
+def create_function(function_type: str, path: str, function_id: str, arguments: List[PropertySpecification]) -> None:
     full_path = os.path.dirname(os.path.abspath(__file__))
 
     folders = path.split(".")
     for idx, folder in enumerate(folders):
         if idx + 1 == len(folders):
             # special handling for final level
-            add_function_file(function_type, full_path, folder, function_id, *args)
+            add_function_file(function_type, full_path, folder, function_id, arguments)
         else:
             full_path = os.path.join(full_path, folder)
             if not os.path.exists(full_path):
