@@ -24,5 +24,6 @@ __pycache__
 
 # poly
 .config.env
+manual_test.py
 polyapi/poly/
 polyapi/vari/

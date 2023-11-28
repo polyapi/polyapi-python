@@ -35,3 +35,11 @@ That's it! Now open up a test file and you can run some code like so:
 from polyapi import poly
 print(poly.polyapi.function.api.list(my_server, my_api_key))
 ```
+
+## Unit Tests
+
+To run this library's unit tests, please clone the repo then run:
+
+```
+python3 -m unittest discover
+```
