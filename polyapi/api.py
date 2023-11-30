@@ -18,13 +18,17 @@ from polyapi.exceptions import PolyApiException
 
 def {function_name}({args}) -> {return_type}:
     api_key, api_url = get_api_key_and_url()
+    return_str = {return_str}
     headers = {{"Authorization": f"Bearer {{api_key}}"}}
     url = f"{{api_url}}/functions/{function_type}/{function_id}/execute"
     data = {data}
     resp = requests.post(url, data=data, headers=headers)
     if resp.status_code != 200 and resp.status_code != 201:
         raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
-    return resp.text
+    if return_str:
+        return resp.text
+    else:
+        return resp.json()
 """
 
 
@@ -42,7 +46,9 @@ def _map_primitive_types(type_: str) -> str:
 
 
 def _get_type(type_spec: PropertyType) -> str:
-    if type_spec["kind"] == "primitive":
+    if type_spec["kind"] == "plain":
+        return _map_primitive_types(type_spec["value"])
+    elif type_spec["kind"] == "primitive":
         return _map_primitive_types(type_spec["type"])
     elif type_spec["kind"] == "array":
         # return f"List[{_get_type(type_spec['type'])}]"
@@ -71,17 +77,17 @@ def render_function(
 ) -> str:
     arg_names = [a["name"] for a in arguments]
     arg_string = _get_arg_string(arguments)
+    return_type_string = _get_type(return_type)  # type: ignore
+    return_str = return_type_string == "str"
     data = "{" + ", ".join([f"'{arg}': {arg}" for arg in arg_names]) + "}"
     return TEMPLATE.format(
         function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
         function_name=function_name,
         function_id=function_id,
         args=arg_string,
-        return_type=_get_type(return_type),  # type: ignore
+        return_type=return_type_string,
+        return_str=return_str,
         data=data,
-        # TODO figure out how to add return_type
-        # what if it's plain?
-        # what if it's an object?
     )
 
 
@@ -101,7 +107,11 @@ def add_function_file(
     # now lets add the code!
     file_path = os.path.join(full_path, f"_{function_name}.py")
     with open(file_path, "w") as f:
-        f.write(render_function(function_type, function_name, function_id, arguments, return_type))
+        f.write(
+            render_function(
+                function_type, function_name, function_id, arguments, return_type
+            )
+        )
 
 
 def create_function(
@@ -117,7 +127,9 @@ def create_function(
     for idx, folder in enumerate(folders):
         if idx + 1 == len(folders):
             # special handling for final level
-            add_function_file(function_type, full_path, folder, function_id, arguments, return_type)
+            add_function_file(
+                function_type, full_path, folder, function_id, arguments, return_type
+            )
         else:
             full_path = os.path.join(full_path, folder)
             if not os.path.exists(full_path):
