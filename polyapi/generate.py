@@ -1,7 +1,7 @@
 import requests
 import os
 import shutil
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from polyapi.typedefs import PropertySpecification
 from .api import generate_api
@@ -20,18 +20,18 @@ def get_specs() -> List:
         raise NotImplementedError(resp.content)
 
 
-def parse_specs(specs: List) -> List[Tuple[str, str, str, List[PropertySpecification]]]:
+def parse_specs(specs: List) -> List[Tuple[str, str, str, List[PropertySpecification], Dict[str, Any]]]:
     api_functions = []
     for spec in specs:
         if spec['type'] != 'apiFunction' and spec['type'] != 'serverFunction':
-            # for now we only support api functions
+            # for now we only support api and server functions
             continue
 
         function_type = spec['type']
         function_name = f"poly.{spec['context']}.{spec['name']}"
         function_id = spec['id']
         arguments: List[PropertySpecification] = [arg for arg in spec['function']['arguments']]
-        api_functions.append((function_type, function_name, function_id, arguments))
+        api_functions.append((function_type, function_name, function_id, arguments, spec['function']["returnType"]))
     return api_functions
 
 

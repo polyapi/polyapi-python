@@ -28,14 +28,53 @@ ACCUWEATHER = {
 }
 
 
+ZILLOW = {
+    "id": "1231234",
+    "name": "zillowGetLocation",
+    "context": "",
+    "description": "",
+    "type": "apiFunction",
+    "function": {
+        "arguments": [
+            {
+                "name": "locationId",
+                "description": "",
+                "type": {"kind": "primitive", "type": "integer"},
+                "required": True,
+            },
+            {
+                "name": "AAPIKey",
+                "description": "",
+                "type": {"kind": "primitive", "type": "string"},
+                "required": True,
+            },
+        ],
+        "returnType": {"kind": "primitive", "type": "string"},
+    },
+}
+
+
 class T(unittest.TestCase):
-    def test_render_function(self):
+    def test_render_function_accuweather(self):
         func_str = render_function(
-            "apiFunction",
-            "accuweatherGetlocation",
+            ACCUWEATHER["type"],
+            ACCUWEATHER["name"],
             ACCUWEATHER["id"],
             ACCUWEATHER["function"]["arguments"],
+            ACCUWEATHER["function"]["returnType"],
         )
         self.assertIn(ACCUWEATHER["id"], func_str)
         self.assertIn("locationId: int,", func_str)
-        print(func_str)
+        self.assertIn("-> None", func_str)
+
+    def test_render_function_zillow(self):
+        func_str = render_function(
+            ZILLOW["type"],
+            ZILLOW["name"],
+            ZILLOW["id"],
+            ZILLOW["function"]["arguments"],
+            ZILLOW["function"]["returnType"],
+        )
+        self.assertIn(ZILLOW["id"], func_str)
+        self.assertIn("locationId: int,", func_str)
+        self.assertIn("-> str", func_str)
