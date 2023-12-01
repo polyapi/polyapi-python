@@ -5,7 +5,7 @@ from jsonschema_gentypes.cli import process_config
 from jsonschema_gentypes import configuration
 
 
-def generate():
+def generate_schema_types():
     config: configuration.Configuration = {
         "python_version": None,
         "generate": [
@@ -19,4 +19,4 @@ def generate():
 
 
 if __name__ == "__main__":
-    generate()
+    generate_schema_types()

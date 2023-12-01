@@ -2,6 +2,7 @@ import os
 from typing import Any, Dict, List
 from polyapi.typedefs import PropertySpecification, PropertyType
 from polyapi.utils import append_init
+from polyapi.schema import generate_schema_types
 
 # map the function type from the spec type to the function execute type
 TEMPLATE_FUNCTION_TYPE_MAP = {
