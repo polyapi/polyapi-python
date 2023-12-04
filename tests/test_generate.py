@@ -155,8 +155,6 @@ class T(unittest.TestCase):
             TWILIO["function"]["arguments"],
             TWILIO["function"]["returnType"],
         )
-
-        print(func_str)
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
