@@ -84,8 +84,9 @@ def generate() -> None:
 
     functions = get_specs_and_parse()
     if functions:
+        # TODO add try/except that clears old library
         generate_api(functions)
 
-    variables = get_variables_and_parse()
-    if variables:
-        generate_variables(variables)
+    # variables = get_variables_and_parse()
+    # if variables:
+    # generate_variables(variables)

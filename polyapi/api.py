@@ -48,12 +48,17 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
     elif type_spec["kind"] == "primitive":
         return _map_primitive_types(type_spec["type"]), ""
     elif type_spec["kind"] == "array":
+        # TODO needs to be more general
         return "Responsetype", generate_schema_types(type_spec)  # type: ignore
     elif type_spec["kind"] == "void":
         return "None", ""
     elif type_spec["kind"] == "object":
         if type_spec.get("schema"):
-            return type_spec["schema"]["title"].title(), generate_schema_types(type_spec["schema"])  # type: ignore
+            try:
+                title = type_spec["schema"]["title"].title()
+            except:
+                title = "unknown"
+            return title, generate_schema_types(type_spec["schema"])  # type: ignore
         else:
             return "Dict", ""
     elif type_spec["kind"] == "any":
