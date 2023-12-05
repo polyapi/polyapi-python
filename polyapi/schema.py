@@ -1,3 +1,4 @@
+import contextlib
 from typing import Dict
 from jsonschema_gentypes.cli import process_config
 from jsonschema_gentypes import configuration
@@ -47,7 +48,11 @@ def generate_schema_types(input_data: Dict):
             }
         ],
     }
-    process_config(config)
+
+    # jsonschema_gentypes prints source to stdout
+    # no option to surpress so we do this
+    with contextlib.redirect_stdout(None):
+        process_config(config)
 
     with open(tmp_output) as f:
         output = f.read()
