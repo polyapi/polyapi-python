@@ -85,6 +85,9 @@ def generate() -> None:
     functions = get_specs_and_parse()
     if functions:
         generate_api(functions)
+    else:
+        print("No functions seem to exist in this tenant! Please add some functions and try again.")
+        exit(1)
 
     variables = get_variables_and_parse()
     if variables:
