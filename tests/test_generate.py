@@ -104,6 +104,11 @@ TWILIO = {
                                 "anyOf": [{"type": "null"}, {"type": "string"}]
                             },
                             "sid": {"type": "string"},
+                            "Attributes": {
+                                "type": "string",
+                                "enum": ["{'key':'value'}", "{}"],
+                                "title": "Attributes",
+                            },
                         },
                     }
                 },
@@ -155,7 +160,15 @@ class T(unittest.TestCase):
             TWILIO["function"]["arguments"],
             TWILIO["function"]["returnType"],
         )
+        print(func_str)
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
         self.assertIn("-> Responsetype", func_str)
+
+    # TODO figure out how to fix `polyapi.test.getProductsCount111`
+    # TODO figure out how to fix `polyapi.twilio.conversation.get`
+    # there is something here with quotes in Literal fields that blows up
+    # polyapi/poly/_getProductsCount44.py:19:34: F821 undefined name 'Responsetype'
+    # polyapi/poly/hubspot/companies/_createAdvanced.py:137:70: F821 undefined name 'unknown'
+    # flake8 polyapi/poly/ --extend-ignore="W291,F401,E303,F811,E501,E402"

@@ -5,6 +5,22 @@ import tempfile
 import json
 
 
+def _cleanup_input_for_gentypes(input_data: Dict):
+    """ cleanup input_data in place to make it more suitable for jsonschema_gentypes
+    """
+    for k, v in input_data.items():
+        if isinstance(v, dict):
+            _cleanup_input_for_gentypes(v)
+        elif k == "enum":
+            # jsonschema_gentypes doesn't like double quotes in enums
+            # TODO fix this upstream
+            for idx, enum in enumerate(v):
+                assert isinstance(enum, str)
+                v[idx] = enum.replace('"', "'")
+
+
+
+
 def _temp_store_input_data(input_data: Dict) -> str:
     """take in the input data and store it in a temporary json file"""
     with tempfile.NamedTemporaryFile(
@@ -16,6 +32,7 @@ def _temp_store_input_data(input_data: Dict) -> str:
 
 def generate_schema_types(input_data: Dict):
     """takes in a Dict representing a schema as input then appends the resulting python code to the output file"""
+    _cleanup_input_for_gentypes(input_data)
     tmp_input = _temp_store_input_data(input_data)
     tmp_output = tempfile.NamedTemporaryFile(
         mode="w", delete=False, prefix="polyapi_", suffix=".json"
