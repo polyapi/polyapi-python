@@ -126,6 +126,32 @@ TWILIO = {
     },
 }
 
+GET_PRODUCTS_COUNT = {
+    "id": "8f7d24b0-4a29-40c0-9091-b3d773c748fb",
+    "type": "serverFunction",
+    "context": "test",
+    "name": "getProductsCount111",
+    "description": "An API call to retrieve the count of products in the product list.",
+    "requirements": ["snabbdom"],
+    "function": {
+        "arguments": [
+            {
+                "name": "products",
+                "required": False,
+                "type": {
+                    "kind": "array",
+                    "items": {"kind": "primitive", "type": "string"},
+                },
+            }
+        ],
+        "returnType": {"kind": "plain", "value": "{ length: number }"},
+        "synchronous": True,
+    },
+    "code": "",
+    "language": "javascript",
+    "visibilityMetadata": {"visibility": "ENVIRONMENT"},
+}
+
 
 class T(unittest.TestCase):
     def test_render_function_accuweather(self):
@@ -160,15 +186,23 @@ class T(unittest.TestCase):
             TWILIO["function"]["arguments"],
             TWILIO["function"]["returnType"],
         )
-        print(func_str)
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
         self.assertIn("-> Responsetype", func_str)
 
-    # TODO figure out how to fix `polyapi.test.getProductsCount111`
-    # TODO figure out how to fix `polyapi.twilio.conversation.get`
-    # there is something here with quotes in Literal fields that blows up
+    def test_render_function_get_products_count(self):
+        func_str = render_function(
+            GET_PRODUCTS_COUNT["type"],
+            GET_PRODUCTS_COUNT["name"],
+            GET_PRODUCTS_COUNT["id"],
+            GET_PRODUCTS_COUNT["function"]["arguments"],
+            GET_PRODUCTS_COUNT["function"]["returnType"],
+        )
+        self.assertIn(GET_PRODUCTS_COUNT["id"], func_str)
+        self.assertIn("products: List[str]", func_str)
+
+
     # polyapi/poly/_getProductsCount44.py:19:34: F821 undefined name 'Responsetype'
     # polyapi/poly/hubspot/companies/_createAdvanced.py:137:70: F821 undefined name 'unknown'
     # flake8 polyapi/poly/ --extend-ignore="W291,F401,E303,F811,E501,E402"

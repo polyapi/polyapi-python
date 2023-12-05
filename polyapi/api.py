@@ -49,16 +49,25 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
         return _map_primitive_types(type_spec["type"]), ""
     elif type_spec["kind"] == "array":
         # TODO needs to be more general
-        return "Responsetype", generate_schema_types(type_spec)  # type: ignore
+        if type_spec["items"].get("$ref"):
+            return "Responsetype", generate_schema_types(type_spec)  # type: ignore
+        else:
+            item_type, _ = _get_type(type_spec["items"])
+            return_type = f"List[{item_type}]"
+            return return_type, ""
     elif type_spec["kind"] == "void":
         return "None", ""
     elif type_spec["kind"] == "object":
         if type_spec.get("schema"):
-            try:
-                title = type_spec["schema"]["title"].title()
-            except:
-                title = "unknown"
-            return title, generate_schema_types(type_spec["schema"])  # type: ignore
+            schema = type_spec["schema"]
+            title = schema.get("title", "").title()
+            if not title:
+                # fallback to schema $ref name if no explicit title
+                title = schema["items"].get("$ref", "")
+                assert title
+                title = title.rsplit("/", 1)[-1].title()
+                title = f'List[{title}]'
+            return title, generate_schema_types(schema)  # type: ignore
         else:
             return "Dict", ""
     elif type_spec["kind"] == "any":
@@ -160,6 +169,5 @@ def create_function(
 
 def generate_api(api_functions: List) -> None:
     for func in api_functions:
-        # if func[2] == "4fa644d7-398b-48c4-8db9-01fdbfbe1f94":
         create_function(*func)
     print("API functions generated!")
