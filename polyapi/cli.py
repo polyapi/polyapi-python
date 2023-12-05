@@ -11,6 +11,7 @@ def execute_from_cli():
     if subcommand == "help":
         print("Use `python3 -m polyapi generate` to generate the PolyAPI library.")
     elif subcommand == "generate":
+        print("Generating...")
         generate()
     else:
         print("Invalid command {subcommand}. Available commands are 'generate' and 'help'.")
