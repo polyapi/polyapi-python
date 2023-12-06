@@ -1,6 +1,6 @@
 import sys
 from .generate import generate
-from .function_cli import function_add_remove
+from .function_cli import function_add_or_update
 
 CLI_COMMANDS = ["generate", "help", "function"]
 
@@ -17,7 +17,7 @@ def execute_from_cli():
         print("Generating...")
         generate()
     elif command == "function":
-        function_add_remove(sys.argv[2:])
+        function_add_or_update(*sys.argv[2:])
     else:
         print("Invalid command {subcommand}. Available commands are 'generate' and 'help'.")
         exit(1)
