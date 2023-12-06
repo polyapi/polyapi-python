@@ -1,18 +1,23 @@
 import sys
 from .generate import generate
+from .function_cli import function_add_remove
+
+CLI_COMMANDS = ["generate", "help", "function"]
 
 
 def execute_from_cli():
     try:
-        subcommand = sys.argv[1]
+        command = sys.argv[1]
     except IndexError:
-        subcommand = "help"  # Display help if no arguments were given.
+        command = "help"  # Display help if no arguments were given.
 
-    if subcommand == "help":
+    if command == "help":
         print("Use `python3 -m polyapi generate` to generate the PolyAPI library.")
-    elif subcommand == "generate":
+    elif command == "generate":
         print("Generating...")
         generate()
+    elif command == "function":
+        function_add_remove(sys.argv[2:])
     else:
         print("Invalid command {subcommand}. Available commands are 'generate' and 'help'.")
         exit(1)
