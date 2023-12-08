@@ -2,6 +2,7 @@ import sys
 from .generate import generate
 from .function_cli import function_add_or_update
 
+
 CLI_COMMANDS = ["generate", "help", "function"]
 
 
