@@ -17,7 +17,7 @@ pip3 install git+https://github.com/polyapi/polyapi-python.git
 Now you can run the following to generate your library
 
 ```bash
-python3 -m polyapi generate
+python -m polyapi generate
 ```
 
 You will be prompted to enter the Poly server url you use and your Poly API key.
@@ -38,10 +38,18 @@ from polyapi import poly
 print(poly.polyapi.function.api.list(my_server, my_api_key))
 ```
 
+## Upgrade
+
+To upgrade your library to the latest version, please run this:
+
+```bash
+pip3 install git+https://github.com/polyapi/polyapi-python.git --upgrade
+```
+
 ## Unit Tests
 
 To run this library's unit tests, please clone the repo then run:
 
 ```
-python3 -m unittest discover
+python -m unittest discover
 ```
