@@ -10,7 +10,7 @@ TEMPLATE_FUNCTION_TYPE_MAP = {
     "serverFunction": "server",
 }
 
-TEMPLATE = """
+SERVER_TEMPLATE = """
 import requests
 from typing import List, Dict, Any
 from polyapi.config import get_api_key_and_url
@@ -26,6 +26,30 @@ def {function_name}({args}) -> {return_type_name}:
     if resp.status_code != 200 and resp.status_code != 201:
         raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
     return {return_action}
+"""
+
+API_TEMPLATE = """
+import requests
+from typing import List, Dict, Any, TypedDict
+from polyapi.config import get_api_key_and_url
+from polyapi.exceptions import PolyApiException
+{args_def}
+{return_type_def}
+class ApiFunctionResponse(TypedDict):
+    status: int
+    headers: Dict
+    data: {return_type_name}
+
+
+def {function_name}({args}) -> ApiFunctionResponse:
+    api_key, api_url = get_api_key_and_url()
+    headers = {{"Authorization": f"Bearer {{api_key}}"}}
+    url = f"{{api_url}}/functions/{function_type}/{function_id}/execute"
+    data = {data}
+    resp = requests.post(url, data=data, headers=headers)
+    if resp.status_code != 200 and resp.status_code != 201:
+        raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
+    return ApiFunctionResponse(resp.json())
 """
 
 
@@ -115,22 +139,33 @@ def render_function(
     args, args_def = _parse_arguments(arguments)
     return_type_name, return_type_def = _get_type(return_type)  # type: ignore
     data = "{" + ", ".join([f"'{arg}': {_parseArgName(arg)}" for arg in arg_names]) + "}"
-    if return_type_def == "str":
-        return_action = "resp.text"
+    if function_type == "apiFunction":
+        rendered = API_TEMPLATE.format(
+            function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
+            function_name=function_name,
+            function_id=function_id,
+            args=args,
+            args_def=args_def,
+            return_type_name=return_type_name,
+            return_type_def=return_type_def,
+            data=data,
+        )
     else:
-        return_action = "resp.json()"
-
-    rendered = TEMPLATE.format(
-        function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
-        function_name=function_name,
-        function_id=function_id,
-        args=args,
-        args_def=args_def,
-        return_type_name=return_type_name,
-        return_type_def=return_type_def,
-        return_action=return_action,
-        data=data,
-    )
+        if return_type_def == "str":
+            return_action = "resp.text"
+        else:
+            return_action = "resp.json()"
+        rendered = SERVER_TEMPLATE.format(
+            function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
+            function_name=function_name,
+            function_id=function_id,
+            args=args,
+            args_def=args_def,
+            return_type_name=return_type_name,
+            return_type_def=return_type_def,
+            return_action=return_action,
+            data=data,
+        )
     return rendered
 
 
