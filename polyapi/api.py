@@ -75,7 +75,7 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
                     title = f'List[{title}]'
                 else:
                     # TODO figure out what the title should really be here!
-                    title = "SomeType"
+                    title = "Any"
             return title, generate_schema_types(schema)  # type: ignore
         else:
             return "Dict", ""
@@ -92,6 +92,9 @@ def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
         arg_type, arg_def = _get_type(a["type"])
         if arg_def:
             args_def.append(arg_def)
+        if "-" in a['name']:
+            # HACK maybe this should be snakeCase?
+            a['name'] = a['name'].replace("-", "_")
         arg_strings.append(f"{a['name']}: {arg_type}")
     return ", ".join(arg_strings), "\n\n".join(args_def)
 
