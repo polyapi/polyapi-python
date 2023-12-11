@@ -63,10 +63,19 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
             title = schema.get("title", "").title()
             if not title:
                 # fallback to schema $ref name if no explicit title
-                title = schema["items"].get("$ref", "")
-                assert title
-                title = title.rsplit("/", 1)[-1].title()
-                title = f'List[{title}]'
+                items = schema.get("items")
+                if not items:
+                    # TODO fix this, key 5ce on develop has something that doesnt have items
+                    # figure out what it is and fix!
+                    return "Any", ""
+
+                title = items.get("$ref", "")
+                if title:
+                    title = title.rsplit("/", 1)[-1].title()
+                    title = f'List[{title}]'
+                else:
+                    # TODO figure out what the title should really be here!
+                    title = "SomeType"
             return title, generate_schema_types(schema)  # type: ignore
         else:
             return "Dict", ""
