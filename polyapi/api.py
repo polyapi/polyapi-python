@@ -85,6 +85,11 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
         return "Any", ""
 
 
+def _parseArgName(name: str) -> str:
+    # HACK this should be snakeCase like Node client
+    return name.replace("-", "_")
+
+
 def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
     args_def = []
     arg_strings = []
@@ -93,8 +98,8 @@ def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
         if arg_def:
             args_def.append(arg_def)
         if "-" in a['name']:
-            # HACK maybe this should be snakeCase?
-            a['name'] = a['name'].replace("-", "_")
+            a['name'] = _parseArgName(a['name'])
+            # arg_type = "Any"
         arg_strings.append(f"{a['name']}: {arg_type}")
     return ", ".join(arg_strings), "\n\n".join(args_def)
 
@@ -109,7 +114,7 @@ def render_function(
     arg_names = [a["name"] for a in arguments]
     args, args_def = _parse_arguments(arguments)
     return_type_name, return_type_def = _get_type(return_type)  # type: ignore
-    data = "{" + ", ".join([f"'{arg}': {arg}" for arg in arg_names]) + "}"
+    data = "{" + ", ".join([f"'{arg}': {_parseArgName(arg)}" for arg in arg_names]) + "}"
     if return_type_def == "str":
         return_action = "resp.text"
     else:
