@@ -4,7 +4,7 @@ from .generate import generate
 from .function_cli import function_add_or_update
 
 
-CLI_COMMANDS = ["generate", "help", "function"]
+CLI_COMMANDS = ["generate", "function", "help"]
 
 
 def execute_from_cli():
@@ -20,7 +20,7 @@ def execute_from_cli():
     command = args.command
 
     if command == "help":
-        print("Use `python3 -m polyapi generate` to generate the PolyAPI library.")
+        parser.print_help()
     elif command == "generate":
         print("Generating...")
         generate()

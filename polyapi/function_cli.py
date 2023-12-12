@@ -1,3 +1,4 @@
+import argparse
 import requests
 from polyapi.config import get_api_key_and_url
 
@@ -7,9 +8,13 @@ def function_add_or_update(context, description, server, subcommands):
     print(description)
     print(server)
     print(subcommands)
-    # parser.add_argument("subcommand", choices=["add"], nargs="?", default="")
-    # parser.add_argument("function_name", nargs="?", default="")
-    # parser.add_argument("filename", nargs="?", default="")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("subcommand", choices=["add"])
+    parser.add_argument("function_name")
+    parser.add_argument("filename")
+    args = parser.parse_args(subcommands)
+    print(args)
     return
 
     base_url, key = get_api_key_and_url()
