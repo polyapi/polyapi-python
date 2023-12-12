@@ -2,20 +2,20 @@ import requests
 from polyapi.config import get_api_key_and_url
 
 
-def _parse_arguments(*args):
-    return args
+def function_add_or_update(context, description, server, subcommands):
+    print(context)
+    print(description)
+    print(server)
+    print(subcommands)
+    # parser.add_argument("subcommand", choices=["add"], nargs="?", default="")
+    # parser.add_argument("function_name", nargs="?", default="")
+    # parser.add_argument("filename", nargs="?", default="")
+    return
 
-
-def function_add_or_update(*args):
-    if not args or not args[0] == "add":
-        print(
-            "Please provide a subcommand. The only available subcommand is 'add' currently, which can be used to both add and update."
-        )
-        exit(1)
-    data = _parse_arguments(*args)
     base_url, key = get_api_key_and_url()
     base_url = "https://example.com"  # hack for testing
     # TODO add key
+    data = {}
     resp = requests.post(f"{base_url}/functions", json=data)
     if resp.status_code == 200:
         print("Function added successfully.")
