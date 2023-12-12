@@ -1,6 +1,6 @@
 [project]
 name = "polyapi"
-version = "0.0.2"
+version = "0.0.6"
 description = "The PolyAPI Python Client"
 dependencies = ["requests", "typing_extensions", "jsonschema-gentypes"]
 readme = "README.md"

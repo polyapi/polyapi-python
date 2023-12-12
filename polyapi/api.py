@@ -10,7 +10,7 @@ TEMPLATE_FUNCTION_TYPE_MAP = {
     "serverFunction": "server",
 }
 
-TEMPLATE = """
+SERVER_TEMPLATE = """
 import requests
 from typing import List, Dict, Any
 from polyapi.config import get_api_key_and_url
@@ -26,6 +26,30 @@ def {function_name}({args}) -> {return_type_name}:
     if resp.status_code != 200 and resp.status_code != 201:
         raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
     return {return_action}
+"""
+
+API_TEMPLATE = """
+import requests
+from typing import List, Dict, Any, TypedDict
+from polyapi.config import get_api_key_and_url
+from polyapi.exceptions import PolyApiException
+{args_def}
+{return_type_def}
+class ApiFunctionResponse(TypedDict):
+    status: int
+    headers: Dict
+    data: {return_type_name}
+
+
+def {function_name}({args}) -> ApiFunctionResponse:
+    api_key, api_url = get_api_key_and_url()
+    headers = {{"Authorization": f"Bearer {{api_key}}"}}
+    url = f"{{api_url}}/functions/{function_type}/{function_id}/execute"
+    data = {data}
+    resp = requests.post(url, data=data, headers=headers)
+    if resp.status_code != 200 and resp.status_code != 201:
+        raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
+    return ApiFunctionResponse(resp.json())
 """
 
 
@@ -63,10 +87,19 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
             title = schema.get("title", "").title()
             if not title:
                 # fallback to schema $ref name if no explicit title
-                title = schema["items"].get("$ref", "")
-                assert title
-                title = title.rsplit("/", 1)[-1].title()
-                title = f'List[{title}]'
+                items = schema.get("items")
+                if not items:
+                    # TODO fix this, key 5ce on develop has something that doesnt have items
+                    # figure out what it is and fix!
+                    return "Any", ""
+
+                title = items.get("$ref", "")
+                if title:
+                    title = title.rsplit("/", 1)[-1].title()
+                    title = f'List[{title}]'
+                else:
+                    # TODO figure out what the title should really be here!
+                    title = "Any"
             return title, generate_schema_types(schema)  # type: ignore
         else:
             return "Dict", ""
@@ -76,6 +109,11 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
         return "Any", ""
 
 
+def _parseArgName(name: str) -> str:
+    # HACK this should be snakeCase like Node client
+    return name.replace("-", "_")
+
+
 def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
     args_def = []
     arg_strings = []
@@ -83,6 +121,9 @@ def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
         arg_type, arg_def = _get_type(a["type"])
         if arg_def:
             args_def.append(arg_def)
+        if "-" in a['name']:
+            a['name'] = _parseArgName(a['name'])
+            # arg_type = "Any"
         arg_strings.append(f"{a['name']}: {arg_type}")
     return ", ".join(arg_strings), "\n\n".join(args_def)
 
@@ -97,23 +138,34 @@ def render_function(
     arg_names = [a["name"] for a in arguments]
     args, args_def = _parse_arguments(arguments)
     return_type_name, return_type_def = _get_type(return_type)  # type: ignore
-    data = "{" + ", ".join([f"'{arg}': {arg}" for arg in arg_names]) + "}"
-    if return_type_def == "str":
-        return_action = "resp.text"
+    data = "{" + ", ".join([f"'{arg}': {_parseArgName(arg)}" for arg in arg_names]) + "}"
+    if function_type == "apiFunction":
+        rendered = API_TEMPLATE.format(
+            function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
+            function_name=function_name,
+            function_id=function_id,
+            args=args,
+            args_def=args_def,
+            return_type_name=return_type_name,
+            return_type_def=return_type_def,
+            data=data,
+        )
     else:
-        return_action = "resp.json()"
-
-    rendered = TEMPLATE.format(
-        function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
-        function_name=function_name,
-        function_id=function_id,
-        args=args,
-        args_def=args_def,
-        return_type_name=return_type_name,
-        return_type_def=return_type_def,
-        return_action=return_action,
-        data=data,
-    )
+        if return_type_def == "str":
+            return_action = "resp.text"
+        else:
+            return_action = "resp.json()"
+        rendered = SERVER_TEMPLATE.format(
+            function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
+            function_name=function_name,
+            function_id=function_id,
+            args=args,
+            args_def=args_def,
+            return_type_name=return_type_name,
+            return_type_def=return_type_def,
+            return_action=return_action,
+            data=data,
+        )
     return rendered
 
 
