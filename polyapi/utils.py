@@ -9,3 +9,7 @@ def append_init(full_path: str, next: str) -> None:
         lines = f.readlines()
         if import_stmt not in set(lines):
             f.write(import_stmt)
+
+
+def get_auth_headers(api_key: str):
+    return {"Authorization": f"Bearer {api_key}"}
