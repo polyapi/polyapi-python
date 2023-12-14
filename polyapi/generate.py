@@ -3,7 +3,8 @@ import os
 import shutil
 from typing import Any, Dict, List, Tuple
 
-from polyapi.typedefs import PropertySpecification
+from .typedefs import PropertySpecification
+from .utils import get_auth_headers
 from .api import generate_api
 from .variables import generate_variables
 from .config import get_api_key_and_url, initialize_config
@@ -11,7 +12,8 @@ from .config import get_api_key_and_url, initialize_config
 
 def get_specs() -> List:
     api_key, api_url = get_api_key_and_url()
-    headers = {"Authorization": f"Bearer {api_key}"}
+    assert api_key
+    headers = get_auth_headers(api_key)
     url = f"{api_url}/specs"
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:

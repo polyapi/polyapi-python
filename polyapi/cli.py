@@ -1,18 +1,28 @@
 import sys
+import argparse
 from .generate import generate
+from .function_cli import function_add_or_update
+
+
+CLI_COMMANDS = ["generate", "function", "help"]
 
 
 def execute_from_cli():
-    try:
-        subcommand = sys.argv[1]
-    except IndexError:
-        subcommand = "help"  # Display help if no arguments were given.
+    parser = argparse.ArgumentParser(
+        prog="python -m polyapi", description="PolyAPI Client"
+    )
+    parser.add_argument("--context", required=False, default="")
+    parser.add_argument("--description", required=False, default="")
+    parser.add_argument("--server", action="store_true")
+    parser.add_argument("command", choices=CLI_COMMANDS)
+    parser.add_argument("subcommands", nargs="*")
+    args = parser.parse_args()
+    command = args.command
 
-    if subcommand == "help":
-        print("Use `python3 -m polyapi generate` to generate the PolyAPI library.")
-    elif subcommand == "generate":
+    if command == "help":
+        parser.print_help()
+    elif command == "generate":
         print("Generating...")
         generate()
-    else:
-        print("Invalid command {subcommand}. Available commands are 'generate' and 'help'.")
-        exit(1)
+    elif command == "function":
+        function_add_or_update(args.context, args.description, args.server, args.subcommands)
