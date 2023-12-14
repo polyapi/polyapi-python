@@ -6,11 +6,6 @@ from polyapi.utils import get_auth_headers
 
 
 def function_add_or_update(context: str, description: str, server: bool, subcommands: List):
-    print(context)
-    print(description)
-    print(server)
-    print(subcommands)
-
     parser = argparse.ArgumentParser()
     parser.add_argument("subcommand", choices=["add"])
     parser.add_argument("function_name")
