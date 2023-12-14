@@ -20,6 +20,7 @@ def function_add_or_update(context: str, description: str, server: bool, subcomm
     with open(args.filename, "r") as f:
         code = f.read()
 
+    # OK! let's parse the code and generate the arguments
     data = {
         "context": context,
         "name": args.function_name,
