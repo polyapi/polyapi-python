@@ -22,7 +22,7 @@ def {function_name}({args}) -> {return_type_name}:
     headers = {{"Authorization": f"Bearer {{api_key}}"}}
     url = f"{{api_url}}/functions/{function_type}/{function_id}/execute"
     data = {data}
-    resp = requests.post(url, data=data, headers=headers)
+    resp = requests.post(url, json=data, headers=headers)
     if resp.status_code != 200 and resp.status_code != 201:
         raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
     return {return_action}
