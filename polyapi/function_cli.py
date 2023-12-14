@@ -9,6 +9,12 @@ from polyapi.utils import get_auth_headers
 
 
 def _get_jsonschema_type(python_type: str):
+    if python_type.startswith("List"):
+        return "array"
+
+    if python_type.startswith("Dict"):
+        return "object"
+
     return PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(python_type, "any")
 
 
