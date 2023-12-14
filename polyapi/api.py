@@ -1,5 +1,6 @@
 import os
 from typing import Any, Dict, List, Tuple
+from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 from polyapi.typedefs import PropertySpecification, PropertyType
 from polyapi.utils import append_init
 from polyapi.schema import generate_schema_types
@@ -53,17 +54,9 @@ def {function_name}({args}) -> ApiFunctionResponse:
 """
 
 
-PRIMITIVE_TYPE_MAP = {
-    "integer": "int",
-    "number": "float",
-    "string": "str",
-    "boolean": "bool",
-}
-
-
 def _map_primitive_types(type_: str) -> str:
     # Define your mapping logic here
-    return PRIMITIVE_TYPE_MAP.get(type_, "Any")
+    return JSONSCHEMA_TO_PYTHON_TYPE_MAP.get(type_, "Any")
 
 
 def _get_type(type_spec: PropertyType) -> Tuple[str, str]:

@@ -1,26 +1,43 @@
 import ast
 import argparse
+import sys
 from typing import List
 import requests
 from polyapi.config import get_api_key_and_url
+from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
 from polyapi.utils import get_auth_headers
 
 
-def _get_arg_type(arg: str):
-    arg_type = "integer"  # todo infer type from function signature
-    return arg_type
+def _get_jsonschema_type(python_type: str):
+    return PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(python_type, "any")
 
 
 def _get_arguments_from_ast(parsed_code: ast.AST, function_name: str):
     # Iterate over every function in the AST
     for node in ast.iter_child_nodes(parsed_code):
         if isinstance(node, ast.FunctionDef) and node.name == function_name:
-            function_args = [arg.arg for arg in node.args.args]
-            # import ipdb; ipdb.set_trace()
-            return [{"key": arg, "name": arg, "type": _get_arg_type(arg)} for arg in function_args]
+            function_args = [arg for arg in node.args.args]
+            rv = []
+            for arg in function_args:
+                rv.append(
+                    {
+                        "key": arg.arg,
+                        "name": arg.arg,
+                        "type": _get_jsonschema_type(getattr(arg.annotation, "id", "any")),
+                    }
+                )
+            return rv
+
+    # if we get here, we didn't find the function
+    print(
+        f"Error: function named {function_name} not found as top-level function in file. Exiting."
+    )
+    sys.exit(1)
 
 
-def function_add_or_update(context: str, description: str, server: bool, subcommands: List):
+def function_add_or_update(
+    context: str, description: str, server: bool, subcommands: List
+):
     parser = argparse.ArgumentParser()
     parser.add_argument("subcommand", choices=["add"])
     parser.add_argument("function_name")
@@ -44,7 +61,7 @@ def function_add_or_update(context: str, description: str, server: bool, subcomm
         "returnType": None,
         "returnTypeSchema": {},
         "arguments": arguments,
-        "logsEnabled": None
+        "logsEnabled": None,
     }
 
     api_key, api_url = get_api_key_and_url()
@@ -65,4 +82,4 @@ def function_add_or_update(context: str, description: str, server: bool, subcomm
         print("Error adding function.")
         print(resp.status_code)
         print(resp.content)
-        exit(1)
+        sys.exit(1)
