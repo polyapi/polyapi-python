@@ -70,7 +70,7 @@ So that you can see your new function in your library!
 To upgrade your library to the latest version, pass the upgrade flag.:
 
 ```bash
-pip3 install git+https://github.com/polyapi/polyapi-python.git --upgrade
+pip install git+https://github.com/polyapi/polyapi-python.git --upgrade
 ```
 
 ## Unit Tests
