@@ -1,5 +1,6 @@
-import configparser
+import sys
 import os
+import configparser
 from typing import Tuple
 
 # cached values
@@ -62,6 +63,6 @@ def initialize_config():
 
     if not key or not url:
         print("Poly API Key and Poly API Base URL are required.")
-        exit(1)
+        sys.exit(1)
 
     return key, url

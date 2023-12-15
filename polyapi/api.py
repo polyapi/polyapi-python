@@ -1,5 +1,6 @@
 import os
 from typing import Any, Dict, List, Tuple
+from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 from polyapi.typedefs import PropertySpecification, PropertyType
 from polyapi.utils import append_init
 from polyapi.schema import generate_schema_types
@@ -22,7 +23,7 @@ def {function_name}({args}) -> {return_type_name}:
     headers = {{"Authorization": f"Bearer {{api_key}}"}}
     url = f"{{api_url}}/functions/{function_type}/{function_id}/execute"
     data = {data}
-    resp = requests.post(url, data=data, headers=headers)
+    resp = requests.post(url, json=data, headers=headers)
     if resp.status_code != 200 and resp.status_code != 201:
         raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
     return {return_action}
@@ -53,17 +54,9 @@ def {function_name}({args}) -> ApiFunctionResponse:
 """
 
 
-PRIMITIVE_TYPE_MAP = {
-    "integer": "int",
-    "number": "float",
-    "string": "str",
-    "boolean": "bool",
-}
-
-
 def _map_primitive_types(type_: str) -> str:
     # Define your mapping logic here
-    return PRIMITIVE_TYPE_MAP.get(type_, "Any")
+    return JSONSCHEMA_TO_PYTHON_TYPE_MAP.get(type_, "Any")
 
 
 def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
@@ -73,12 +66,16 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
         return _map_primitive_types(type_spec["type"]), ""
     elif type_spec["kind"] == "array":
         # TODO needs to be more general
-        if type_spec["items"].get("$ref"):
-            return "Responsetype", generate_schema_types(type_spec)  # type: ignore
+        if type_spec.get("items"):
+            items = type_spec["items"]
+            if items.get("$ref"):
+                return "Responsetype", generate_schema_types(type_spec)  # type: ignore
+            else:
+                item_type, _ = _get_type(items)
+                return_type = f"List[{item_type}]"
+                return return_type, ""
         else:
-            item_type, _ = _get_type(type_spec["items"])
-            return_type = f"List[{item_type}]"
-            return return_type, ""
+            return "List", ""
     elif type_spec["kind"] == "void":
         return "None", ""
     elif type_spec["kind"] == "object":
@@ -87,7 +84,8 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
             title = schema.get("title", "").title()
             if not title:
                 # fallback to schema $ref name if no explicit title
-                items = schema.get("items")
+                # TODO fix type
+                items = schema.get("items")  # type: ignore
                 if not items:
                     # TODO fix this, key 5ce on develop has something that doesnt have items
                     # figure out what it is and fix!
