@@ -9,7 +9,7 @@ The PolyAPI Python Library lets you use and define PolyAPI functions using Pytho
 First install the client:
 
 ```bash
-pip install git+https://github.com/polyapi/polyapi-python.git
+pip install polyapi-python
 ```
 
 ### 2. Generate Your Functions
@@ -70,7 +70,7 @@ So that you can see your new function in your library!
 To upgrade your library to the latest version, pass the upgrade flag.:
 
 ```bash
-pip install git+https://github.com/polyapi/polyapi-python.git --upgrade
+pip install polyapi-python --upgrade
 ```
 
 ## Unit Tests
