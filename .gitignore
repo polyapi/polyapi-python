@@ -2,6 +2,10 @@
 .env*
 .DS_Store
 
+# Pip
+dist/
+polyapi_python.egg-info/
+
 # IDEs and editors
 /.idea
 .project
