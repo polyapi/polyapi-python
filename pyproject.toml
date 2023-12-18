@@ -1,6 +1,12 @@
 [project]
-name = "polyapi"
+name = "polyapi-python"
 version = "0.0.10"
 description = "The PolyAPI Python Client"
+authors = [{ name = "Dan Fellin", email = "dan@polyapi.io" }]
 dependencies = ["requests", "typing_extensions", "jsonschema-gentypes"]
 readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/polyapi/polyapi-python"
