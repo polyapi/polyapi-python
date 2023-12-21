@@ -67,7 +67,7 @@ def function_add_or_update(
         "returnType": None,
         "returnTypeSchema": {},
         "arguments": arguments,
-        "logsEnabled": None,
+        "logsEnabled": True,
     }
 
     api_key, api_url = get_api_key_and_url()
