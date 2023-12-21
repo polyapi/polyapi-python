@@ -13,7 +13,8 @@ def execute_from_cli():
     )
     parser.add_argument("--context", required=False, default="")
     parser.add_argument("--description", required=False, default="")
-    parser.add_argument("--server", action="store_true")
+    parser.add_argument("--server", action="store_true", help="Pass --server if you want this to be a server function. By default, it will be a client function.")
+    parser.add_argument("--logs", action="store_true", help="Pass --logs if you want to store and see the logs from this function executing")
     parser.add_argument("command", choices=CLI_COMMANDS)
     parser.add_argument("subcommands", nargs="*")
     args = parser.parse_args()
@@ -25,4 +26,4 @@ def execute_from_cli():
         print("Generating...")
         generate()
     elif command == "function":
-        function_add_or_update(args.context, args.description, args.server, args.subcommands)
+        function_add_or_update(args.context, args.description, args.server, args.logs, args.subcommands)

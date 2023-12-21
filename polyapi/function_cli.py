@@ -42,7 +42,7 @@ def _get_arguments_from_ast(parsed_code: ast.AST, function_name: str):
 
 
 def function_add_or_update(
-    context: str, description: str, server: bool, subcommands: List
+    context: str, description: str, server: bool, logs_enabled: bool, subcommands: List
 ):
     parser = argparse.ArgumentParser()
     parser.add_argument("subcommand", choices=["add"])
@@ -67,7 +67,7 @@ def function_add_or_update(
         "returnType": None,
         "returnTypeSchema": {},
         "arguments": arguments,
-        "logsEnabled": True,
+        "logsEnabled": logs_enabled,
     }
 
     api_key, api_url = get_api_key_and_url()
