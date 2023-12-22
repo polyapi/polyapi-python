@@ -150,13 +150,13 @@ def render_function(
             data=data,
         )
     else:
-        if return_type_def == "str":
+        if return_type_name == "str":
             return_action = "resp.text"
-        elif return_type_def == "int":
+        elif return_type_name == "int":
             return_action = "int(resp.text.replace('(int) ', ''))"
-        elif return_type_def == "float":
+        elif return_type_name == "float":
             return_action = "float(resp.text.replace('(float) ', ''))"
-        elif return_type_def == "bool":
+        elif return_type_name == "bool":
             return_action = "False if resp.text == 'False' else True"
         else:
             return_action = "resp.json()"
