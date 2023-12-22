@@ -26,6 +26,7 @@ def {function_name}({args}) -> {return_type_name}:
     resp = requests.post(url, json=data, headers=headers)
     if resp.status_code != 200 and resp.status_code != 201:
         raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
+
     return {return_action}
 """
 
@@ -151,6 +152,12 @@ def render_function(
     else:
         if return_type_def == "str":
             return_action = "resp.text"
+        elif return_type_def == "int":
+            return_action = "int(resp.text.replace('(int) ', ''))"
+        elif return_type_def == "float":
+            return_action = "float(resp.text.replace('(float) ', ''))"
+        elif return_type_def == "bool":
+            return_action = "False if resp.text == 'False' else True"
         else:
             return_action = "resp.json()"
         rendered = SERVER_TEMPLATE.format(

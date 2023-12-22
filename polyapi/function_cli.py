@@ -18,21 +18,25 @@ def _get_jsonschema_type(python_type: str):
     return PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(python_type, "any")
 
 
-def _get_arguments_from_ast(parsed_code: ast.AST, function_name: str):
+def _get_args_and_return_type_from_ast(parsed_code: ast.AST, function_name: str):
     # Iterate over every function in the AST
     for node in ast.iter_child_nodes(parsed_code):
         if isinstance(node, ast.FunctionDef) and node.name == function_name:
             function_args = [arg for arg in node.args.args]
-            rv = []
+            parsed_args = []
             for arg in function_args:
-                rv.append(
+                parsed_args.append(
                     {
                         "key": arg.arg,
                         "name": arg.arg,
-                        "type": _get_jsonschema_type(getattr(arg.annotation, "id", "any")),
+                        "type": _get_jsonschema_type(getattr(arg.annotation, "id", "Any")),
                     }
                 )
-            return rv
+            if node.returns:
+                return_type = _get_jsonschema_type(getattr(node.returns, "id", "Any"))
+            else:
+                return_type = "Any"
+            return parsed_args, return_type
 
     # if we get here, we didn't find the function
     print(
@@ -55,7 +59,7 @@ def function_add_or_update(
 
     # OK! let's parse the code and generate the arguments
     code_ast = ast.parse(code)
-    arguments = _get_arguments_from_ast(code_ast, args.function_name)
+    arguments, return_type = _get_args_and_return_type_from_ast(code_ast, args.function_name)
 
     data = {
         "context": context,
@@ -63,9 +67,9 @@ def function_add_or_update(
         "description": description,
         "code": code,
         "language": "python",
-        "typeSchemas": {},
-        "returnType": None,
-        "returnTypeSchema": {},
+        "typeSchemas": None,
+        "returnType": return_type,
+        "returnTypeSchema": None,
         "arguments": arguments,
         "logsEnabled": logs_enabled,
     }
