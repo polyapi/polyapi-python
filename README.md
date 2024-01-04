@@ -6,7 +6,21 @@ The PolyAPI Python Library lets you use and define PolyAPI functions using Pytho
 
 ### 1. Install Libraries
 
-First install the client:
+First install the client.
+
+We recommend the use of venv so you can have multiple projects each with separate credentials:
+
+```bash
+python -m venv myvenv
+source myvenv/bin/activate
+pip install polyapi-python
+```
+
+Replace `myvenv` with whatever you'd like your venv to be named!
+
+For more on Python virtual environments, we recommend this [venv primer](https://realpython.com/python-virtual-environments-a-primer/).
+
+However, if you only need to use polyapi with a single project, you can do a basic install:
 
 ```bash
 pip install polyapi-python
