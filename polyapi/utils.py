@@ -1,3 +1,4 @@
+import re
 import os
 
 
@@ -13,3 +14,8 @@ def append_init(full_path: str, next: str) -> None:
 
 def get_auth_headers(api_key: str):
     return {"Authorization": f"Bearer {api_key}"}
+
+
+def camelCase(s):
+    s = re.sub(r"(_|-)+", " ", s).title().replace(" ", "")
+    return ''.join([s[0].lower(), s[1:]])
