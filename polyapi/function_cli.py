@@ -1,24 +1,43 @@
 import ast
+import types
 import argparse
 import sys
 from typing import List
 import requests
+from pydantic import BaseModel
 from polyapi.config import get_api_key_and_url
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
 from polyapi.utils import get_auth_headers
 
 
-def _get_jsonschema_type(python_type: str):
+def _get_jsonschema_type(python_type: str, code: str):
+    if python_type == "Any":
+        return "Any"
+
     if python_type.startswith("List"):
+        # TODO do some stuff on items?
         return "array"
 
     if python_type.startswith("Dict"):
         return "object"
 
-    return PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(python_type, "any")
+    # TODO find the matching type in the code and recursively turn it into JSONSchema?
+
+    rv = PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(python_type)
+    if rv:
+        return rv
+
+    user_code = types.SimpleNamespace()
+    exec(code, user_code.__dict__)
+    type_obj = getattr(user_code, python_type, None)
+    if type_obj and issubclass(type_obj, BaseModel):
+        return type_obj.model_json_schema()
+    else:
+        return "Any"
 
 
 def _get_args_and_return_type_from_code(code: str, function_name: str):
+    return_type_schema = None
     parsed_code = ast.parse(code)
     # Iterate over every function in the AST
     for node in ast.iter_child_nodes(parsed_code):
@@ -30,14 +49,15 @@ def _get_args_and_return_type_from_code(code: str, function_name: str):
                     {
                         "key": arg.arg,
                         "name": arg.arg,
-                        "type": _get_jsonschema_type(getattr(arg.annotation, "id", "Any")),
+                        "type": _get_jsonschema_type(getattr(arg.annotation, "id", "Any"), code),
                     }
                 )
             if node.returns:
-                return_type = _get_jsonschema_type(getattr(node.returns, "id", "Any"))
+                return_type_schema = _get_jsonschema_type(getattr(node.returns, "id", "Any"), code)
+                return_type = "object"
             else:
                 return_type = "Any"
-            return parsed_args, return_type
+            return parsed_args, return_type, return_type_schema
 
     # if we get here, we didn't find the function
     print(
@@ -59,7 +79,7 @@ def function_add_or_update(
         code = f.read()
 
     # OK! let's parse the code and generate the arguments
-    arguments, return_type = _get_args_and_return_type_from_code(code, args.function_name)
+    arguments, return_type, return_type_schema = _get_args_and_return_type_from_code(code, args.function_name)
 
     data = {
         "context": context,
@@ -69,7 +89,7 @@ def function_add_or_update(
         "language": "python",
         "typeSchemas": None,
         "returnType": return_type,
-        "returnTypeSchema": None,
+        "returnTypeSchema": return_type_schema,
         "arguments": arguments,
         "logsEnabled": logs_enabled,
     }
