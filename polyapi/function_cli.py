@@ -18,7 +18,8 @@ def _get_jsonschema_type(python_type: str):
     return PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(python_type, "any")
 
 
-def _get_args_and_return_type_from_ast(parsed_code: ast.AST, function_name: str):
+def _get_args_and_return_type_from_code(code: str, function_name: str):
+    parsed_code = ast.parse(code)
     # Iterate over every function in the AST
     for node in ast.iter_child_nodes(parsed_code):
         if isinstance(node, ast.FunctionDef) and node.name == function_name:
@@ -58,8 +59,7 @@ def function_add_or_update(
         code = f.read()
 
     # OK! let's parse the code and generate the arguments
-    code_ast = ast.parse(code)
-    arguments, return_type = _get_args_and_return_type_from_ast(code_ast, args.function_name)
+    arguments, return_type = _get_args_and_return_type_from_code(code, args.function_name)
 
     data = {
         "context": context,
