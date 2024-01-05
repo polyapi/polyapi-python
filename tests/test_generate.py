@@ -164,7 +164,7 @@ class T(unittest.TestCase):
         )
         self.assertIn(ACCUWEATHER["id"], func_str)
         self.assertIn("locationId: int,", func_str)
-        self.assertIn("-> None", func_str)
+        self.assertIn("-> ApiFunctionResponse", func_str)
 
     def test_render_function_zillow(self):
         func_str = render_function(
@@ -176,7 +176,7 @@ class T(unittest.TestCase):
         )
         self.assertIn(ZILLOW["id"], func_str)
         self.assertIn("locationId: int,", func_str)
-        self.assertIn("-> str", func_str)
+        self.assertIn("-> ApiFunctionResponse", func_str)
 
     def test_render_function_twilio(self):
         func_str = render_function(
@@ -189,7 +189,7 @@ class T(unittest.TestCase):
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
-        self.assertIn("-> Responsetype", func_str)
+        self.assertIn("-> ApiFunctionResponse", func_str)
 
     def test_render_function_get_products_count(self):
         func_str = render_function(
