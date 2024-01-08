@@ -1,4 +1,4 @@
 requests
 typing_extensions
 jsonschema-gentypes
-pydantic
+pydantic>=2.5.3
