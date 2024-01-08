@@ -25,9 +25,15 @@ def _get_jsonschema_type(python_type: str):
         return "Any"
 
     if python_type.startswith("List"):
-        # TODO do some stuff on items?
-        # actually the schema should handle this right?
-        return "array"
+        if python_type.startswith("List["):
+            # we've specified the subtype, lets return it!
+            slice = python_type[5:-1]
+            return {
+                "type": "array",
+                "items": {"$ref": f"#/definitions/{slice}"}
+            }
+        else:
+            return "array"
 
     if python_type.startswith("Dict"):
         return "object"
@@ -41,7 +47,18 @@ def _get_jsonschema_type(python_type: str):
 
 
 def get_python_type_from_ast(expr: ast.expr | None) -> str:
-    return getattr(expr, "id", "Any")
+    if isinstance(expr, ast.Name):
+        return str(expr.id)
+    elif isinstance(expr, ast.Subscript):
+        assert isinstance(expr, ast.Subscript)
+        name = getattr(expr.value, "id", "")
+        if name == "List":
+            slice = getattr(expr.slice, "id", "Any")
+            return f"List[{slice}]"
+        return "Any"
+    else:
+        return "Any"
+
 
 
 def _get_args_and_return_type_from_code(code: str, function_name: str):

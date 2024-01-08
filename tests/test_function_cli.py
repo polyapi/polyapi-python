@@ -74,5 +74,4 @@ class T(unittest.TestCase):
         args, arg_schemas, return_type, return_type_schema = _get_args_and_return_type_from_code(LIST_COMPLEX_RETURN_TYPE, "foobar")
         self.assertEqual(len(args), 1)
         self.assertEqual(args[0], {"key": "n", "name": "n", "type": "integer"})
-        self.assertEqual(return_type, "Barbar")
-        self.assertEqual(return_type_schema['title'], "List[Barbar]")
+        self.assertEqual(return_type['items'], {"$ref": "#/definitions/Barbar"})
