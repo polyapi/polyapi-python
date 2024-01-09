@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict, List, Tuple
 from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 from polyapi.typedefs import PropertySpecification, PropertyType
-from polyapi.utils import append_init
+from polyapi.utils import append_init, camelCase
 from polyapi.schema import generate_schema_types
 
 # map the function type from the spec type to the function execute type
@@ -88,7 +88,6 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
                 # TODO fix type
                 items = schema.get("items")  # type: ignore
                 if not items:
-                    # TODO fix this, key 5ce on develop has something that doesnt have items
                     # figure out what it is and fix!
                     return "Any", ""
 
@@ -108,11 +107,6 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
         return "Any", ""
 
 
-def _parseArgName(name: str) -> str:
-    # HACK this should be snakeCase like Node client
-    return name.replace("-", "_")
-
-
 def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
     args_def = []
     arg_strings = []
@@ -121,8 +115,7 @@ def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
         if arg_def:
             args_def.append(arg_def)
         if "-" in a['name']:
-            a['name'] = _parseArgName(a['name'])
-            # arg_type = "Any"
+            a['name'] = camelCase(a["name"])
         arg_strings.append(f"{a['name']}: {arg_type}")
     return ", ".join(arg_strings), "\n\n".join(args_def)
 
@@ -137,7 +130,7 @@ def render_function(
     arg_names = [a["name"] for a in arguments]
     args, args_def = _parse_arguments(arguments)
     return_type_name, return_type_def = _get_type(return_type)  # type: ignore
-    data = "{" + ", ".join([f"'{arg}': {_parseArgName(arg)}" for arg in arg_names]) + "}"
+    data = "{" + ", ".join([f"'{arg}': {camelCase(arg)}" for arg in arg_names]) + "}"
     if function_type == "apiFunction":
         rendered = API_TEMPLATE.format(
             function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],

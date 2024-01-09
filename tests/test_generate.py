@@ -144,7 +144,7 @@ GET_PRODUCTS_COUNT = {
                 },
             }
         ],
-        "returnType": {"kind": "plain", "value": "{ length: number }"},
+        "returnType": {"kind": "plain", "value": "number"},
         "synchronous": True,
     },
     "code": "",
@@ -178,7 +178,7 @@ class T(unittest.TestCase):
         self.assertIn("locationId: int,", func_str)
         self.assertIn("-> ApiFunctionResponse", func_str)
 
-    def test_render_function_twilio(self):
+    def test_render_function_twilio_api(self):
         func_str = render_function(
             TWILIO["type"],
             TWILIO["name"],
@@ -191,18 +191,29 @@ class T(unittest.TestCase):
         self.assertIn("authToken: str", func_str)
         self.assertIn("-> ApiFunctionResponse", func_str)
 
+    def test_render_function_twilio_server(self):
+        # same test but try it as a serverFunction rather than an apiFunction
+        func_str = render_function(
+            "serverFunction",
+            TWILIO["name"],
+            TWILIO["id"],
+            TWILIO["function"]["arguments"],
+            TWILIO["function"]["returnType"],
+        )
+        self.assertIn(TWILIO["id"], func_str)
+        self.assertIn("conversationSID: str", func_str)
+        self.assertIn("authToken: str", func_str)
+        self.assertIn("-> Responsetype", func_str)
+
     def test_render_function_get_products_count(self):
+        return_type = GET_PRODUCTS_COUNT["function"]["returnType"]
         func_str = render_function(
             GET_PRODUCTS_COUNT["type"],
             GET_PRODUCTS_COUNT["name"],
             GET_PRODUCTS_COUNT["id"],
             GET_PRODUCTS_COUNT["function"]["arguments"],
-            GET_PRODUCTS_COUNT["function"]["returnType"],
+            return_type,
         )
         self.assertIn(GET_PRODUCTS_COUNT["id"], func_str)
         self.assertIn("products: List[str]", func_str)
-
-
-    # polyapi/poly/_getProductsCount44.py:19:34: F821 undefined name 'Responsetype'
-    # polyapi/poly/hubspot/companies/_createAdvanced.py:137:70: F821 undefined name 'unknown'
-    # flake8 polyapi/poly/ --extend-ignore="W291,F401,E303,F811,E501,E402"
+        self.assertIn("-> float", func_str)
