@@ -17,26 +17,45 @@ def _get_schemas(code: str) -> List[Dict]:
     user_code = types.SimpleNamespace()
     exec(code, user_code.__dict__)
     for name, obj in user_code.__dict__.items():
-        if isinstance(obj, type) and issubclass(obj, BaseModel) and obj.__name__ != "BaseModel":
+        if (
+            isinstance(obj, type)
+            and issubclass(obj, BaseModel)
+            and obj.__name__ != "BaseModel"
+        ):
             schemas.append(obj.model_json_schema())
     return schemas
+
+
+def _get_list_return_type_schema(
+    python_return_type: str, schemas: List[Dict]
+) -> Dict | str:
+    subtype = python_return_type[5:-1]
+    for schema in schemas:
+        if schema["title"] == subtype:
+            return {"type": "array", "items": schema}
+
+    # subtype somehow not in schema, just call it any
+    return "any[]"
 
 
 def _get_jsonschema_type(python_type: str):
     if python_type == "Any":
         return "Any"
 
-    if python_type == "List" or python_type.startswith("List["):
-        # TODO fix subtypes of lists
-        if False and python_type.startswith("List["):
-            # we've specified the subtype, lets return it!
-            slice = python_type[5:-1]
-            return json.dumps({
-                "type": "array",
-                "items": {"$ref": f"#/definitions/{slice}"}
-            })
+    if python_type == "List":
+        return "array"
+
+    if python_type.startswith("List["):
+        # the actual type will be returned as return_type_schema
+        subtype = python_type[5:-1]
+        if subtype == "Any":
+            return "any[]"
+        elif subtype in ["int", "float", "str", "bool"]:
+            jsonschema_type = PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(subtype)
+            return f"{jsonschema_type}[]"
         else:
-            return "array"
+            # the schema will handle it!
+            return "object"
 
     if python_type.startswith("Dict"):
         return "object"
@@ -63,9 +82,9 @@ def get_python_type_from_ast(expr: ast.expr | None) -> str:
         return "Any"
 
 
-
 def _get_args_and_return_type_from_code(code: str, function_name: str):
     parsed_args = []
+    python_return_type = ""
     return_type = None
     return_type_schema = None
 
@@ -74,19 +93,20 @@ def _get_args_and_return_type_from_code(code: str, function_name: str):
         if isinstance(node, ast.FunctionDef) and node.name == function_name:
             function_args = [arg for arg in node.args.args]
             for arg in function_args:
-                python_type = get_python_type_from_ast(arg.annotation)
+                python_return_type = get_python_type_from_ast(arg.annotation)
                 parsed_args.append(
                     {
                         "key": arg.arg,
                         "name": arg.arg,
-                        "type": _get_jsonschema_type(python_type),
+                        "type": _get_jsonschema_type(python_return_type),
                     }
                 )
             if node.returns:
-                python_type = get_python_type_from_ast(node.returns)
-                return_type = _get_jsonschema_type(python_type)
+                python_return_type = get_python_type_from_ast(node.returns)
+                return_type = _get_jsonschema_type(python_return_type)
             else:
                 return_type = "Any"
+            break
 
     if not return_type:
         print(
@@ -94,14 +114,22 @@ def _get_args_and_return_type_from_code(code: str, function_name: str):
         )
         sys.exit(1)
 
-    arg_schemas = _get_schemas(code)
-    if return_type not in PYTHON_TO_JSONSCHEMA_TYPE_MAP.values():
-        for schema in arg_schemas:
-            if schema["title"] == return_type:
-                return_type_schema = schema
-                break
+    schemas = _get_schemas(code)
+    if return_type.endswith("[]") or return_type == "Any" or return_type in PYTHON_TO_JSONSCHEMA_TYPE_MAP.values():
+        # return type is simple and has no schema
+        pass
+    else:
+        if python_return_type.startswith("List["):
+            return_type_schema = _get_list_return_type_schema(
+                python_return_type, schemas
+            )
+        else:
+            for schema in schemas:
+                if schema["title"] == return_type:
+                    return_type_schema = schema
+                    break
 
-    return parsed_args, arg_schemas, return_type, return_type_schema
+    return parsed_args, schemas, return_type, return_type_schema
 
 
 def function_add_or_update(
@@ -117,7 +145,12 @@ def function_add_or_update(
         code = f.read()
 
     # OK! let's parse the code and generate the arguments
-    arguments, arg_type_schemas, return_type, return_type_schema = _get_args_and_return_type_from_code(code, args.function_name)
+    (
+        arguments,
+        type_schemas,
+        return_type,
+        return_type_schema,
+    ) = _get_args_and_return_type_from_code(code, args.function_name)
 
     data = {
         "context": context,
@@ -125,7 +158,7 @@ def function_add_or_update(
         "description": description,
         "code": code,
         "language": "python",
-        "typeSchemas": arg_type_schemas,
+        "typeSchemas": type_schemas,
         "returnType": return_type,
         "returnTypeSchema": return_type_schema,
         "arguments": arguments,

@@ -62,7 +62,12 @@ def _map_primitive_types(type_: str) -> str:
 
 def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
     if type_spec["kind"] == "plain":
-        return _map_primitive_types(type_spec["value"]), ""
+        value = type_spec["value"]
+        if value.endswith("[]"):
+            primitive = _map_primitive_types(value[:-2])
+            return f"List[{primitive}]", ""
+        else:
+            return _map_primitive_types(value), ""
     elif type_spec["kind"] == "primitive":
         return _map_primitive_types(type_spec["type"]), ""
     elif type_spec["kind"] == "array":
