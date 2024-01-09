@@ -27,6 +27,7 @@ def _get_jsonschema_type(python_type: str):
         return "Any"
 
     if python_type.startswith("List"):
+        # TODO fix subtypes of lists
         if False and python_type.startswith("List["):
             # we've specified the subtype, lets return it!
             slice = python_type[5:-1]
