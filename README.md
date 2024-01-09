@@ -57,7 +57,7 @@ print(poly.polyapi.function.api.list(my_server, my_api_key))
 
 To add a new server function, please follow the quickstart. Then you can add a server function like so:
 
-```
+```bash
 python -m polyapi --context mycontext --description mydesc --server function add <function_name> foo.py
 ```
 
@@ -65,18 +65,28 @@ The code in `foo.py` should contain a single defined function named the same as 
 
 So for example, if you want to add a function named `bar`, your file `foo.py` would look like this:
 
-```
+```python
 def bar():
     return "Hello World"
 ```
 
-Pro-tip: after adding your function, be sure to re-run:
+## Complex Types In Server Functions
 
-```
-python -m polyapi generate
+You can define arbitrarily complex argument and return types using pydantic models.
+
+```python
+from pydantic import BaseModel
+
+
+class Foobar(BaseModel):
+    count: int
+
+
+def myfunc(n: int) -> Foobar:
+    return Foobar(count=n)
 ```
 
-So that you can see your new function in your library!
+Here are the [docs on Pydantic models](https://docs.pydantic.dev/latest/concepts/models/).
 
 
 ## Upgrade
@@ -91,6 +101,6 @@ pip install polyapi-python --upgrade
 
 To run this library's unit tests, please clone the repo then run:
 
-```
+```bash
 python -m unittest discover
 ```
