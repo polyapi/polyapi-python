@@ -1,10 +1,12 @@
 import ast
-import types
 import argparse
+import json
+import types
 import sys
 from typing import Dict, List
 import requests
 from pydantic import BaseModel
+from polyapi.generate import generate
 from polyapi.config import get_api_key_and_url
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
 from polyapi.utils import get_auth_headers
@@ -25,13 +27,13 @@ def _get_jsonschema_type(python_type: str):
         return "Any"
 
     if python_type.startswith("List"):
-        if python_type.startswith("List["):
+        if False and python_type.startswith("List["):
             # we've specified the subtype, lets return it!
             slice = python_type[5:-1]
-            return {
+            return json.dumps({
                 "type": "array",
                 "items": {"$ref": f"#/definitions/{slice}"}
-            }
+            })
         else:
             return "array"
 
@@ -93,7 +95,7 @@ def _get_args_and_return_type_from_code(code: str, function_name: str):
 
     arg_schemas = _get_schemas(code)
     if return_type not in PYTHON_TO_JSONSCHEMA_TYPE_MAP.values():
-        for idx, schema in enumerate(arg_schemas):
+        for schema in arg_schemas:
             if schema["title"] == return_type:
                 return_type_schema = schema
                 break
@@ -128,7 +130,6 @@ def function_add_or_update(
         "arguments": arguments,
         "logsEnabled": logs_enabled,
     }
-
     api_key, api_url = get_api_key_and_url()
     assert api_key
     if server:
@@ -143,6 +144,8 @@ def function_add_or_update(
     if resp.status_code == 201:
         function_id = resp.json()["id"]
         print(f"Function added successfully. Function id is {function_id}")
+        print("Regenerating library...")
+        generate()
     else:
         print("Error adding function.")
         print(resp.status_code)

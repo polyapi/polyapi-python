@@ -88,7 +88,6 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
                 # TODO fix type
                 items = schema.get("items")  # type: ignore
                 if not items:
-                    # TODO fix this, key 5ce on develop has something that doesnt have items
                     # figure out what it is and fix!
                     return "Any", ""
 
