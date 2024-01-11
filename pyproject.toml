@@ -1,6 +1,6 @@
 [project]
 name = "polyapi-python"
-version = "0.0.14"
+version = "0.0.15"
 description = "The PolyAPI Python Client"
 authors = [{ name = "Dan Fellin", email = "dan@polyapi.io" }]
 dependencies = ["requests", "typing_extensions", "jsonschema-gentypes", "pydantic>=2.5.3"]

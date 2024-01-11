@@ -72,22 +72,21 @@ def bar():
 
 ## Complex Types In Server Functions
 
-You can define arbitrarily complex argument and return types using pydantic models.
+You can define arbitrarily complex argument and return types using TypedDicts.
+
+NOTE: you must use `TypedDict` from `typing_extensions`, not from the base `typing` module.
 
 ```python
-from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 
-class Foobar(BaseModel):
+class Foobar(TypedDict):
     count: int
 
 
 def myfunc(n: int) -> Foobar:
     return Foobar(count=n)
 ```
-
-Here are the [docs on Pydantic models](https://docs.pydantic.dev/latest/concepts/models/).
-
 
 ## Upgrade
 
