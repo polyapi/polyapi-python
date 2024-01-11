@@ -89,8 +89,13 @@ def generate() -> None:
     if functions:
         generate_api(functions)
     else:
-        print("No functions seem to exist in this tenant! Please add some functions and try again.")
-        sys.exit(1)
+
+        full_path = os.path.dirname(os.path.abspath(__file__))
+        full_path = os.path.join(full_path, "poly")
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
+        print("No functions exist yet in this tenant! Empty library initialized. Let's add some functions!")
+        exit()
 
     variables = get_variables_and_parse()
     if variables:
