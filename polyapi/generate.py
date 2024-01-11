@@ -89,7 +89,6 @@ def generate() -> None:
     if functions:
         generate_api(functions)
     else:
-
         full_path = os.path.dirname(os.path.abspath(__file__))
         full_path = os.path.join(full_path, "poly")
         if not os.path.exists(full_path):

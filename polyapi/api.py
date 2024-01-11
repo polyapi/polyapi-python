@@ -150,6 +150,8 @@ def render_function(
     else:
         if return_type_name == "str":
             return_action = "resp.text"
+        elif return_type_name == "Any":
+            return_action = "resp.text"
         elif return_type_name == "int":
             return_action = "int(resp.text.replace('(int) ', ''))"
         elif return_type_name == "float":
