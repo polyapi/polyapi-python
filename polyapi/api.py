@@ -96,7 +96,10 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
                     # figure out what it is and fix!
                     return "Any", ""
 
-                title = items.get("$ref", "")
+                title = items.get("title")
+                if not title:
+                    # title is actually a reference to another schema
+                    title = items.get("$ref", "")
                 if title:
                     title = title.rsplit("/", 1)[-1].title()
                     title = f'List[{title}]'
