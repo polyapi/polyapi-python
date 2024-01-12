@@ -13,14 +13,19 @@ from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
 from polyapi.utils import get_auth_headers
 
 
+# these libraries are already installed in the base docker image
+# and shouldnt be included in additional requirements
+ALREADY_INSTALLED = {"requests", "typing_extensions", "jsonschema-gentypes", "pydantic"}
+
+
 def _get_schemas(code: str) -> List[Dict]:
     schemas = []
     user_code = types.SimpleNamespace()
     exec(code, user_code.__dict__)
     for name, obj in user_code.__dict__.items():
         if (
-            isinstance(obj, type) and
-            isinstance(obj, _TypedDictMeta)
+            isinstance(obj, type)
+            and isinstance(obj, _TypedDictMeta)
             and name != "TypedDict"
         ):
             schemas.append(TypeAdapter(obj).json_schema())
@@ -94,7 +99,6 @@ def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[str, Dict | N
     return json_type, _get_type_schema(json_type, python_type, schemas)
 
 
-
 def _get_args_and_return_type_from_code(code: str, function_name: str):
     parsed_args = []
     return_type = None
@@ -104,6 +108,10 @@ def _get_args_and_return_type_from_code(code: str, function_name: str):
 
     parsed_code = ast.parse(code)
     for node in ast.iter_child_nodes(parsed_code):
+        import ipdb
+
+        ipdb.set_trace()
+
         if isinstance(node, ast.FunctionDef) and node.name == function_name:
             function_args = [arg for arg in node.args.args]
             for arg in function_args:
@@ -127,7 +135,6 @@ def _get_args_and_return_type_from_code(code: str, function_name: str):
             f"Error: function named {function_name} not found as top-level function in file. Exiting."
         )
         sys.exit(1)
-
 
     return parsed_args, return_type, return_type_schema
 
