@@ -1,6 +1,6 @@
 import unittest
 
-from polyapi.function_cli import _get_args_and_return_type_from_code
+from polyapi.function_cli import _parse_code
 
 
 SIMPLE_CODE = """
@@ -9,10 +9,10 @@ def foobar(n: int) -> int:
 """
 
 COMPLEX_RETURN_TYPE = """
-from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 
-class Barbar(BaseModel):
+class Barbar(TypedDict):
     count: int
 
 
@@ -22,10 +22,10 @@ def foobar(n: int) -> Barbar:
 
 LIST_COMPLEX_RETURN_TYPE = """
 from typing import List
-from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 
-class Barbar(BaseModel):
+class Barbar(TypedDict):
     count: int
 
 
@@ -34,10 +34,10 @@ def foobar(n: int) -> List[Barbar]:
 """
 
 COMPLEX_ARG_TYPE = """
-from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 
-class Barbar(BaseModel):
+class Barbar(TypedDict):
     count: int
 
 
@@ -48,30 +48,45 @@ def foobar(n: Barbar) -> int:
 
 class T(unittest.TestCase):
     def test_simple_types(self):
-        args, arg_schemas, return_type, return_type_schema = _get_args_and_return_type_from_code(SIMPLE_CODE, "foobar")
+        args, return_type, return_type_schema, additional_requirements = _parse_code(SIMPLE_CODE, "foobar")
         self.assertEqual(len(args), 1)
         self.assertEqual(args[0], {"key": "n", "name": "n", "type": "integer"})
         self.assertEqual(return_type, "integer")
-        self.assertEqual(arg_schemas, [])
         self.assertIsNone(return_type_schema)
+        self.assertEqual(additional_requirements, [])
 
     def test_complex_return_type(self):
-        args, arg_schemas, return_type, return_type_schema = _get_args_and_return_type_from_code(COMPLEX_RETURN_TYPE, "foobar")
+        args, return_type, return_type_schema, _ = _parse_code(COMPLEX_RETURN_TYPE, "foobar")
         self.assertEqual(len(args), 1)
         self.assertEqual(args[0], {"key": "n", "name": "n", "type": "integer"})
         self.assertEqual(return_type, "Barbar")
         self.assertEqual(return_type_schema['title'], "Barbar")
 
     def test_complex_arg_type(self):
-        args, arg_schemas, return_type, return_type_schema = _get_args_and_return_type_from_code(COMPLEX_ARG_TYPE, "foobar")
+        args, return_type, return_type_schema, _ = _parse_code(COMPLEX_ARG_TYPE, "foobar")
         self.assertEqual(len(args), 1)
-        self.assertEqual(args[0], {"key": "n", "name": "n", "type": "Barbar"})
-        self.assertEqual(len(arg_schemas), 1)
+        self.assertEqual(args[0]["type"], "Barbar")
         self.assertEqual(return_type, "integer")
         self.assertIsNone(return_type_schema)
 
     def test_list_complex_return_type(self):
-        args, arg_schemas, return_type, return_type_schema = _get_args_and_return_type_from_code(LIST_COMPLEX_RETURN_TYPE, "foobar")
+        args, return_type, return_type_schema, _ = _parse_code(LIST_COMPLEX_RETURN_TYPE, "foobar")
         self.assertEqual(len(args), 1)
         self.assertEqual(args[0], {"key": "n", "name": "n", "type": "integer"})
-        self.assertEqual(return_type['items'], {"$ref": "#/definitions/Barbar"})
+        self.assertEqual(return_type, "object")
+        self.assertEqual(return_type_schema["items"]['title'], "Barbar")
+
+    def test_parse_import_basic(self):
+        code = "import flask\n\n\ndef foobar(n: int) -> int:\n    return 9\n"
+        _, _, _, additional_requirements = _parse_code(code, "foobar")
+        self.assertEqual(additional_requirements, ["flask"])
+
+    def test_parse_import_from(self):
+        code = "from flask import Request, Response\n\n\ndef foobar(n: int) -> int:\n    return 9\n"
+        _, _, _, additional_requirements = _parse_code(code, "foobar")
+        self.assertEqual(additional_requirements, ["flask"])
+
+    def test_parse_import_base(self):
+        code = "import requests\n\n\ndef foobar(n: int) -> int:\n    return 9\n"
+        _, _, _, additional_requirements = _parse_code(code, "foobar")
+        self.assertEqual(additional_requirements, [])

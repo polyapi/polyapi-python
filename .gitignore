@@ -21,6 +21,7 @@ polyapi_python.egg-info/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+*.swp
 
 # pycache
 __pycache__

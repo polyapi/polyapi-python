@@ -15,7 +15,7 @@ from polyapi.utils import get_auth_headers
 
 # these libraries are already installed in the base docker image
 # and shouldnt be included in additional requirements
-ALREADY_INSTALLED = {"requests", "typing_extensions", "jsonschema-gentypes", "pydantic"}
+BASE_REQUIREMENTS = {"requests", "typing_extensions", "jsonschema-gentypes", "pydantic"}
 
 
 def _get_schemas(code: str) -> List[Dict]:
@@ -99,44 +99,43 @@ def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[str, Dict | N
     return json_type, _get_type_schema(json_type, python_type, schemas)
 
 
-def _get_args_and_return_type_from_code(code: str, function_name: str):
+def _parse_code(code: str, function_name: str):
     parsed_args = []
     return_type = None
     return_type_schema = None
+    requirements: List[str] = []
 
     schemas = _get_schemas(code)
 
     parsed_code = ast.parse(code)
     for node in ast.iter_child_nodes(parsed_code):
-        import ipdb
+        if isinstance(node, ast.Import):
+            for name in node.names:
+                if name.name not in BASE_REQUIREMENTS:
+                    requirements.append(name.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.module not in BASE_REQUIREMENTS:
+                requirements.append(node.module)
 
-        ipdb.set_trace()
-
-        if isinstance(node, ast.FunctionDef) and node.name == function_name:
+        elif isinstance(node, ast.FunctionDef) and node.name == function_name:
             function_args = [arg for arg in node.args.args]
             for arg in function_args:
                 json_type, type_schema = _get_type(arg.annotation, schemas)
-                parsed_args.append(
-                    {
-                        "key": arg.arg,
-                        "name": arg.arg,
-                        "type": json_type,
-                        "typeSchema": json.dumps(type_schema),
-                    }
-                )
+                json_arg = {
+                    "key": arg.arg,
+                    "name": arg.arg,
+                    "type": json_type,
+                }
+                if type_schema:
+                    json_arg["typeSchema"] = json.dumps(type_schema)
+                parsed_args.append(json_arg)
             if node.returns:
                 return_type, return_type_schema = _get_type(node.returns, schemas)
             else:
                 return_type = "Any"
             break
 
-    if not return_type:
-        print(
-            f"Error: function named {function_name} not found as top-level function in file. Exiting."
-        )
-        sys.exit(1)
-
-    return parsed_args, return_type, return_type_schema
+    return parsed_args, return_type, return_type_schema, requirements
 
 
 def function_add_or_update(
@@ -156,7 +155,14 @@ def function_add_or_update(
         arguments,
         return_type,
         return_type_schema,
-    ) = _get_args_and_return_type_from_code(code, args.function_name)
+        requirements
+    ) = _parse_code(code, args.function_name)
+
+    if not return_type:
+        print(
+            f"Error: function named {args.function_name} not found as top-level function in file. Exiting."
+        )
+        sys.exit(1)
 
     data = {
         "context": context,
@@ -166,6 +172,7 @@ def function_add_or_update(
         "language": "python",
         "returnType": return_type,
         "returnTypeSchema": return_type_schema,
+        "requirements": requirements,
         "arguments": arguments,
         "logsEnabled": logs_enabled,
     }
