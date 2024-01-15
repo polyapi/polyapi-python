@@ -203,7 +203,7 @@ class T(unittest.TestCase):
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
-        self.assertIn("-> Responsetype", func_str)
+        self.assertIn("-> ResponseType", func_str)
 
     def test_render_function_get_products_count(self):
         return_type = GET_PRODUCTS_COUNT["function"]["returnType"]

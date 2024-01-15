@@ -2,3 +2,4 @@ requests
 typing_extensions
 jsonschema-gentypes
 pydantic>=2.5.3
+stdlib_list

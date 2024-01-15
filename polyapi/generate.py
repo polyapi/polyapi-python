@@ -26,6 +26,9 @@ def get_specs() -> List:
 def parse_specs(specs: List) -> List[Tuple[str, str, str, List[PropertySpecification], Dict[str, Any]]]:
     api_functions = []
     for spec in specs:
+        if spec['id'] != "38203417-0965-4b9c-8747-0766aba07c39":
+            continue
+
         if spec['type'] != 'apiFunction' and spec['type'] != 'serverFunction':
             # for now we only support api and server functions
             continue

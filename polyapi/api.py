@@ -87,7 +87,7 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
     elif type_spec["kind"] == "object":
         if type_spec.get("schema"):
             schema = type_spec["schema"]
-            title = schema.get("title", "").title()
+            title = schema.get("title", "")
             if not title:
                 # fallback to schema $ref name if no explicit title
                 # TODO fix type
@@ -101,7 +101,7 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
                     # title is actually a reference to another schema
                     title = items.get("$ref", "")
                 if title:
-                    title = title.rsplit("/", 1)[-1].title()
+                    title = title.rsplit("/", 1)[-1]
                     title = f'List[{title}]'
                 else:
                     # TODO figure out what the title should really be here!
@@ -122,8 +122,7 @@ def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
         arg_type, arg_def = _get_type(a["type"])
         if arg_def:
             args_def.append(arg_def)
-        if "-" in a['name']:
-            a['name'] = camelCase(a["name"])
+        a['name'] = camelCase(a["name"])
         arg_strings.append(f"{a['name']}: {arg_type}")
     return ", ".join(arg_strings), "\n\n".join(args_def)
 

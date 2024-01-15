@@ -57,4 +57,18 @@ def generate_schema_types(input_data: Dict):
     with open(tmp_output) as f:
         output = f.read()
 
+    output = _fix_title(input_data, output)
+    return output
+
+
+def _fix_title(input_data, output) -> str:
+    """ the jsonschema_gentypes library changes all titles to Pascalcase
+    this function changes them back
+    TODO fix bug in gentypes so this step is not necessary
+    """
+    for k, v in input_data.items():
+        if isinstance(v, dict):
+            output = _fix_title(v, output)
+        elif k == "title":
+            output = output.replace(f"class {v.title()}", f"class {v}")
     return output

@@ -1,9 +1,9 @@
 [project]
 name = "polyapi-python"
-version = "0.0.19"
+version = "0.0.20"
 description = "The PolyAPI Python Client"
 authors = [{ name = "Dan Fellin", email = "dan@polyapi.io" }]
-dependencies = ["requests", "typing_extensions", "jsonschema-gentypes", "pydantic>=2.5.3"]
+dependencies = ["requests", "typing_extensions", "jsonschema-gentypes", "pydantic>=2.5.3", "stdlib_list"]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"

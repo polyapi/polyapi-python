@@ -6,6 +6,7 @@ import sys
 from typing import Dict, List, Tuple
 from typing_extensions import _TypedDictMeta  # type: ignore
 import requests
+from stdlib_list import stdlib_list
 from pydantic import TypeAdapter
 from polyapi.generate import generate
 from polyapi.config import get_api_key_and_url
@@ -16,6 +17,8 @@ from polyapi.utils import get_auth_headers
 # these libraries are already installed in the base docker image
 # and shouldnt be included in additional requirements
 BASE_REQUIREMENTS = {"requests", "typing_extensions", "jsonschema-gentypes", "pydantic"}
+all_stdlib_symbols = stdlib_list('.'.join([str(v) for v in sys.version_info[0:2]]))
+BASE_REQUIREMENTS.update(all_stdlib_symbols)  # dont need to pip install stuff in the python standard library
 
 
 def _get_schemas(code: str) -> List[Dict]:
