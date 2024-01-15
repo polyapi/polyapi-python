@@ -18,7 +18,7 @@ def get_auth_headers(api_key: str):
 
 def camelCase(s):
     s = s.strip()
-    if " " in s or "-" in s or "_" in s:
+    if " " in s or "-" in s:
         s = re.sub(r"(_|-)+", " ", s).title().replace(" ", "")
         return ''.join([s[0].lower(), s[1:]])
     else:
