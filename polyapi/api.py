@@ -75,7 +75,7 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
         if type_spec.get("items"):
             items = type_spec["items"]
             if items.get("$ref"):
-                return "Responsetype", generate_schema_types(type_spec)  # type: ignore
+                return "ResponseType", generate_schema_types(type_spec, root="ResponseType")  # type: ignore
             else:
                 item_type, _ = _get_type(items)
                 return_type = f"List[{item_type}]"
@@ -106,7 +106,7 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
                 else:
                     # TODO figure out what the title should really be here!
                     title = "Any"
-            return title, generate_schema_types(schema)  # type: ignore
+            return title, generate_schema_types(schema, root=title)  # type: ignore
         else:
             return "Dict", ""
     elif type_spec["kind"] == "any":

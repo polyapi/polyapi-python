@@ -31,7 +31,7 @@ def _temp_store_input_data(input_data: Dict) -> str:
         return temp_file.name
 
 
-def generate_schema_types(input_data: Dict):
+def generate_schema_types(input_data: Dict, root=None):
     """takes in a Dict representing a schema as input then appends the resulting python code to the output file"""
     _cleanup_input_for_gentypes(input_data)
     tmp_input = _temp_store_input_data(input_data)
@@ -45,6 +45,7 @@ def generate_schema_types(input_data: Dict):
             {
                 "source": tmp_input,
                 "destination": tmp_output,
+                "root_name": root,
             }
         ],
     }
