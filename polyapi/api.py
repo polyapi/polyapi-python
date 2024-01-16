@@ -25,7 +25,8 @@ def {function_name}({args}) -> {return_type_name}:
     data = {data}
     resp = requests.post(url, json=data, headers=headers)
     if resp.status_code != 200 and resp.status_code != 201:
-        raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
+        error_content = resp.content.decode("utf-8", errors="ignore")
+        raise PolyApiException(f"{{resp.status_code}}: {{error_content}}")
 
     return {return_action}
 """
@@ -50,7 +51,8 @@ def {function_name}({args}) -> ApiFunctionResponse:
     data = {data}
     resp = requests.post(url, json=data, headers=headers)
     if resp.status_code != 200 and resp.status_code != 201:
-        raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
+        error_content = resp.content.decode("utf-8", errors="ignore")
+        raise PolyApiException(f"{{resp.status_code}}: {{error_content}}")
     return ApiFunctionResponse(resp.json())
 """
 
