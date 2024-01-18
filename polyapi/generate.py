@@ -24,8 +24,15 @@ def get_specs() -> List:
 
 
 def parse_specs(specs: List) -> List[Tuple[str, str, str, List[PropertySpecification], Dict[str, Any]]]:
+    # optional array of ids to include in the generated library
+    # currently just used for testing/development purposes
+    allowed_ids: List[str] = []
+
     api_functions = []
     for spec in specs:
+        if allowed_ids and spec['id'] not in allowed_ids:
+            continue
+
         if spec['type'] != 'apiFunction' and spec['type'] != 'serverFunction':
             # for now we only support api and server functions
             continue
