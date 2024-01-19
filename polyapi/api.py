@@ -1,5 +1,6 @@
 import os
 from typing import Any, Dict, List, Tuple
+
 from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 from polyapi.typedefs import PropertySpecification, PropertyType
 from polyapi.utils import append_init, camelCase
@@ -104,6 +105,9 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
 
                 title = title.rsplit("/", 1)[-1]
                 title = clean_title(title)
+                if not title:
+                    return "List", ""
+
                 title = f'List[{title}]'
                 return title, generate_schema_types(schema, root=title)
             else:
