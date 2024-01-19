@@ -23,18 +23,30 @@ def get_specs() -> List:
         raise NotImplementedError(resp.content)
 
 
-def parse_specs(specs: List) -> List[Tuple[str, str, str, List[PropertySpecification], Dict[str, Any]]]:
+def parse_specs(
+    specs: List,
+) -> List[Tuple[str, str, str, List[PropertySpecification], Dict[str, Any]]]:
     api_functions = []
     for spec in specs:
-        if spec['type'] != 'apiFunction' and spec['type'] != 'serverFunction':
+        if spec["type"] != "apiFunction" and spec["type"] != "serverFunction":
             # for now we only support api and server functions
             continue
 
-        function_type = spec['type']
+        function_type = spec["type"]
         function_name = f"poly.{spec['context']}.{spec['name']}"
-        function_id = spec['id']
-        arguments: List[PropertySpecification] = [arg for arg in spec['function']['arguments']]
-        api_functions.append((function_type, function_name, function_id, arguments, spec['function']["returnType"]))
+        function_id = spec["id"]
+        arguments: List[PropertySpecification] = [
+            arg for arg in spec["function"]["arguments"]
+        ]
+        api_functions.append(
+            (
+                function_type,
+                function_name,
+                function_id,
+                arguments,
+                spec["function"]["returnType"],
+            )
+        )
     return api_functions
 
 
@@ -65,7 +77,7 @@ def parse_variables(variables: List) -> List[Tuple[str, str, bool]]:
     rv = []
     for v in variables:
         path = f"vari.{v['context']}.{v['name']}"
-        rv.append((path, v['id'], v['secret']))
+        rv.append((path, v["id"], v["secret"]))
     return rv
 
 
@@ -93,9 +105,23 @@ def generate() -> None:
         full_path = os.path.join(full_path, "poly")
         if not os.path.exists(full_path):
             os.makedirs(full_path)
-        print("No functions exist yet in this tenant! Empty library initialized. Let's add some functions!")
+        print(
+            "No functions exist yet in this tenant! Empty library initialized. Let's add some functions!"
+        )
         exit()
 
     variables = get_variables_and_parse()
     if variables:
         generate_variables(variables)
+
+
+def clear() -> None:
+    base = os.path.dirname(os.path.abspath(__file__))
+    poly_path = os.path.join(base, "poly")
+    if os.path.exists(poly_path):
+        shutil.rmtree(poly_path)
+
+    vari_path = os.path.join(base, "vari")
+    if os.path.exists(vari_path):
+        shutil.rmtree(vari_path)
+    print("Cleared!")

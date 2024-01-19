@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Tuple
 from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 from polyapi.typedefs import PropertySpecification, PropertyType
 from polyapi.utils import append_init, camelCase
-from polyapi.schema import generate_schema_types
+from polyapi.schema import generate_schema_types, clean_title
 
 # map the function type from the spec type to the function execute type
 TEMPLATE_FUNCTION_TYPE_MAP = {
@@ -73,15 +73,15 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
     elif type_spec["kind"] == "primitive":
         return _map_primitive_types(type_spec["type"]), ""
     elif type_spec["kind"] == "array":
-        # TODO needs to be more general
         if type_spec.get("items"):
             items = type_spec["items"]
             if items.get("$ref"):
                 return "ResponseType", generate_schema_types(type_spec, root="ResponseType")  # type: ignore
             else:
                 item_type, _ = _get_type(items)
-                return_type = f"List[{item_type}]"
-                return return_type, ""
+                title = f"List[{item_type}]"
+                title = clean_title(title)
+                return title, ""
         else:
             return "List", ""
     elif type_spec["kind"] == "void":
@@ -90,25 +90,24 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
         if type_spec.get("schema"):
             schema = type_spec["schema"]
             title = schema.get("title", "")
-            if not title:
+            if title:
+                assert isinstance(title, str)
+                title = clean_title(title)
+                return title, generate_schema_types(schema, root=title)  # type: ignore
+            elif schema.get("items"):
                 # fallback to schema $ref name if no explicit title
-                # TODO fix type
                 items = schema.get("items")  # type: ignore
-                if not items:
-                    # figure out what it is and fix!
-                    return "Any", ""
-
-                title = items.get("title")
+                title = items.get("title", "")  # type: ignore
                 if not title:
                     # title is actually a reference to another schema
-                    title = items.get("$ref", "")
-                if title:
-                    title = title.rsplit("/", 1)[-1]
-                    title = f'List[{title}]'
-                else:
-                    # TODO figure out what the title should really be here!
-                    title = "Any"
-            return title, generate_schema_types(schema, root=title)  # type: ignore
+                    title = items.get("$ref", "")  # type: ignore
+
+                title = title.rsplit("/", 1)[-1]
+                title = clean_title(title)
+                title = f'List[{title}]'
+                return title, generate_schema_types(schema, root=title)
+            else:
+                return "Any", ""
         else:
             return "Dict", ""
     elif type_spec["kind"] == "any":

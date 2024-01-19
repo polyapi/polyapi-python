@@ -73,3 +73,10 @@ def _fix_title(input_data, output) -> str:
         elif k == "title":
             output = output.replace(f"class {v.title()}", f"class {v}")
     return output
+
+
+def clean_title(title: str) -> str:
+    """ used by library generation, sometimes functions can be added with spaces in the title
+    or other nonsense. fix them!
+    """
+    return title.replace(" ", "")

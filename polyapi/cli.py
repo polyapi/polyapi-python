@@ -1,10 +1,10 @@
 import sys
 import argparse
-from .generate import generate
+from .generate import generate, clear
 from .function_cli import function_add_or_update
 
 
-CLI_COMMANDS = ["generate", "function", "help"]
+CLI_COMMANDS = ["generate", "clear", "function", "help"]
 
 
 def execute_from_cli():
@@ -25,5 +25,8 @@ def execute_from_cli():
     elif command == "generate":
         print("Generating...")
         generate()
+    elif command == "clear":
+        print("Clearing the generated library...")
+        clear()
     elif command == "function":
         function_add_or_update(args.context, args.description, args.server, args.logs, args.subcommands)

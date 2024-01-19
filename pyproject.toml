@@ -1,6 +1,9 @@
+[build-system]
+requires = ["setuptools>=61.2", "wheel"]
+
 [project]
 name = "polyapi-python"
-version = "0.0.22"
+version = "0.0.23"
 description = "The PolyAPI Python Client"
 authors = [{ name = "Dan Fellin", email = "dan@polyapi.io" }]
 dependencies = ["requests", "typing_extensions", "jsonschema-gentypes", "pydantic>=2.5.3", "stdlib_list"]
@@ -10,3 +13,10 @@ requires-python = ">=3.10"
 
 [project.urls]
 Homepage = "https://github.com/polyapi/polyapi-python"
+
+[tool.setuptools]
+packages = ["polyapi"]
+
+[tools.setuptools.packages.find]
+include = ["polyapi"]
+exclude = ["polyapi/poly*", "polyapi/vari*"]  # exclude the generated libraries from builds
