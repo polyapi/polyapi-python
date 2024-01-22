@@ -5,10 +5,10 @@ on:
       - main
 
 jobs:
-  develop:
-    name: Development Pre-built Python image
+  update-pre-built-python-image:
+    runs-on: ubuntu-latest
     steps:
-    - name: Hit endpoint and build Python server function pre-built image from scratch
+    - name: Hit endpoint and build Python server function pre-built image
       run: |
         curl -X POST \
         https://develop-k8s.polyapi.io/functions/server/prebuilt-base-image \
