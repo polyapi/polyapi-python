@@ -1,0 +1,46 @@
+name: Update pre-built Python docker image
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  develop:
+    name: Development Pre-built Python image
+    # if: ${{ github.ref == 'refs/heads/develop' }}
+    # environment: dev
+
+    steps:
+    - name: Hit endpoint and build Python server function pre-built image from scratch
+      run: |
+        curl -X POST \
+        https://develop-k8s.polyapi.io/functions/server/prebuilt-base-image \
+        -H "Authorization: Bearer ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}" \
+        -H "Content-Type: application/json" \
+        -d '{"language": "python"}'
+
+
+  # main:
+  #   name: Main Pre-built Java image
+  #   runs-on: ubuntu-latest
+  #   if: ${{ github.ref == 'refs/heads/main' }}
+  #   environment: main
+
+  #   steps:
+  #   - uses: actions/checkout@v3
+
+  #   - uses: dorny/paths-filter@v2
+  #     id: changes
+  #     with:
+  #       filters: |
+  #         client:
+  #           - 'packages/java-client/pom.xml'
+
+  #   - if: steps.changes.outputs.client == 'true'
+  #     name: Hit endpoint and build Java server function pre-built image from scratch
+  #     run: |
+  #       curl -X POST \
+  #       https://na1.polyapi.io/functions/server/prebuilt-base-image \
+  #       -H "Authorization: Bearer ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}" \
+  #       -H "Content-Type: application/json" \
+  #       -d '{"language": "java"}'
