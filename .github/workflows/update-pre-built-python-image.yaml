@@ -8,7 +8,7 @@ jobs:
   update-pre-built-python-image:
     runs-on: ubuntu-latest
     steps:
-     - uses: dorny/paths-filter@v2
+    - uses: dorny/paths-filter@v2
       id: changes
       with:
         filters: |
