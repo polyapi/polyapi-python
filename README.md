@@ -84,7 +84,7 @@ class Foobar(TypedDict):
     count: int
 
 
-def myfunc(n: int) -> Foobar:
+def bar(n: int) -> Foobar:
     return Foobar(count=n)
 ```
 

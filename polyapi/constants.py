@@ -1,5 +1,3 @@
-# TODO figure out arrays and dicts
-
 JSONSCHEMA_TO_PYTHON_TYPE_MAP = {
     "integer": "int",
     "number": "float",
