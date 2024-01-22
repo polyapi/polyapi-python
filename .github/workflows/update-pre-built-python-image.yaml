@@ -8,7 +8,15 @@ jobs:
   update-pre-built-python-image:
     runs-on: ubuntu-latest
     steps:
-    - name: Hit endpoint and build Python server function pre-built image
+     - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          version:
+            - pyproject.toml
+
+    - if: steps.changes.outputs.version == 'true'
+      name: trigger pre-built base image update
       run: |
         curl --fail-with-body -X POST \
         https://develop-k8s.polyapi.io/functions/server/prebuilt-base-image \
