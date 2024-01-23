@@ -1,10 +1,11 @@
-import sys
 import argparse
+
+from .config import clear_config
 from .generate import generate, clear
 from .function_cli import function_add_or_update
 
 
-CLI_COMMANDS = ["generate", "clear", "function", "help"]
+CLI_COMMANDS = ["generate", "config", "clear", "function", "help"]
 
 
 def execute_from_cli():
@@ -24,6 +25,10 @@ def execute_from_cli():
         parser.print_help()
     elif command == "generate":
         print("Generating...")
+        generate()
+    elif command == "config":
+        print("Clearing old config...")
+        clear_config()
         generate()
     elif command == "clear":
         print("Clearing the generated library...")

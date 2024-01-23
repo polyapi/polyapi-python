@@ -66,3 +66,9 @@ def initialize_config():
         sys.exit(1)
 
     return key, url
+
+
+def clear_config():
+    path = get_config_file_path()
+    if os.path.exists(path):
+        os.remove(path)
