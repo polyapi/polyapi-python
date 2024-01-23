@@ -19,7 +19,9 @@ from polyapi.execute import execute
 from polyapi.exceptions import PolyApiException
 {args_def}
 {return_type_def}
-def {function_name}({args}) -> {return_type_name}:
+def {function_name}(
+{args}
+) -> {return_type_name}:
     "{function_description}"
     resp = execute("{function_type}", "{function_id}", {data})
     if resp.status_code != 200 and resp.status_code != 201:
@@ -42,7 +44,9 @@ class ApiFunctionResponse(TypedDict):
     data: {return_type_name}
 
 
-def {function_name}({args}) -> ApiFunctionResponse:
+def {function_name}(
+{args}
+) -> ApiFunctionResponse:
     "{function_description}"
     resp = execute("{function_type}", "{function_id}", {data})
     if resp.status_code != 200 and resp.status_code != 201:
@@ -116,14 +120,18 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
 
 def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
     args_def = []
-    arg_strings = []
-    for a in arguments:
+    arg_string = ""
+    for idx, a in enumerate(arguments):
         arg_type, arg_def = _get_type(a["type"])
         if arg_def:
             args_def.append(arg_def)
         a['name'] = camelCase(a["name"])
-        arg_strings.append(f"{a['name']}: {arg_type}")
-    return ", ".join(arg_strings), "\n\n".join(args_def)
+        arg_string += f"    {a['name']}: {arg_type}"
+        if idx == len(arguments) - 1:
+            arg_string += f'  # {a["description"]}\n'
+        else:
+            arg_string += f',  # {a["description"]}\n'
+    return arg_string, "\n\n".join(args_def)
 
 
 def render_function(
