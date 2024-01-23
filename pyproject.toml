@@ -19,4 +19,4 @@ packages = ["polyapi"]
 
 [tools.setuptools.packages.find]
 include = ["polyapi"]
-exclude = ["polyapi/poly*", "polyapi/vari*"]  # exclude the generated libraries from builds
+exclude = ["polyapi/poly*", "polyapi/vari*", "polyapi/.config.env"]  # exclude the generated libraries from builds
