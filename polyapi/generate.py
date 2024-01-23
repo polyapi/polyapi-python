@@ -25,10 +25,10 @@ def get_specs() -> List:
 
 def parse_specs(
     specs: List,
-) -> List[Tuple[str, str, str, List[PropertySpecification], Dict[str, Any]]]:
+) -> List[Tuple[str, str, str, str, List[PropertySpecification], Dict[str, Any]]]:
     # optional array of ids to include in the generated library
     # currently just used for testing/development purposes
-    allowed_ids: List[str] = []
+    allowed_ids: List[str] = ["3afeb1a5-f666-483d-a6f9-306dd03858b3"]
 
     api_functions = []
     for spec in specs:
@@ -50,6 +50,7 @@ def parse_specs(
                 function_type,
                 function_name,
                 function_id,
+                spec["description"],
                 arguments,
                 spec["function"]["returnType"],
             )
