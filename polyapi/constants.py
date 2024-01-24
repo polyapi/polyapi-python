@@ -16,3 +16,6 @@ PYTHON_TO_JSONSCHEMA_TYPE_MAP = {
     "List": "array",
     "Dict": "object",
 }
+
+# TODO wire this up to config-variables in future so clients can modify
+SUPPORT_EMAIL = 'support@polyapi.io'
