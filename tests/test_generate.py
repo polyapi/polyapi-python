@@ -159,6 +159,7 @@ class T(unittest.TestCase):
             ACCUWEATHER["type"],
             ACCUWEATHER["name"],
             ACCUWEATHER["id"],
+            ACCUWEATHER["description"],
             ACCUWEATHER["function"]["arguments"],
             ACCUWEATHER["function"]["returnType"],
         )
@@ -171,6 +172,7 @@ class T(unittest.TestCase):
             ZILLOW["type"],
             ZILLOW["name"],
             ZILLOW["id"],
+            ZILLOW["description"],
             ZILLOW["function"]["arguments"],
             ZILLOW["function"]["returnType"],
         )
@@ -183,6 +185,7 @@ class T(unittest.TestCase):
             TWILIO["type"],
             TWILIO["name"],
             TWILIO["id"],
+            TWILIO["description"],
             TWILIO["function"]["arguments"],
             TWILIO["function"]["returnType"],
         )
@@ -197,6 +200,7 @@ class T(unittest.TestCase):
             "serverFunction",
             TWILIO["name"],
             TWILIO["id"],
+            TWILIO["description"],
             TWILIO["function"]["arguments"],
             TWILIO["function"]["returnType"],
         )
@@ -211,6 +215,7 @@ class T(unittest.TestCase):
             GET_PRODUCTS_COUNT["type"],
             GET_PRODUCTS_COUNT["name"],
             GET_PRODUCTS_COUNT["id"],
+            GET_PRODUCTS_COUNT["description"],
             GET_PRODUCTS_COUNT["function"]["arguments"],
             return_type,
         )
