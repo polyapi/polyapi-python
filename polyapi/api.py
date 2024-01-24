@@ -106,7 +106,7 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
                 if not title:
                     return "List", ""
 
-                title = f'List[{title}]'
+                title = f"List[{title}]"
                 return title, generate_schema_types(schema, root=title)
             else:
                 return "Any", ""
@@ -125,13 +125,17 @@ def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
         arg_type, arg_def = _get_type(a["type"])
         if arg_def:
             args_def.append(arg_def)
-        a['name'] = camelCase(a["name"])
+        a["name"] = camelCase(a["name"])
         arg_string += f"    {a['name']}: {arg_type}"
-        if idx == len(arguments) - 1:
-            arg_string += f'  # {a["description"]}\n'
+        description = a.get("description", "")
+        if description:
+            if idx == len(arguments) - 1:
+                arg_string += f"  # {description}\n"
+            else:
+                arg_string += f",  # {description}\n"
         else:
-            arg_string += f',  # {a["description"]}\n'
-    return arg_string, "\n\n".join(args_def)
+            arg_string += ",\n"
+    return arg_string.rstrip("\n"), "\n\n".join(args_def)
 
 
 def render_function(
@@ -210,7 +214,12 @@ def add_function_file(
     with open(file_path, "w") as f:
         f.write(
             render_function(
-                function_type, function_name, function_id, function_description, arguments, return_type
+                function_type,
+                function_name,
+                function_id,
+                function_description,
+                arguments,
+                return_type,
             )
         )
 
@@ -230,7 +239,13 @@ def create_function(
         if idx + 1 == len(folders):
             # special handling for final level
             add_function_file(
-                function_type, full_path, folder, function_id, function_description, arguments, return_type
+                function_type,
+                full_path,
+                folder,
+                function_id,
+                function_description,
+                arguments,
+                return_type,
             )
         else:
             full_path = os.path.join(full_path, folder)
