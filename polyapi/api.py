@@ -15,16 +15,15 @@ TEMPLATE_FUNCTION_TYPE_MAP = {
 SERVER_TEMPLATE = """
 import requests
 from typing import List, Dict, Any
-from polyapi.config import get_api_key_and_url
+from polyapi.execute import execute
 from polyapi.exceptions import PolyApiException
 {args_def}
 {return_type_def}
-def {function_name}({args}) -> {return_type_name}:
-    api_key, api_url = get_api_key_and_url()
-    headers = {{"Authorization": f"Bearer {{api_key}}"}}
-    url = f"{{api_url}}/functions/{function_type}/{function_id}/execute"
-    data = {data}
-    resp = requests.post(url, json=data, headers=headers)
+def {function_name}(
+{args}
+) -> {return_type_name}:
+    "{function_description}"
+    resp = execute("{function_type}", "{function_id}", {data})
     if resp.status_code != 200 and resp.status_code != 201:
         error_content = resp.content.decode("utf-8", errors="ignore")
         raise PolyApiException(f"{{resp.status_code}}: {{error_content}}")
@@ -35,7 +34,7 @@ def {function_name}({args}) -> {return_type_name}:
 API_TEMPLATE = """
 import requests
 from typing import List, Dict, Any, TypedDict
-from polyapi.config import get_api_key_and_url
+from polyapi.execute import execute
 from polyapi.exceptions import PolyApiException
 {args_def}
 {return_type_def}
@@ -45,12 +44,11 @@ class ApiFunctionResponse(TypedDict):
     data: {return_type_name}
 
 
-def {function_name}({args}) -> ApiFunctionResponse:
-    api_key, api_url = get_api_key_and_url()
-    headers = {{"Authorization": f"Bearer {{api_key}}"}}
-    url = f"{{api_url}}/functions/{function_type}/{function_id}/execute"
-    data = {data}
-    resp = requests.post(url, json=data, headers=headers)
+def {function_name}(
+{args}
+) -> ApiFunctionResponse:
+    "{function_description}"
+    resp = execute("{function_type}", "{function_id}", {data})
     if resp.status_code != 200 and resp.status_code != 201:
         error_content = resp.content.decode("utf-8", errors="ignore")
         raise PolyApiException(f"{{resp.status_code}}: {{error_content}}")
@@ -108,7 +106,7 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
                 if not title:
                     return "List", ""
 
-                title = f'List[{title}]'
+                title = f"List[{title}]"
                 return title, generate_schema_types(schema, root=title)
             else:
                 return "Any", ""
@@ -122,20 +120,29 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
 
 def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
     args_def = []
-    arg_strings = []
-    for a in arguments:
+    arg_string = ""
+    for idx, a in enumerate(arguments):
         arg_type, arg_def = _get_type(a["type"])
         if arg_def:
             args_def.append(arg_def)
-        a['name'] = camelCase(a["name"])
-        arg_strings.append(f"{a['name']}: {arg_type}")
-    return ", ".join(arg_strings), "\n\n".join(args_def)
+        a["name"] = camelCase(a["name"])
+        arg_string += f"    {a['name']}: {arg_type}"
+        description = a.get("description", "")
+        if description:
+            if idx == len(arguments) - 1:
+                arg_string += f"  # {description}\n"
+            else:
+                arg_string += f",  # {description}\n"
+        else:
+            arg_string += ",\n"
+    return arg_string.rstrip("\n"), "\n\n".join(args_def)
 
 
 def render_function(
     function_type: str,
     function_name: str,
     function_id: str,
+    function_description: str,
     arguments: List[PropertySpecification],
     return_type: Dict[str, Any],
 ) -> str:
@@ -148,6 +155,7 @@ def render_function(
             function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
             function_name=function_name,
             function_id=function_id,
+            function_description=function_description.replace('"', "'"),
             args=args,
             args_def=args_def,
             return_type_name=return_type_name,
@@ -155,22 +163,12 @@ def render_function(
             data=data,
         )
     else:
-        if return_type_name == "str":
-            return_action = "resp.text"
-        elif return_type_name == "Any":
-            return_action = "resp.text"
-        elif return_type_name == "int":
-            return_action = "int(resp.text.replace('(int) ', ''))"
-        elif return_type_name == "float":
-            return_action = "float(resp.text.replace('(float) ', ''))"
-        elif return_type_name == "bool":
-            return_action = "False if resp.text == 'False' else True"
-        else:
-            return_action = "resp.json()"
+        return_action = _get_server_return_action(return_type_name)
         rendered = SERVER_TEMPLATE.format(
             function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
             function_name=function_name,
             function_id=function_id,
+            function_description=function_description.replace('"', "'"),
             args=args,
             args_def=args_def,
             return_type_name=return_type_name,
@@ -181,11 +179,28 @@ def render_function(
     return rendered
 
 
+def _get_server_return_action(return_type_name: str) -> str:
+    if return_type_name == "str":
+        return_action = "resp.text"
+    elif return_type_name == "Any":
+        return_action = "resp.text"
+    elif return_type_name == "int":
+        return_action = "int(resp.text.replace('(int) ', ''))"
+    elif return_type_name == "float":
+        return_action = "float(resp.text.replace('(float) ', ''))"
+    elif return_type_name == "bool":
+        return_action = "False if resp.text == 'False' else True"
+    else:
+        return_action = "resp.json()"
+    return return_action
+
+
 def add_function_file(
     function_type: str,
     full_path: str,
     function_name: str,
     function_id: str,
+    function_description: str,
     arguments: List[PropertySpecification],
     return_type: Dict[str, Any],
 ):
@@ -199,7 +214,12 @@ def add_function_file(
     with open(file_path, "w") as f:
         f.write(
             render_function(
-                function_type, function_name, function_id, arguments, return_type
+                function_type,
+                function_name,
+                function_id,
+                function_description,
+                arguments,
+                return_type,
             )
         )
 
@@ -208,6 +228,7 @@ def create_function(
     function_type: str,
     path: str,
     function_id: str,
+    function_description: str,
     arguments: List[PropertySpecification],
     return_type: Dict[str, Any],
 ) -> None:
@@ -218,7 +239,13 @@ def create_function(
         if idx + 1 == len(folders):
             # special handling for final level
             add_function_file(
-                function_type, full_path, folder, function_id, arguments, return_type
+                function_type,
+                full_path,
+                folder,
+                function_id,
+                function_description,
+                arguments,
+                return_type,
             )
         else:
             full_path = os.path.join(full_path, folder)

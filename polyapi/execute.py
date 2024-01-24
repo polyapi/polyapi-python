@@ -1,12 +1,10 @@
 import requests
 from requests import Response
-from typing import List, Dict, Any, TypedDict
 from polyapi.config import get_api_key_and_url
 from polyapi.exceptions import PolyApiException
-from typing import List, TypedDict
-from typing_extensions import Required
 
 
+# TODO use this to cleanup generated code
 def execute(function_type, function_id, data) -> Response:
     api_key, api_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}

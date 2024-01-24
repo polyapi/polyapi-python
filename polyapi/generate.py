@@ -1,4 +1,4 @@
-import sys
+import json
 import requests
 import os
 import shutil
@@ -25,7 +25,7 @@ def get_specs() -> List:
 
 def parse_specs(
     specs: List,
-) -> List[Tuple[str, str, str, List[PropertySpecification], Dict[str, Any]]]:
+) -> List[Tuple[str, str, str, str, List[PropertySpecification], Dict[str, Any]]]:
     # optional array of ids to include in the generated library
     # currently just used for testing/development purposes
     allowed_ids: List[str] = []
@@ -50,6 +50,7 @@ def parse_specs(
                 function_type,
                 function_name,
                 function_id,
+                spec["description"],
                 arguments,
                 spec["function"]["returnType"],
             )
@@ -57,10 +58,27 @@ def parse_specs(
     return api_functions
 
 
-def get_specs_and_parse():
+def cache_specs(specs):
+    supported = []
+    for spec in specs:
+        # this needs to stay in sync with logic in parse_specs
+        if spec["type"] == "apiFunction" or spec["type"] == "serverFunction":
+            supported.append(spec)
+
+    full_path = os.path.dirname(os.path.abspath(__file__))
+    full_path = os.path.join(full_path, "poly")
+    if not os.path.exists(full_path):
+        os.makedirs(full_path)
+
+    with open(os.path.join(full_path, "specs.json"), "w") as f:
+        f.write(json.dumps(supported))
+
+
+def get_functions_and_parse():
     specs = get_specs()
-    api_functions = parse_specs(specs)
-    return api_functions
+    cache_specs(specs)
+    functions = parse_specs(specs)
+    return functions
 
 
 def get_variables_and_parse() -> List[Tuple[str, str, bool]]:
@@ -104,14 +122,10 @@ def generate() -> None:
 
     remove_old_library()
 
-    functions = get_specs_and_parse()
+    functions = get_functions_and_parse()
     if functions:
         generate_api(functions)
     else:
-        full_path = os.path.dirname(os.path.abspath(__file__))
-        full_path = os.path.join(full_path, "poly")
-        if not os.path.exists(full_path):
-            os.makedirs(full_path)
         print(
             "No functions exist yet in this tenant! Empty library initialized. Let's add some functions!"
         )
