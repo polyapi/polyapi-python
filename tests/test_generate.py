@@ -155,9 +155,10 @@ GET_PRODUCTS_COUNT = {
 
 class T(unittest.TestCase):
     def test_render_function_accuweather(self):
-        func_str = render_function(
+        name = ACCUWEATHER["name"]
+        func_str, _ = render_function(
             ACCUWEATHER["type"],
-            ACCUWEATHER["name"],
+            name,
             ACCUWEATHER["id"],
             ACCUWEATHER["description"],
             ACCUWEATHER["function"]["arguments"],
@@ -165,12 +166,13 @@ class T(unittest.TestCase):
         )
         self.assertIn(ACCUWEATHER["id"], func_str)
         self.assertIn("locationId: int,", func_str)
-        self.assertIn("-> ApiFunctionResponse", func_str)
+        self.assertIn(f"-> _{name}.{name}Response", func_str)
 
     def test_render_function_zillow(self):
-        func_str = render_function(
+        name = ZILLOW['name']
+        func_str, _ = render_function(
             ZILLOW["type"],
-            ZILLOW["name"],
+            name,
             ZILLOW["id"],
             ZILLOW["description"],
             ZILLOW["function"]["arguments"],
@@ -178,10 +180,11 @@ class T(unittest.TestCase):
         )
         self.assertIn(ZILLOW["id"], func_str)
         self.assertIn("locationId: int,", func_str)
-        self.assertIn("-> ApiFunctionResponse", func_str)
+        self.assertIn(f"-> _{name}.{name}Response", func_str)
 
     def test_render_function_twilio_api(self):
-        func_str = render_function(
+        name = TWILIO['name']
+        func_str, _ = render_function(
             TWILIO["type"],
             TWILIO["name"],
             TWILIO["id"],
@@ -192,11 +195,12 @@ class T(unittest.TestCase):
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
-        self.assertIn("-> ApiFunctionResponse", func_str)
+        self.assertIn(f"-> _{name}.{name}Response", func_str)
 
     def test_render_function_twilio_server(self):
         # same test but try it as a serverFunction rather than an apiFunction
-        func_str = render_function(
+        name = TWILIO['name']
+        func_str, _ = render_function(
             "serverFunction",
             TWILIO["name"],
             TWILIO["id"],
@@ -207,11 +211,11 @@ class T(unittest.TestCase):
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
-        self.assertIn("-> ResponseType", func_str)
+        self.assertIn(f"-> _{name}.ResponseType", func_str)
 
     def test_render_function_get_products_count(self):
         return_type = GET_PRODUCTS_COUNT["function"]["returnType"]
-        func_str = render_function(
+        func_str, _ = render_function(
             GET_PRODUCTS_COUNT["type"],
             GET_PRODUCTS_COUNT["name"],
             GET_PRODUCTS_COUNT["id"],

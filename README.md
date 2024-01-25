@@ -90,10 +90,18 @@ def bar(n: int) -> Foobar:
 
 ## Upgrade
 
-To upgrade your library to the latest version, pass the upgrade flag.:
+To upgrade your library to the latest version, pass the upgrade flag.
 
 ```bash
 pip install polyapi-python --upgrade
+```
+
+## Pre-Release
+
+To upgrade your library to the latest dev version, pass the `--pre` flag.
+
+```bash
+pip install polyapi-python --pre --upgrade
 ```
 
 ## Unit Tests
