@@ -79,4 +79,8 @@ def clean_title(title: str) -> str:
     """ used by library generation, sometimes functions can be added with spaces in the title
     or other nonsense. fix them!
     """
-    return title.replace(" ", "")
+    title = title.replace(" ", "")
+    # certain reserved words cant be titles, let's replace them
+    if title == "List":
+        title = "List_"
+    return title
