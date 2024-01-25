@@ -141,6 +141,7 @@ def _add_type_import_path(function_name: str, arg: str) -> str:
             return arg
         else:
             if '"' in sub:
+                sub = sub.replace('"', "")
                 return f'List["_{function_name}.{camelCase(sub)}"]'
             else:
                 return f'List[_{function_name}.{camelCase(sub)}]'
