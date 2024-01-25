@@ -90,7 +90,7 @@ def bar(n: int) -> Foobar:
 
 ## Pypi
 
-This library is hosted on Pypi. You can find the latest version on the [pypi polyapi-python](https://pypi.org/project/polyapi-python/https://pypi.org/project/polyapi-python/) project.
+This library is hosted on Pypi. You can find the latest version on the [pypi polyapi-python](https://pypi.org/project/polyapi-python/) project.
 
 
 ## Upgrade
