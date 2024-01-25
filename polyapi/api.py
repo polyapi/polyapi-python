@@ -1,8 +1,6 @@
 import os
 from typing import Any, Dict, List, Tuple
 
-from regex import W
-
 from polyapi.constants import BASIC_PYTHON_TYPES, JSONSCHEMA_TO_PYTHON_TYPE_MAP
 from polyapi.typedefs import PropertySpecification, PropertyType
 from polyapi.utils import append_init, camelCase
