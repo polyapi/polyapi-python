@@ -1,0 +1,126 @@
+name: Update python pip package 
+on:
+  push:
+    paths:
+      - "pyproject.toml"
+    branches:
+      - develop
+      - main
+
+jobs:
+  develop:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/develop' }}
+    environment: dev
+    
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.x"
+
+    - name: Install pypa/build
+      run: >-
+        python3 -m
+        pip install
+        build
+        --user
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package-distributions
+        path: dist/
+
+
+  publish-to-pypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    if: ${{ github.ref == 'refs/heads/develop' }}  # only publish to PyPI on tag pushes
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://pypi.org/p/polyapi-python 
+    permissions:
+      id-token: write 
+
+    - name: Download all the dists
+      uses: actions/download-artifact@v3
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution 📦 to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+
+    - name: trigger pre-built base image update
+      run: |
+        curl --fail-with-body -X POST \
+        https://na1.polyapi.io/functions/server/prebuilt-base-image \
+        -H "Authorization: Bearer ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}" \
+        -H "Content-Type: application/json" \
+        -d '{"language": "python"}'
+        
+
+  main:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: main
+    
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.x"
+
+    - name: Install pypa/build
+      run: >-
+        python3 -m
+        pip install
+        build
+        --user
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package-distributions
+        path: dist/
+
+
+  publish-to-pypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    if: ${{ github.ref == 'refs/heads/main' }}  # only publish to PyPI on tag pushes
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://pypi.org/p/polyapi-python 
+    permissions:
+      id-token: write 
+
+
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v3
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution 📦 to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+
+    - name: trigger pre-built base image update
+      run: |
+        curl --fail-with-body -X POST \
+        https://na1.polyapi.io/functions/server/prebuilt-base-image \
+        -H "Authorization: Bearer ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}" \
+        -H "Content-Type: application/json" \
+        -d '{"language": "python"}'
