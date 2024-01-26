@@ -8,7 +8,7 @@ on:
       - main
 
 jobs:
-  develop:
+  develop-build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/develop' }}
@@ -41,7 +41,7 @@ jobs:
       Publish Python 🐍 distribution 📦 to PyPI
     if: ${{ github.ref == 'refs/heads/develop' }}  # only publish to PyPI on tag pushes
     needs:
-    - build
+    - develop-build
     runs-on: ubuntu-latest
     environment:
       name: dev
@@ -66,7 +66,7 @@ jobs:
         -d '{"language": "python"}'
         
 
-  main:
+  main-build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' }}
@@ -99,7 +99,7 @@ jobs:
       Publish Python 🐍 distribution 📦 to PyPI
     if: ${{ github.ref == 'refs/heads/main' }}  # only publish to PyPI on tag pushes
     needs:
-    - build
+    - main-build
     runs-on: ubuntu-latest
     environment:
       name: dev
