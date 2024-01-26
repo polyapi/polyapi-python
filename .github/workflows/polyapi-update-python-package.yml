@@ -21,6 +21,7 @@ jobs:
       with:
         python-version: "3.x"
 
+
     - name: Install pypa/build
       run: >-
         python3 -m
@@ -37,17 +38,17 @@ jobs:
 
 
   publish-to-pypi:
-    name: >-
-      Publish Python 🐍 distribution 📦 to PyPI
-    if: ${{ github.ref == 'refs/heads/develop' }}  # only publish to PyPI on tag pushes
-    needs:
-    - develop-build
+    name: Publish Python 🐍 distribution 📦 to PyPI
     runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/develop' }}
+    needs: develop-build
     environment:
       name: dev
       url: https://pypi.org/p/polyapi-python 
+
     permissions:
       id-token: write 
+    steps:
 
     - name: Download all the dists
       uses: actions/download-artifact@v3
