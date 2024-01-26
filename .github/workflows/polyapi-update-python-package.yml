@@ -57,14 +57,6 @@ jobs:
         path: dist/
     - name: Publish distribution 📦 to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-
-    - name: trigger pre-built base image update
-      run: |
-        curl --fail-with-body -X POST \
-        https://na1.polyapi.io/functions/server/prebuilt-base-image \
-        -H "Authorization: Bearer ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}" \
-        -H "Content-Type: application/json" \
-        -d '{"language": "python"}'
         
 
   main-build:
@@ -103,7 +95,7 @@ jobs:
     - main-build
     runs-on: ubuntu-latest
     environment:
-      name: dev
+      name: main
       url: https://pypi.org/p/polyapi-python 
     permissions:
       id-token: write 
@@ -117,11 +109,3 @@ jobs:
         path: dist/
     - name: Publish distribution 📦 to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-
-    - name: trigger pre-built base image update
-      run: |
-        curl --fail-with-body -X POST \
-        https://na1.polyapi.io/functions/server/prebuilt-base-image \
-        -H "Authorization: Bearer ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}" \
-        -H "Content-Type: application/json" \
-        -d '{"language": "python"}'
