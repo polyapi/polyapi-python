@@ -4,7 +4,7 @@ import os
 import shutil
 from typing import Any, Dict, List, Tuple
 
-from .typedefs import PropertySpecification
+from .typedefs import PropertySpecification, VariableSpecDto
 from .utils import get_auth_headers
 from .api import generate_api
 from .variables import generate_variables
@@ -81,29 +81,17 @@ def get_functions_and_parse():
     return functions
 
 
-def get_variables_and_parse() -> List[Tuple[str, str, bool]]:
-    raw = get_variables()
-    variables = parse_variables(raw)
-    return variables
-
-
-def get_variables():
+def get_variables() -> List[VariableSpecDto]:
     api_key, api_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}
-    url = f"{api_url}/variables"
+    # TODO do some caching so this and get_functions just do 1 function call
+    url = f"{api_url}/specs"
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
-        return resp.json()
+        specs = resp.json()
+        return [spec for spec in specs if spec['type'] == "serverVariable"]
     else:
         raise NotImplementedError(resp.content)
-
-
-def parse_variables(variables: List) -> List[Tuple[str, str, bool]]:
-    rv = []
-    for v in variables:
-        path = f"vari.{v['context']}.{v['name']}"
-        rv.append((path, v["id"], v["secret"]))
-    return rv
 
 
 def remove_old_library():
@@ -131,7 +119,7 @@ def generate() -> None:
         )
         exit()
 
-    variables = get_variables_and_parse()
+    variables = get_variables()
     if variables:
         generate_variables(variables)
 

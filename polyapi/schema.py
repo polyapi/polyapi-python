@@ -5,6 +5,8 @@ from jsonschema_gentypes import configuration
 import tempfile
 import json
 
+from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
+
 
 def _cleanup_input_for_gentypes(input_data: Dict):
     """ cleanup input_data in place to make it more suitable for jsonschema_gentypes
@@ -84,3 +86,8 @@ def clean_title(title: str) -> str:
     if title == "List":
         title = "List_"
     return title
+
+
+def map_primitive_types(type_: str) -> str:
+    # Define your mapping logic here
+    return JSONSCHEMA_TO_PYTHON_TYPE_MAP.get(type_, "Any")

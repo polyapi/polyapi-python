@@ -1,86 +1,103 @@
 import os
+from typing import List
 
-from polyapi.utils import append_init
+from polyapi.schema import map_primitive_types
+from polyapi.typedefs import PropertyType, VariableSpecDto
+from polyapi.utils import add_import_to_init, init_the_init
+
+
+# GET is only included if the variable is not a secret
+GET_TEMPLATE = """
+    @staticmethod
+    def get() -> {variable_type}:
+        resp = variable_get("{variable_id}")
+        return resp.text
+"""
 
 
 TEMPLATE = """
-import requests
-from polyapi.config import get_api_key_and_url
-from polyapi.exceptions import PolyApiException
-
-
-class {variable_name}:
+class {variable_name}:{get_method}
     @staticmethod
-    def get():
-        secret = {secret}
-        if secret:
-            raise ValueError('Cannot access secret variable from client. Use .inject() instead within Poly function.')
-        else:
-            api_key, base_url = get_api_key_and_url()
-            headers = {{"Authorization": f"Bearer {{api_key}}"}}
-            url = f"{{base_url}}/variables/{variable_id}/value"
-            resp = requests.get(url, headers=headers)
-            if resp.status_code != 200 and resp.status_code != 201:
-                raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
-            return resp.text
-
-    @staticmethod
-    def update(value):
-        api_key, base_url = get_api_key_and_url()
-        headers = {{"Authorization": f"Bearer {{api_key}}"}}
-        url = f"{{base_url}}/variables/{variable_id}"
-        resp = requests.patch(url, data={{"value": value}}, headers=headers)
-        if resp.status_code != 200 and resp.status_code != 201:
-            raise PolyApiException(f"{{resp.status_code}}: {{resp.content}}")
+    def update(value: {variable_type}):
+        resp = variable_update("{variable_id}", value)
         return resp.json()
 
-    def inject(path=None):
+    @staticmethod
+    def inject(path=None) -> {variable_type}:
         return {{
             "type": "PolyVariable",
             "id": "{variable_id}",
             "path": path,
-        }}
-"""
+        }}  # type: ignore"""
 
 
-def generate_variables(variables):
+def generate_variables(variables: List[VariableSpecDto]):
     for variable in variables:
-        create_variable(*variable)
+        create_variable(variable)
     print("Variables generated!")
 
 
-def add_variable_file(full_path: str, variable_name: str, variable_id: str, secret: str):
-    # first lets add the import to the __init__
+def render_variable(variable: VariableSpecDto):
+    variable_type = _get_variable_type(variable["variable"]["valueType"])
+    get_method = (
+        ""
+        if variable["variable"]["secret"]
+        else GET_TEMPLATE.format(
+            variable_id=variable["id"], variable_type=variable_type
+        )
+    )
+    return TEMPLATE.format(
+        variable_name=variable["name"],
+        variable_id=variable["id"],
+        variable_type=variable_type,
+        get_method=get_method,
+    )
+
+
+def _get_variable_type(type_spec: PropertyType) -> str:
+    # simplified version of _get_type from api.py
+    if type_spec["kind"] == "plain":
+        value = type_spec["value"]
+        if value.endswith("[]"):
+            primitive = map_primitive_types(value[:-2])
+            return f"List[{primitive}]"
+        else:
+            return map_primitive_types(value)
+    elif type_spec["kind"] == "primitive":
+        return map_primitive_types(type_spec["type"])
+    elif type_spec["kind"] == "array":
+        return "List"
+    elif type_spec["kind"] == "void":
+        return "None"
+    elif type_spec["kind"] == "object":
+        return "Dict"
+    elif type_spec["kind"] == "any":
+        return "Any"
+    else:
+        return "Any"
+
+
+def create_variable(variable: VariableSpecDto) -> None:
+    folders = ["vari"]
+    if variable["context"]:
+        folders += variable["context"].split(".")
+
+    # build up the full_path by adding all the folders
+    full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+
+    for idx, folder in enumerate(folders):
+        full_path = os.path.join(full_path, folder)
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
+        next = folders[idx + 1] if idx + 1 < len(folders) else None
+        if next:
+            add_import_to_init(full_path, next)
+
+    add_variable_to_init(full_path, variable)
+
+
+def add_variable_to_init(full_path: str, variable: VariableSpecDto):
+    init_the_init(full_path)
     init_path = os.path.join(full_path, "__init__.py")
     with open(init_path, "a") as f:
-        f.write(f"from ._{variable_name} import {variable_name}\n")
-
-    # now lets add the code!
-    file_path = os.path.join(full_path, f"_{variable_name}.py")
-    with open(file_path, "w") as f:
-        f.write(
-            TEMPLATE.format(
-                variable_name=variable_name,
-                variable_id=variable_id,
-                secret=secret,
-            )
-        )
-
-
-def create_variable(path: str, variable_id: str, secret: str) -> None:
-    full_path = os.path.dirname(os.path.abspath(__file__))
-
-    folders = path.split(".")
-    for idx, folder in enumerate(folders):
-        if idx + 1 == len(folders):
-            variable_name = folder
-            add_variable_file(full_path, variable_name, variable_id, secret)
-        else:
-            full_path = os.path.join(full_path, folder)
-            if not os.path.exists(full_path):
-                os.makedirs(full_path)
-
-            # append to __init__.py file if nested folders
-            next = folders[idx + 1] if idx + 2 < len(folders) else ""
-            if next:
-                append_init(full_path, next)
+        f.write(render_variable(variable) + "\n\n")

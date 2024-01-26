@@ -32,6 +32,22 @@ class SpecificationDto(TypedDict):
     context: str
     name: str
     description: str
+    # function is none if this is actually VariableSpecDto
     function: FunctionSpecification | None
-    # variables have variable: {"secret": boolean} and NO function
     type: Literal['apiFunction', 'customFunction', 'serverFunction', 'authFunction', 'webhookHandle', 'serverVariable']
+
+
+class VariableSpecification(TypedDict):
+    environmentId: str
+    value: Any
+    valueType: PropertyType
+    secret: bool
+
+
+class VariableSpecDto(TypedDict):
+    id: str
+    context: str
+    name: str
+    description: str
+    variable: VariableSpecification
+    type: Literal['serverVariable']

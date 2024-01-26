@@ -2,7 +2,21 @@ import re
 import os
 
 
-def append_init(full_path: str, next: str) -> None:
+# this string should be in every __init__ file.
+# it contains all the imports needed for the function or variable code to run
+CODE_IMPORTS = "from typing import List, Dict, Any, TypedDict\nfrom polyapi.execute import execute, variable_get, variable_update\n\n"
+
+
+def init_the_init(full_path: str) -> None:
+    init_path = os.path.join(full_path, "__init__.py")
+    if not os.path.exists(init_path):
+        with open(init_path, "w") as f:
+            f.write(CODE_IMPORTS)
+
+
+def add_import_to_init(full_path: str, next: str) -> None:
+    init_the_init(full_path)
+
     init_path = os.path.join(full_path, "__init__.py")
     with open(init_path, "a+") as f:
         import_stmt = "from . import {}\n".format(next)

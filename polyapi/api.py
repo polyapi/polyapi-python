@@ -1,10 +1,10 @@
 import os
 from typing import Any, Dict, List, Tuple
 
-from polyapi.constants import BASIC_PYTHON_TYPES, JSONSCHEMA_TO_PYTHON_TYPE_MAP
+from polyapi.constants import BASIC_PYTHON_TYPES
 from polyapi.typedefs import PropertySpecification, PropertyType
-from polyapi.utils import append_init, camelCase
-from polyapi.schema import generate_schema_types, clean_title
+from polyapi.utils import add_import_to_init, camelCase, init_the_init
+from polyapi.schema import generate_schema_types, clean_title, map_primitive_types
 
 # map the function type from the spec type to the function execute type
 TEMPLATE_FUNCTION_TYPE_MAP = {
@@ -47,21 +47,16 @@ def {function_name}(
 """
 
 
-def _map_primitive_types(type_: str) -> str:
-    # Define your mapping logic here
-    return JSONSCHEMA_TO_PYTHON_TYPE_MAP.get(type_, "Any")
-
-
 def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
     if type_spec["kind"] == "plain":
         value = type_spec["value"]
         if value.endswith("[]"):
-            primitive = _map_primitive_types(value[:-2])
+            primitive = map_primitive_types(value[:-2])
             return f"List[{primitive}]", ""
         else:
-            return _map_primitive_types(value), ""
+            return map_primitive_types(value), ""
     elif type_spec["kind"] == "primitive":
-        return _map_primitive_types(type_spec["type"]), ""
+        return map_primitive_types(type_spec["type"]), ""
     elif type_spec["kind"] == "array":
         if type_spec.get("items"):
             items = type_spec["items"]
@@ -222,8 +217,7 @@ def add_function_file(
     return_type: Dict[str, Any],
 ):
     # first lets add the import to the __init__
-    init_path = os.path.join(full_path, "__init__.py")
-    _init_the_init(init_path)
+    init_the_init(full_path)
 
     func_str, func_type_defs = render_function(
         function_type,
@@ -234,6 +228,7 @@ def add_function_file(
         return_type,
     )
 
+    init_path = os.path.join(full_path, "__init__.py")
     with open(init_path, "a") as f:
         f.write(f"\n\nfrom . import _{function_name}\n\n{func_str}")
 
@@ -241,12 +236,6 @@ def add_function_file(
     file_path = os.path.join(full_path, f"_{function_name}.py")
     with open(file_path, "w") as f:
         f.write(func_type_defs)
-
-
-def _init_the_init(init_path: str) -> None:
-    if not os.path.exists(init_path):
-        with open(init_path, "w") as f:
-            f.write("from typing import List, Dict, Any, TypedDict\nfrom polyapi.execute import execute\nfrom polyapi.exceptions import PolyApiException\n")
 
 
 def create_function(
@@ -280,8 +269,8 @@ def create_function(
             # append to __init__.py file if nested folders
             next = folders[idx + 1] if idx + 2 < len(folders) else ""
             if next:
-                _init_the_init(os.path.join(full_path, "__init__.py"))
-                append_init(full_path, next)
+                init_the_init(full_path)
+                add_import_to_init(full_path, next)
 
 
 def generate_api(api_functions: List) -> None:
