@@ -23,7 +23,7 @@ jobs:
 
 
     - name: Install pypa/build
-      run: >-
+      run: |
         python3 -m
         pip install
         build
@@ -37,7 +37,7 @@ jobs:
         path: dist/
 
 
-  publish-to-pypi:
+  dev-publish-to-pypi:
     name: Publish Python 🐍 distribution 📦 to PyPI
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/develop' }}
@@ -95,10 +95,10 @@ jobs:
         path: dist/
 
 
-  publish-to-pypi:
+  main-publish-to-pypi:
     name: >-
       Publish Python 🐍 distribution 📦 to PyPI
-    if: ${{ github.ref == 'refs/heads/main' }}  # only publish to PyPI on tag pushes
+    if: ${{ github.ref == 'refs/heads/main' }} 
     needs:
     - main-build
     runs-on: ubuntu-latest
