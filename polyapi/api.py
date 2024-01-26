@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, List, Tuple
 
-from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
+from polyapi.constants import BASIC_PYTHON_TYPES, JSONSCHEMA_TO_PYTHON_TYPE_MAP
 from polyapi.typedefs import PropertySpecification, PropertyType
 from polyapi.utils import append_init, camelCase
 from polyapi.schema import generate_schema_types, clean_title
@@ -12,47 +12,38 @@ TEMPLATE_FUNCTION_TYPE_MAP = {
     "serverFunction": "server",
 }
 
-SERVER_TEMPLATE = """
-import requests
-from typing import List, Dict, Any
-from polyapi.execute import execute
-from polyapi.exceptions import PolyApiException
+SERVER_DEFS_TEMPLATE = """
+from typing import List, Dict, Any, TypedDict
 {args_def}
 {return_type_def}
+"""
+
+SERVER_FUNCTION_TEMPLATE = """
 def {function_name}(
 {args}
 ) -> {return_type_name}:
     "{function_description}"
     resp = execute("{function_type}", "{function_id}", {data})
-    if resp.status_code != 200 and resp.status_code != 201:
-        error_content = resp.content.decode("utf-8", errors="ignore")
-        raise PolyApiException(f"{{resp.status_code}}: {{error_content}}")
-
     return {return_action}
 """
 
-API_TEMPLATE = """
-import requests
+API_DEFS_TEMPLATE = """
 from typing import List, Dict, Any, TypedDict
-from polyapi.execute import execute
-from polyapi.exceptions import PolyApiException
 {args_def}
 {return_type_def}
-class ApiFunctionResponse(TypedDict):
+class {api_response_type}(TypedDict):
     status: int
     headers: Dict
     data: {return_type_name}
+"""
 
-
+API_FUNCTION_TEMPLATE = """
 def {function_name}(
 {args}
-) -> ApiFunctionResponse:
+) -> {api_response_type}:
     "{function_description}"
     resp = execute("{function_type}", "{function_id}", {data})
-    if resp.status_code != 200 and resp.status_code != 201:
-        error_content = resp.content.decode("utf-8", errors="ignore")
-        raise PolyApiException(f"{{resp.status_code}}: {{error_content}}")
-    return ApiFunctionResponse(resp.json())
+    return {api_response_type}(resp.json())  # type: ignore
 """
 
 
@@ -118,7 +109,7 @@ def _get_type(type_spec: PropertyType) -> Tuple[str, str]:
         return "Any", ""
 
 
-def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
+def _parse_arguments(function_name: str, arguments: List[PropertySpecification]) -> Tuple[str, str]:
     args_def = []
     arg_string = ""
     for idx, a in enumerate(arguments):
@@ -126,7 +117,7 @@ def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
         if arg_def:
             args_def.append(arg_def)
         a["name"] = camelCase(a["name"])
-        arg_string += f"    {a['name']}: {arg_type}"
+        arg_string += f"    {a['name']}: {_add_type_import_path(function_name, arg_type)}"
         description = a.get("description", "")
         if description:
             if idx == len(arguments) - 1:
@@ -138,6 +129,26 @@ def _parse_arguments(arguments: List[PropertySpecification]) -> Tuple[str, str]:
     return arg_string.rstrip("\n"), "\n\n".join(args_def)
 
 
+def _add_type_import_path(function_name: str, arg: str) -> str:
+    """ if not basic type, coerce to camelCase and add the import path
+    """
+    if arg in BASIC_PYTHON_TYPES:
+        return arg
+
+    if arg.startswith("List["):
+        sub = arg[5:-1]
+        if sub in BASIC_PYTHON_TYPES:
+            return arg
+        else:
+            if '"' in sub:
+                sub = sub.replace('"', "")
+                return f'List["_{function_name}.{camelCase(sub)}"]'
+            else:
+                return f'List[_{function_name}.{camelCase(sub)}]'
+
+    return f'_{function_name}.{camelCase(arg)}'
+
+
 def render_function(
     function_type: str,
     function_name: str,
@@ -145,38 +156,44 @@ def render_function(
     function_description: str,
     arguments: List[PropertySpecification],
     return_type: Dict[str, Any],
-) -> str:
+) -> Tuple[str, str]:
     arg_names = [a["name"] for a in arguments]
-    args, args_def = _parse_arguments(arguments)
+    args, args_def = _parse_arguments(function_name, arguments)
     return_type_name, return_type_def = _get_type(return_type)  # type: ignore
     data = "{" + ", ".join([f"'{arg}': {camelCase(arg)}" for arg in arg_names]) + "}"
     if function_type == "apiFunction":
-        rendered = API_TEMPLATE.format(
+        api_response_type = f"{function_name}Response"
+        func_type_defs = API_DEFS_TEMPLATE.format(
+            args_def=args_def,
+            api_response_type=api_response_type,
+            return_type_name=return_type_name,
+            return_type_def=return_type_def,
+        )
+        func_str = API_FUNCTION_TEMPLATE.format(
             function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
             function_name=function_name,
             function_id=function_id,
             function_description=function_description.replace('"', "'"),
             args=args,
-            args_def=args_def,
-            return_type_name=return_type_name,
-            return_type_def=return_type_def,
             data=data,
+            api_response_type=_add_type_import_path(function_name, api_response_type),
         )
     else:
-        return_action = _get_server_return_action(return_type_name)
-        rendered = SERVER_TEMPLATE.format(
+        func_type_defs = SERVER_DEFS_TEMPLATE.format(
+            args_def=args_def,
+            return_type_def=return_type_def,
+        )
+        func_str = SERVER_FUNCTION_TEMPLATE.format(
+            return_type_name=_add_type_import_path(function_name, return_type_name),
             function_type=TEMPLATE_FUNCTION_TYPE_MAP[function_type],
             function_name=function_name,
             function_id=function_id,
             function_description=function_description.replace('"', "'"),
             args=args,
-            args_def=args_def,
-            return_type_name=return_type_name,
-            return_type_def=return_type_def,
-            return_action=return_action,
+            return_action=_get_server_return_action(return_type_name),
             data=data,
         )
-    return rendered
+    return func_str, func_type_defs
 
 
 def _get_server_return_action(return_type_name: str) -> str:
@@ -206,22 +223,30 @@ def add_function_file(
 ):
     # first lets add the import to the __init__
     init_path = os.path.join(full_path, "__init__.py")
+    _init_the_init(init_path)
+
+    func_str, func_type_defs = render_function(
+        function_type,
+        function_name,
+        function_id,
+        function_description,
+        arguments,
+        return_type,
+    )
+
     with open(init_path, "a") as f:
-        f.write(f"from ._{function_name} import {function_name}\n")
+        f.write(f"\n\nfrom . import _{function_name}\n\n{func_str}")
 
     # now lets add the code!
     file_path = os.path.join(full_path, f"_{function_name}.py")
     with open(file_path, "w") as f:
-        f.write(
-            render_function(
-                function_type,
-                function_name,
-                function_id,
-                function_description,
-                arguments,
-                return_type,
-            )
-        )
+        f.write(func_type_defs)
+
+
+def _init_the_init(init_path: str) -> None:
+    if not os.path.exists(init_path):
+        with open(init_path, "w") as f:
+            f.write("from typing import List, Dict, Any, TypedDict\nfrom polyapi.execute import execute\nfrom polyapi.exceptions import PolyApiException\n")
 
 
 def create_function(
@@ -255,6 +280,7 @@ def create_function(
             # append to __init__.py file if nested folders
             next = folders[idx + 1] if idx + 2 < len(folders) else ""
             if next:
+                _init_the_init(os.path.join(full_path, "__init__.py"))
                 append_init(full_path, next)
 
 

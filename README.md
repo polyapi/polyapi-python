@@ -88,6 +88,11 @@ def bar(n: int) -> Foobar:
     return Foobar(count=n)
 ```
 
+## Pypi
+
+This library is hosted on Pypi. You can find the latest version on the [pypi polyapi-python](https://pypi.org/project/polyapi-python/) project.
+
+
 ## Upgrade
 
 To upgrade your library to the latest version, pass the upgrade flag.
@@ -111,3 +116,7 @@ To run this library's unit tests, please clone the repo then run:
 ```bash
 python -m unittest discover
 ```
+
+## Support
+
+If you run into any issues or want help getting started with this project, please contact support@polyapi.io
