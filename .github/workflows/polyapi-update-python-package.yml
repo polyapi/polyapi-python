@@ -60,7 +60,7 @@ jobs:
 
 
   invoke-remote-workflow:
-    uses: polyapi/poly-alpha/.github/workflows/polyapi-update-pre-built-python-image.yml@develop
+    uses: polyapi/poly-alpha/.github/workflows/polyapi-update-pre-built-python-image.yml
 
   main-build:
     name: Build distribution 📦
