@@ -69,6 +69,11 @@ def initialize_config():
 
 
 def clear_config():
+    global API_KEY
+    global API_URL
+    API_KEY = None
+    API_URL = None
+
     path = get_config_file_path()
     if os.path.exists(path):
         os.remove(path)
