@@ -3,7 +3,7 @@ import unittest
 from polyapi.api import render_function
 
 ACCUWEATHER = {
-    "id": "f7588018-2364-4586-b60d-b08a285f1ea3",
+    "id": "f7588018-2364-4586-b60d",
     "name": "accuweatherGetlocation",
     "context": "",
     "description": "",
@@ -126,8 +126,103 @@ TWILIO = {
     },
 }
 
+TWILIO_GET_DETAILS = {
+    "id": "123abcde",
+    "type": "apiFunction",
+    "context": "OOB.twilio.messages",
+    "name": "getDetails",
+    "description": "Retrieves a message from a specific Twilio account. The API call includes parameters for the 'to' and 'from' phone numbers, and the date the message was sent. For more details: https://www.twilio.com/docs/sms/api/message-resource#fetch-a-message-resource",
+    "function": {
+        "arguments": [
+            {
+                "name": "accountSID",
+                "description": "This is a unique identifier for the Twilio account from which the message is to be retrieved. It is a string that acts as an authentication token, ensuring that the user has the necessary permissions to access the desired information.",
+                "required": True,
+                "type": {"kind": "primitive", "type": "string"},
+            },
+            {
+                "name": "messageSID",
+                "description": "This is a unique identifier for the specific message that is to be retrieved. It is a string that Twilio uses to track and manage every individual message that is sent or received through their platform.",
+                "required": True,
+                "type": {"kind": "primitive", "type": "string"},
+            },
+            {
+                "name": "authToken",
+                "description": "",
+                "required": True,
+                "type": {"kind": "primitive", "type": "string"},
+            },
+        ],
+        "returnType": {
+            "kind": "object",
+            "schema": {
+                "$schema": "http://json-schema.org/draft-06/schema#",
+                "definitions": {
+                    "SubresourceUris": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "media": {"type": "string"},
+                            "feedback": {"type": "string"},
+                        },
+                        "required": ["feedback", "media"],
+                        "title": "SubresourceUris",
+                    }
+                },
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "body": {"type": "string"},
+                    "num_segments": {"type": "string", "format": "integer"},
+                    "direction": {"type": "string"},
+                    "from": {"type": "string"},
+                    "date_updated": {"type": "string"},
+                    "price": {"type": "string"},
+                    "error_message": {"type": "null"},
+                    "uri": {"type": "string"},
+                    "account_sid": {"type": "string"},
+                    "num_media": {"type": "string", "format": "integer"},
+                    "to": {"type": "string"},
+                    "date_created": {"type": "string"},
+                    "status": {"type": "string"},
+                    "sid": {"type": "string"},
+                    "date_sent": {"type": "string"},
+                    "messaging_service_sid": {"type": "null"},
+                    "error_code": {"type": "null"},
+                    "price_unit": {"type": "string"},
+                    "api_version": {"type": "string", "format": "date"},
+                    "subresource_uris": {"$ref": "#/definitions/SubresourceUris"},
+                },
+                "required": [
+                    "account_sid",
+                    "api_version",
+                    "body",
+                    "date_created",
+                    "date_sent",
+                    "date_updated",
+                    "direction",
+                    "error_code",
+                    "error_message",
+                    "from",
+                    "messaging_service_sid",
+                    "num_media",
+                    "num_segments",
+                    "price",
+                    "price_unit",
+                    "sid",
+                    "status",
+                    "subresource_uris",
+                    "to",
+                    "uri",
+                ],
+                "title": "ResponseType",
+            },
+        },
+    },
+}
+
 GET_PRODUCTS_COUNT = {
-    "id": "8f7d24b0-4a29-40c0-9091-b3d773c748fb",
+    "id": "8f7d24b0-4a29-40c0-9091",
     "type": "serverFunction",
     "context": "test",
     "name": "getProductsCount111",
@@ -169,7 +264,7 @@ class T(unittest.TestCase):
         self.assertIn(f"-> _{name}.{name}Response", func_str)
 
     def test_render_function_zillow(self):
-        name = ZILLOW['name']
+        name = ZILLOW["name"]
         func_str, _ = render_function(
             ZILLOW["type"],
             name,
@@ -183,7 +278,7 @@ class T(unittest.TestCase):
         self.assertIn(f"-> _{name}.{name}Response", func_str)
 
     def test_render_function_twilio_api(self):
-        name = TWILIO['name']
+        name = TWILIO["name"]
         func_str, _ = render_function(
             TWILIO["type"],
             TWILIO["name"],
@@ -197,9 +292,23 @@ class T(unittest.TestCase):
         self.assertIn("authToken: str", func_str)
         self.assertIn(f"-> _{name}.{name}Response", func_str)
 
+    def test_render_function_twilio_get_details(self):
+        # same test but try it as a serverFunction rather than an apiFunction
+        name = TWILIO_GET_DETAILS["name"]
+        func_str, _ = render_function(
+            TWILIO_GET_DETAILS["type"],
+            TWILIO_GET_DETAILS["name"],
+            TWILIO_GET_DETAILS["id"],
+            TWILIO_GET_DETAILS["description"],
+            TWILIO_GET_DETAILS["function"]["arguments"],
+            TWILIO_GET_DETAILS["function"]["returnType"],
+        )
+        self.assertIn(TWILIO_GET_DETAILS["id"], func_str)
+        self.assertIn(f"-> _{name}.{name}Response", func_str)
+
     def test_render_function_twilio_server(self):
         # same test but try it as a serverFunction rather than an apiFunction
-        name = TWILIO['name']
+        name = TWILIO["name"]
         func_str, _ = render_function(
             "serverFunction",
             TWILIO["name"],
