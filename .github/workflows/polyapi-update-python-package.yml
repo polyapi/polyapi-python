@@ -58,10 +58,7 @@ jobs:
     - name: Publish distribution 📦 to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
 
-
-  invoke-remote-workflow:
-    uses: polyapi/poly-alpha/.github/workflows/polyapi-update-pre-built-python-image.yml
-
+          
   main-build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
