@@ -295,7 +295,7 @@ class T(unittest.TestCase):
     def test_render_function_twilio_get_details(self):
         # same test but try it as a serverFunction rather than an apiFunction
         name = TWILIO_GET_DETAILS["name"]
-        func_str, _ = render_function(
+        func_str, func_type_defs = render_function(
             TWILIO_GET_DETAILS["type"],
             TWILIO_GET_DETAILS["name"],
             TWILIO_GET_DETAILS["id"],
@@ -305,6 +305,8 @@ class T(unittest.TestCase):
         )
         self.assertIn(TWILIO_GET_DETAILS["id"], func_str)
         self.assertIn(f"-> _{name}.{name}Response", func_str)
+        self.assertIn("class SubresourceUris", func_type_defs)
+        # self.assertIn('Required["SubresourceUris"]', func_type_defs)
 
     def test_render_function_twilio_server(self):
         # same test but try it as a serverFunction rather than an apiFunction

@@ -38,7 +38,7 @@ def generate_schema_types(input_data: Dict, root=None):
     _cleanup_input_for_gentypes(input_data)
     tmp_input = _temp_store_input_data(input_data)
     tmp_output = tempfile.NamedTemporaryFile(
-        mode="w", delete=False, prefix="polyapi_", suffix=".json"
+        mode="w", delete=False, prefix="polyapi_", suffix=".py"
     ).name
 
     config: configuration.Configuration = {
