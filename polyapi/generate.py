@@ -4,7 +4,7 @@ import os
 import shutil
 from typing import Any, Dict, List, Tuple
 
-from .typedefs import PropertySpecification, VariableSpecDto
+from .typedefs import PropertySpecification, SpecificationDto, VariableSpecDto
 from .utils import get_auth_headers
 from .api import generate_api
 from .variables import generate_variables
@@ -58,11 +58,11 @@ def parse_specs(
     return api_functions
 
 
-def cache_specs(specs):
+def cache_specs(specs: List[SpecificationDto]):
     supported = []
     for spec in specs:
         # this needs to stay in sync with logic in parse_specs
-        if spec["type"] == "apiFunction" or spec["type"] == "serverFunction":
+        if spec["type"] == "apiFunction" or spec["type"] == "serverFunction" or spec["type"] == "serverVariable":
             supported.append(spec)
 
     full_path = os.path.dirname(os.path.abspath(__file__))
