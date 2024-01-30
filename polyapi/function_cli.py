@@ -11,7 +11,8 @@ from pydantic import TypeAdapter
 from polyapi.generate import get_functions_and_parse, generate_api
 from polyapi.config import get_api_key_and_url
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
-from polyapi.utils import get_auth_headers
+from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
+import importlib
 
 
 # these libraries are already installed in the base docker image
@@ -141,6 +142,14 @@ def _parse_code(code: str, function_name: str):
     return parsed_args, return_type, return_type_schema, requirements
 
 
+def _func_already_exists(context: str, function_name: str) -> bool:
+    try:
+        module = importlib.import_module(f"polyapi.poly.{context}")
+        return bool(getattr(module, function_name, False))
+    except ModuleNotFoundError:
+        return False
+
+
 def function_add_or_update(
     context: str, description: str, server: bool, logs_enabled: bool, subcommands: List
 ):
@@ -149,6 +158,9 @@ def function_add_or_update(
     parser.add_argument("function_name")
     parser.add_argument("filename")
     args = parser.parse_args(subcommands)
+
+    verb = "Updating" if _func_already_exists(context, args.function_name) else "Adding"
+    print(f"{verb} custom server side function...", end="")
 
     with open(args.filename, "r") as f:
         code = f.read()
@@ -162,10 +174,12 @@ def function_add_or_update(
     ) = _parse_code(code, args.function_name)
 
     if not return_type:
-        print(
-            f"Error: function named {args.function_name} not found as top-level function in file. Exiting."
-        )
+        print_red("ERROR")
+        print(f"Function {args.function_name} not found as top-level function in {args.filename}")
         sys.exit(1)
+
+    if requirements:
+        print_yellow('\nPlease note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi.')
 
     data = {
         "context": context,
@@ -189,14 +203,15 @@ def function_add_or_update(
         # url = f"{base_url}/functions/client"
 
     headers = get_auth_headers(api_key)
-    print("Adding function...")
     resp = requests.post(url, headers=headers, json=data)
     if resp.status_code == 201:
+        print_green("DEPLOYED")
         function_id = resp.json()["id"]
-        print(f"Function added successfully. Function id is {function_id}")
-        print("Adding new function to environment...")
+        print(f"Function ID: {function_id}")
+        print("Generating new custom function...", end="")
         functions = get_functions_and_parse(limit_ids=[function_id])
         generate_api(functions)
+        print_green("DONE")
     else:
         print("Error adding function.")
         print(resp.status_code)

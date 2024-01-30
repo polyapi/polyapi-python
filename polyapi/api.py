@@ -276,4 +276,3 @@ def create_function(
 def generate_api(api_functions: List) -> None:
     for func in api_functions:
         create_function(*func)
-    print("API functions generated!")

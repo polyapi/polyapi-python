@@ -34,7 +34,6 @@ class {variable_name}:{get_method}
 def generate_variables(variables: List[VariableSpecDto]):
     for variable in variables:
         create_variable(variable)
-    print("Variables generated!")
 
 
 def render_variable(variable: VariableSpecDto):

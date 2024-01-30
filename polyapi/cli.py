@@ -1,21 +1,30 @@
 import argparse
 
+from polyapi.utils import print_green
+
 from .config import clear_config
 from .generate import generate, clear
 from .function_cli import function_add_or_update
 
 
-CLI_COMMANDS = ["generate", "config", "clear", "function", "help"]
+CLI_COMMANDS = ["setup", "generate", "function", "clear", "help"]
+
+CLIENT_DESC = """Commands
+  python -m polyapi setup                Setup your Poly connection
+  python -m polyapi generate             Generates Poly library
+  python -m polyapi function <command>   Manages functions
+  python -m polyapi clear                Clear current generated Poly library
+"""
 
 
 def execute_from_cli():
     parser = argparse.ArgumentParser(
-        prog="python -m polyapi", description="PolyAPI Client"
+        prog="python -m polyapi", description=CLIENT_DESC, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("--context", required=False, default="")
     parser.add_argument("--description", required=False, default="")
-    parser.add_argument("--server", action="store_true", help="Pass --server if you want this to be a server function. By default, it will be a client function.")
-    parser.add_argument("--logs", action="store_true", help="Pass --logs if you want to store and see the logs from this function executing")
+    parser.add_argument("--server", action="store_true", help="Pass --server when adding function to add a server function. By default, new functions are client.")
+    parser.add_argument("--logs", action="store_true", help="Pass --logs when adding function if you want to store and see the function logs.")
     parser.add_argument("command", choices=CLI_COMMANDS)
     parser.add_argument("subcommands", nargs="*")
     args = parser.parse_args()
@@ -24,10 +33,10 @@ def execute_from_cli():
     if command == "help":
         parser.print_help()
     elif command == "generate":
-        print("Generating...")
+        print("Generating Poly functions...", end="")
         generate()
-    elif command == "config":
-        print("Clearing old config...")
+        print_green("DONE")
+    elif command == "setup":
         clear_config()
         generate()
     elif command == "clear":

@@ -1,5 +1,6 @@
 import re
 import os
+from colorama import Fore, Style
 
 
 # this string should be in every __init__ file.
@@ -38,3 +39,15 @@ def camelCase(s):
     else:
         # s is already in camelcase as best as we can tell, just move on!
         return s
+
+
+def print_green(s: str):
+    print(Fore.GREEN + s + Style.RESET_ALL)
+
+
+def print_yellow(s: str):
+    print(Fore.YELLOW + s + Style.RESET_ALL)
+
+
+def print_red(s: str):
+    print(Fore.RED + s + Style.RESET_ALL)

@@ -69,6 +69,10 @@ def initialize_config():
 
 
 def clear_config():
+    if os.environ.get("POLY_API_KEY"):
+        print("Using POLY_API_KEY from environment. Please unset environment variable to manually set api key.")
+        return
+
     global API_KEY
     global API_URL
     API_KEY = None
