@@ -25,14 +25,11 @@ def get_specs() -> List:
 
 def parse_specs(
     specs: List,
+    limit_ids: List[str] | None  # optional list of ids to limit to
 ) -> List[Tuple[str, str, str, str, List[PropertySpecification], Dict[str, Any]]]:
-    # optional array of ids to include in the generated library
-    # currently just used for testing/development purposes
-    allowed_ids: List[str] = []
-
     api_functions = []
     for spec in specs:
-        if allowed_ids and spec["id"] not in allowed_ids:
+        if limit_ids and spec["id"] not in limit_ids:
             continue
 
         if spec["type"] != "apiFunction" and spec["type"] != "serverFunction":
@@ -74,10 +71,10 @@ def cache_specs(specs: List[SpecificationDto]):
         f.write(json.dumps(supported))
 
 
-def get_functions_and_parse():
+def get_functions_and_parse(limit_ids: List[str] | None = None):
     specs = get_specs()
     cache_specs(specs)
-    functions = parse_specs(specs)
+    functions = parse_specs(specs, limit_ids=limit_ids)
     return functions
 
 
