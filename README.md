@@ -109,6 +109,14 @@ To upgrade your library to the latest dev version, pass the `--pre` flag.
 pip install polyapi-python --pre --upgrade
 ```
 
+## Change Your API Key
+
+If you need to change your API key or what server you are pointing to, you can run:
+
+```bash
+python -m polyapi setup
+```
+
 ## Unit Tests
 
 To run this library's unit tests, please clone the repo then run:
