@@ -5,8 +5,9 @@ import shutil
 from typing import Any, Dict, List, Tuple
 
 from .typedefs import PropertySpecification, SpecificationDto, VariableSpecDto
-from .utils import get_auth_headers
-from .api import generate_api
+from .api import render_api_function
+from .server import render_server_function
+from .utils import add_import_to_init, get_auth_headers, init_the_init
 from .variables import generate_variables
 from .config import get_api_key_and_url, initialize_config
 
@@ -109,7 +110,7 @@ def generate() -> None:
 
     functions = get_functions_and_parse()
     if functions:
-        generate_api(functions)
+        generate_functions(functions)
     else:
         print(
             "No functions exist yet in this tenant! Empty library initialized. Let's add some functions!"
@@ -136,3 +137,85 @@ def clear() -> None:
     if os.path.exists(vari_path):
         shutil.rmtree(vari_path)
     print("Cleared!")
+
+
+def add_function_file(
+    function_type: str,
+    full_path: str,
+    function_name: str,
+    function_id: str,
+    function_description: str,
+    arguments: List[PropertySpecification],
+    return_type: Dict[str, Any],
+):
+    # first lets add the import to the __init__
+    init_the_init(full_path)
+
+    if function_type == "apiFunction":
+        func_str, func_type_defs = render_api_function(
+            function_type,
+            function_name,
+            function_id,
+            function_description,
+            arguments,
+            return_type,
+        )
+    elif function_type == "serverFunction":
+        func_str, func_type_defs = render_server_function(
+            function_type,
+            function_name,
+            function_id,
+            function_description,
+            arguments,
+            return_type,
+        )
+
+
+    init_path = os.path.join(full_path, "__init__.py")
+    with open(init_path, "a") as f:
+        f.write(f"\n\nfrom . import _{function_name}\n\n{func_str}")
+
+    # now lets add the code!
+    file_path = os.path.join(full_path, f"_{function_name}.py")
+    with open(file_path, "w") as f:
+        f.write(func_type_defs)
+
+
+def create_function(
+    function_type: str,
+    path: str,
+    function_id: str,
+    function_description: str,
+    arguments: List[PropertySpecification],
+    return_type: Dict[str, Any],
+) -> None:
+    full_path = os.path.dirname(os.path.abspath(__file__))
+
+    folders = path.split(".")
+    for idx, folder in enumerate(folders):
+        if idx + 1 == len(folders):
+            # special handling for final level
+            add_function_file(
+                function_type,
+                full_path,
+                folder,
+                function_id,
+                function_description,
+                arguments,
+                return_type,
+            )
+        else:
+            full_path = os.path.join(full_path, folder)
+            if not os.path.exists(full_path):
+                os.makedirs(full_path)
+
+            # append to __init__.py file if nested folders
+            next = folders[idx + 1] if idx + 2 < len(folders) else ""
+            if next:
+                init_the_init(full_path)
+                add_import_to_init(full_path, next)
+
+
+def generate_functions(functions: List) -> None:
+    for func in functions:
+        create_function(*func)

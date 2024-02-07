@@ -8,7 +8,7 @@ from typing_extensions import _TypedDictMeta  # type: ignore
 import requests
 from stdlib_list import stdlib_list
 from pydantic import TypeAdapter
-from polyapi.generate import get_functions_and_parse, generate_api
+from polyapi.generate import get_functions_and_parse, generate_functions
 from polyapi.config import get_api_key_and_url
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
 from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
@@ -210,7 +210,7 @@ def function_add_or_update(
         print(f"Function ID: {function_id}")
         print("Generating new custom function...", end="")
         functions = get_functions_and_parse(limit_ids=[function_id])
-        generate_api(functions)
+        generate_functions(functions)
         print_green("DONE")
     else:
         print("Error adding function.")
