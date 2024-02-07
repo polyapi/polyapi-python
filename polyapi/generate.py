@@ -13,12 +13,13 @@ from .utils import add_import_to_init, get_auth_headers, init_the_init
 from .variables import generate_variables
 from .config import get_api_key_and_url, initialize_config
 
-SUPPORTED_TYPES = {
+SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
     "authFunction",
     "serverFunction",
-    "serverVariable",
 }
+
+SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable"}
 
 
 def get_specs() -> List:
@@ -33,17 +34,16 @@ def get_specs() -> List:
         raise NotImplementedError(resp.content)
 
 
-def parse_specs(
+def parse_function_specs(
     specs: List,
     limit_ids: List[str] | None  # optional list of ids to limit to
 ) -> List[Tuple[str, str, str, str, List[PropertySpecification], Dict[str, Any]]]:
-    api_functions = []
+    functions = []
     for spec in specs:
         if limit_ids and spec["id"] not in limit_ids:
             continue
 
-        if spec["type"] != "apiFunction" and spec["type"] != "serverFunction":
-            # for now we only support api and server functions
+        if spec["type"] not in SUPPORTED_FUNCTION_TYPES:
             continue
 
         function_type = spec["type"]
@@ -52,7 +52,7 @@ def parse_specs(
         arguments: List[PropertySpecification] = [
             arg for arg in spec["function"]["arguments"]
         ]
-        api_functions.append(
+        functions.append(
             (
                 function_type,
                 function_name,
@@ -62,7 +62,7 @@ def parse_specs(
                 spec["function"]["returnType"],
             )
         )
-    return api_functions
+    return functions
 
 
 def cache_specs(specs: List[SpecificationDto]):
@@ -84,7 +84,7 @@ def cache_specs(specs: List[SpecificationDto]):
 def get_functions_and_parse(limit_ids: List[str] | None = None):
     specs = get_specs()
     cache_specs(specs)
-    functions = parse_specs(specs, limit_ids=limit_ids)
+    functions = parse_function_specs(specs, limit_ids=limit_ids)
     return functions
 
 
