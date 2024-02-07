@@ -11,14 +11,15 @@ from typing import List, Dict, Any, TypedDict
 """
 
 GET_TOKEN_TEMPLATE = """
-def getToken(clientId, clientSecret, scopes, callback, userId):
+def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Dict[str, Any] = None):
     {description}
+    options = options or {{}}
     url = "/auth-providers/{function_id}/execute"
     resp = execute_post(url, {{
         "clientId": clientId,
         "clientSecret": clientSecret,
         "scopes": scopes,
-        "userId": userId,
+        "userId": options.get("userId"),
     }})
     data = resp.json()
     assert resp.status_code == 201, (resp.status_code, resp.content)
