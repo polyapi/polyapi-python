@@ -4,12 +4,21 @@ import os
 import shutil
 from typing import Any, Dict, List, Tuple
 
+from polyapi.auth import render_auth_function
+
 from .typedefs import PropertySpecification, SpecificationDto, VariableSpecDto
 from .api import render_api_function
 from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init
 from .variables import generate_variables
 from .config import get_api_key_and_url, initialize_config
+
+SUPPORTED_TYPES = {
+    "apiFunction",
+    "authFunction",
+    "serverFunction",
+    "serverVariable",
+}
 
 
 def get_specs() -> List:
@@ -60,7 +69,7 @@ def cache_specs(specs: List[SpecificationDto]):
     supported = []
     for spec in specs:
         # this needs to stay in sync with logic in parse_specs
-        if spec["type"] == "apiFunction" or spec["type"] == "serverFunction" or spec["type"] == "serverVariable":
+        if spec["type"] in SUPPORTED_TYPES:
             supported.append(spec)
 
     full_path = os.path.dirname(os.path.abspath(__file__))
@@ -169,16 +178,26 @@ def add_function_file(
             arguments,
             return_type,
         )
+    elif function_type == "authFunction":
+        func_str, func_type_defs = render_auth_function(
+            function_type,
+            function_name,
+            function_id,
+            function_description,
+            arguments,
+            return_type,
+        )
 
+    if func_str:
+        # add function to init
+        init_path = os.path.join(full_path, "__init__.py")
+        with open(init_path, "a") as f:
+            f.write(f"\n\nfrom . import _{function_name}\n\n{func_str}")
 
-    init_path = os.path.join(full_path, "__init__.py")
-    with open(init_path, "a") as f:
-        f.write(f"\n\nfrom . import _{function_name}\n\n{func_str}")
-
-    # now lets add the code!
-    file_path = os.path.join(full_path, f"_{function_name}.py")
-    with open(file_path, "w") as f:
-        f.write(func_type_defs)
+        # add type_defs to underscore file
+        file_path = os.path.join(full_path, f"_{function_name}.py")
+        with open(file_path, "w") as f:
+            f.write(func_type_defs)
 
 
 def create_function(
