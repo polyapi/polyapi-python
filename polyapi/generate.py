@@ -120,6 +120,11 @@ def generate() -> None:
     if variables:
         generate_variables(variables)
 
+    # indicator to vscode extension that this is a polyapi-python project
+    file_path = os.path.join(os.getcwd(), '.polyapi-python')
+    open(file_path, 'w').close()
+
+
 
 def clear() -> None:
     base = os.path.dirname(os.path.abspath(__file__))

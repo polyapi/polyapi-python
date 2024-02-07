@@ -29,6 +29,7 @@ __pycache__
 
 # poly
 .config.env
+.polyapi-python
 function_add_test.py
 lib_test.py
 lib_test2.py
