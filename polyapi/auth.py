@@ -21,8 +21,17 @@ def getToken(clientId, clientSecret, scopes, callback, userId):
         "userId": userId,
     }})
     data = resp.json()
-    assert resp.status_code == 201, resp.status_code
+    assert resp.status_code == 201, (resp.status_code, resp.content)
     return callback(data.get("token"), data.get("url"), data.get("error"))
+"""
+
+REFRESH_TOKEN_TEMPLATE = """
+def refreshToken(token: str) -> str:
+    {description}
+    url = "/auth-providers/{function_id}/refresh"
+    resp = execute_post(url, {{"token": token}})
+    assert resp.status_code == 201, (resp.status_code, resp.content)
+    return resp.text
 """
 
 REVOKE_TOKEN_TEMPLATE = """
@@ -30,7 +39,7 @@ def revokeToken(token: str) -> None:
     {description}
     url = "/auth-providers/{function_id}/revoke"
     resp = execute_post(url, {{"token": token}})
-    assert resp.status_code == 201, resp.status_code
+    assert resp.status_code == 201, (resp.status_code, resp.content)
 """
 
 
@@ -58,6 +67,8 @@ def render_auth_function(
 
     if function_name == "getToken":
         func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
+    elif function_name == "refreshToken":
+        func_str = REFRESH_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
     elif function_name == "revokeToken":
         func_str = REVOKE_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
 
