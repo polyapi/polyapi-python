@@ -11,7 +11,8 @@ from typing import List, Dict, Any, TypedDict
 """
 
 GET_TOKEN_TEMPLATE = """
-def getToken(clientId, clientSecret, scopes, callback, userId) -> Dict:
+def getToken(clientId, clientSecret, scopes, callback, userId):
+    {description}
     url = "/auth-providers/{function_id}/execute"
     resp = execute_post(url, {{
         "clientId": clientId,
@@ -20,7 +21,16 @@ def getToken(clientId, clientSecret, scopes, callback, userId) -> Dict:
         "userId": userId,
     }})
     data = resp.json()
+    assert resp.status_code == 201, resp.status_code
     return callback(data.get("token"), data.get("url"), data.get("error"))
+"""
+
+REVOKE_TOKEN_TEMPLATE = """
+def revokeToken(token: str) -> None:
+    {description}
+    url = "/auth-providers/{function_id}/revoke"
+    resp = execute_post(url, {{"token": token}})
+    assert resp.status_code == 201, resp.status_code
 """
 
 
@@ -43,7 +53,12 @@ def render_auth_function(
 
     func_str = ""
 
+    if function_description:
+        function_description = f'"""{function_description}"""'
+
     if function_name == "getToken":
-        func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id)
+        func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
+    elif function_name == "revokeToken":
+        func_str = REVOKE_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
 
     return func_str, func_type_defs
