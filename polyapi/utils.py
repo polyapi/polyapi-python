@@ -9,7 +9,7 @@ from polyapi.schema import generate_schema_types, clean_title, map_primitive_typ
 
 # this string should be in every __init__ file.
 # it contains all the imports needed for the function or variable code to run
-CODE_IMPORTS = "from typing import List, Dict, Any, TypedDict\nfrom polyapi.execute import execute, variable_get, variable_update\n\n"
+CODE_IMPORTS = "from typing import List, Dict, Any, TypedDict\nimport requests\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
 
 
 def init_the_init(full_path: str) -> None:

@@ -5,6 +5,8 @@ from polyapi.exceptions import PolyApiException
 
 
 def execute(function_type, function_id, data) -> Response:
+    """ execute a specific function id/type
+    """
     api_key, api_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}
     url = f"{api_url}/functions/{function_type}/{function_id}/execute"
@@ -12,6 +14,13 @@ def execute(function_type, function_id, data) -> Response:
     if resp.status_code != 200 and resp.status_code != 201:
         error_content = resp.content.decode("utf-8", errors="ignore")
         raise PolyApiException(f"{resp.status_code}: {error_content}")
+    return resp
+
+
+def execute_post(path, data):
+    api_key, api_url = get_api_key_and_url()
+    headers = {"Authorization": f"Bearer {api_key}"}
+    resp = requests.post(api_url + path, json=data, headers=headers)
     return resp
 
 
