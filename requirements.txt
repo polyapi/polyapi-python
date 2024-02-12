@@ -4,3 +4,4 @@ jsonschema-gentypes
 pydantic>=2.5.3
 stdlib_list
 colorama
+websockets==12.0
