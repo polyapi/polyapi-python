@@ -13,14 +13,18 @@ from typing import List, Dict, Any, TypedDict
 GET_TOKEN_TEMPLATE = """
 def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Dict[str, Any] = None):
     {description}
+    # TODO timeout, autoCloseOnUrl, autoCloseOnToken
     options = options or {{}}
     url = "/auth-providers/{function_id}/execute"
-    resp = execute_post(url, {{
+    data = {{
         "clientId": clientId,
         "clientSecret": clientSecret,
         "scopes": scopes,
+        "audience": options.get("audience"),
+        "callbackUrl": options.get("callbackUrl"),
         "userId": options.get("userId"),
-    }})
+    }}
+    resp = execute_post(url, data)
     data = resp.json()
     assert resp.status_code == 201, (resp.status_code, resp.content)
     return callback(data.get("token"), data.get("url"), data.get("error"))
