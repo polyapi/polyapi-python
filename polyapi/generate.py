@@ -235,6 +235,9 @@ def create_function(
                 add_import_to_init(full_path, next)
 
 
+# TODO create the socket and pass to create_function?
+
+
 def generate_functions(functions: List) -> None:
     for func in functions:
         create_function(*func)

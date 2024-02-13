@@ -6,7 +6,7 @@ name = "polyapi-python"
 version = "0.1.0.dev14"
 description = "The PolyAPI Python Client"
 authors = [{ name = "Dan Fellin", email = "dan@polyapi.io" }]
-dependencies = ["requests", "typing_extensions", "jsonschema-gentypes", "pydantic>=2.5.3", "stdlib_list", "colorama"]
+dependencies = ["requests", "typing_extensions", "jsonschema-gentypes", "pydantic>=2.5.3", "stdlib_list", "colorama", "python-socketio[asyncio_client]"]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"

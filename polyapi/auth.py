@@ -11,6 +11,9 @@ from typing import List, Dict, Any, TypedDict
 """
 
 GET_TOKEN_TEMPLATE = """
+from polyapi.config import get_api_key_and_url
+
+
 def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Dict[str, Any] = None):
     {description}
     # TODO timeout, autoCloseOnUrl, autoCloseOnToken
@@ -27,7 +30,47 @@ def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, opti
     resp = execute_post(url, data)
     data = resp.json()
     assert resp.status_code == 201, (resp.status_code, resp.content)
-    return callback(data.get("token"), data.get("url"), data.get("error"))
+
+    token = data.get("token")
+    url = data.get("url")
+    error = data.get("error")
+    if token:
+        return callback(token, url, error)
+    elif True or url and options.get("autoCloseOnUrl"):
+        return callback(token, url, error)
+
+    timeout = options.get("timeout", 120)
+"""
+
+SOCKETIO_STUFF = """
+    except TimeoutError:
+        print('timed out waiting for event')
+
+    _, url = get_api_key_and_url()
+    events_url = f"{{url}}/events"
+    socketio.AsyncSimpleClient() as sio:
+    print(f"Connecting to {{events_url}}")
+    await sio.connect(events_url, transports=['websocket'])
+    print('my sid is', sio.sid)
+    print("my transport is", sio.transport)
+    await sio.receive(timeout=timeout)
+
+    const closeEventHandler = () => {
+        if (!socket) {
+        return;
+        }
+        socket.off(`handleAuthFunctionEvent:{{id}}`);
+        socket.emit('unregisterAuthFunctionEventHandler', {
+        clientID: eventsClientId,
+        functionId: '{{id}}',
+        apiKey: getApiKey()
+        });
+        socket.close();
+        socket = null;
+        if (timeoutID) {
+        clearTimeout(timeoutID);
+        }
+    };
 """
 
 REFRESH_TOKEN_TEMPLATE = """
