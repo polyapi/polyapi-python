@@ -5,7 +5,7 @@ from polyapi.utils import parse_arguments, get_type_and_def
 
 
 AUTH_DEFS_TEMPLATE = """
-from typing import List, Dict, Any, TypedDict
+from typing import List, Dict, Any, TypedDict, Optional
 {args_def}
 {return_type_def}
 """
@@ -14,7 +14,7 @@ GET_TOKEN_TEMPLATE = """
 from polyapi.config import get_api_key_and_url
 
 
-def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Dict[str, Any] = None):
+def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Optional[Dict[str, Any]] = None):
     {description}
     # TODO timeout, autoCloseOnUrl, autoCloseOnToken
     options = options or {{}}
