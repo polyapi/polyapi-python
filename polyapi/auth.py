@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Tuple
+import uuid
 
 from polyapi.typedefs import PropertySpecification
 from polyapi.utils import parse_arguments, get_type_and_def
@@ -11,14 +12,18 @@ from typing import List, Dict, Any, TypedDict, Optional
 """
 
 GET_TOKEN_TEMPLATE = """
+import asyncio
+import socketio  # type: ignore
 from polyapi.config import get_api_key_and_url
 
 
-def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Optional[Dict[str, Any]] = None):
+async def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Optional[Dict[str, Any]] = None):
     {description}
-    # TODO timeout, autoCloseOnUrl, autoCloseOnToken
+    eventsClientId = "{client_id}"
+    function_id = "{function_id}"
+
     options = options or {{}}
-    url = "/auth-providers/{function_id}/execute"
+    path = "/auth-providers/{function_id}/execute"
     data = {{
         "clientId": clientId,
         "clientSecret": clientSecret,
@@ -27,7 +32,7 @@ def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, opti
         "callbackUrl": options.get("callbackUrl"),
         "userId": options.get("userId"),
     }}
-    resp = execute_post(url, data)
+    resp = execute_post(path, data)
     data = resp.json()
     assert resp.status_code == 201, (resp.status_code, resp.content)
 
@@ -36,41 +41,64 @@ def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, opti
     error = data.get("error")
     if token:
         return callback(token, url, error)
-    elif True or url and options.get("autoCloseOnUrl"):
+    elif url and options.get("autoCloseOnUrl"):
         return callback(token, url, error)
 
     timeout = options.get("timeout", 120)
-"""
 
-SOCKETIO_STUFF = """
-    except TimeoutError:
-        print('timed out waiting for event')
+    api_key, base_url = get_api_key_and_url()
+    socket = socketio.AsyncClient()
+    await socket.connect(base_url, transports=['websocket'], namespaces=['/events'])
 
-    _, url = get_api_key_and_url()
-    events_url = f"{{url}}/events"
-    socketio.AsyncSimpleClient() as sio:
-    print(f"Connecting to {{events_url}}")
-    await sio.connect(events_url, transports=['websocket'])
-    print('my sid is', sio.sid)
-    print("my transport is", sio.transport)
-    await sio.receive(timeout=timeout)
+    async def closeEventHandler():
+        nonlocal socket
+        if not socket:
+            return
 
-    const closeEventHandler = () => {
-        if (!socket) {
-        return;
-        }
-        socket.off(`handleAuthFunctionEvent:{{id}}`);
-        socket.emit('unregisterAuthFunctionEventHandler', {
-        clientID: eventsClientId,
-        functionId: '{{id}}',
-        apiKey: getApiKey()
-        });
-        socket.close();
-        socket = null;
-        if (timeoutID) {
-        clearTimeout(timeoutID);
-        }
-    };
+        del socket.handlers['/events']['handleAuthFunctionEvent:{function_id}']
+        await socket.emit('unregisterAuthFunctionEventHandler', {{
+            "clientID": eventsClientId,
+            "functionId": function_id,
+            "apiKey": api_key
+        }}, namespace="/events")
+        await socket.disconnect()
+        socket = None
+
+
+    async def waitUntilTimeout(timeout):
+        await asyncio.sleep(timeout)
+        await closeEventHandler()
+
+
+    async def handleEvent(data):
+        nonlocal options
+        callback(data.get('token'), data.get('url'), data.get('error'))
+        if data.get('token') and options.get("autoCloseOnToken", True):
+            await closeEventHandler()
+
+
+    def registerCallback(registered: bool):
+        nonlocal socket
+        if registered:
+            socket.on('handleAuthFunctionEvent:{function_id}', handleEvent, namespace="/events")
+            callback(data.get('token'), data.get('url'), data.get('error'))
+
+    data2 = {{
+        "clientID": eventsClientId,
+        "functionId": function_id,
+        "apiKey": api_key
+    }}
+    await socket.emit('registerAuthFunctionEventHandler', data2, namespace="/events", callback=registerCallback)
+
+    # run timeout task in background
+    timeout = options.get("timeout", 120)
+    timeout_task = asyncio.create_task(waitUntilTimeout(timeout))
+
+    # cancel timeout task if socket.wait finishes before timeout up
+    await socket.wait()
+    timeout_task.cancel()
+
+    return {{"close": closeEventHandler}}
 """
 
 REFRESH_TOKEN_TEMPLATE = """
@@ -114,7 +142,7 @@ def render_auth_function(
         function_description = f'"""{function_description}"""'
 
     if function_name == "getToken":
-        func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
+        func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description, client_id=uuid.uuid4().hex)
     elif function_name == "refreshToken":
         func_str = REFRESH_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
     elif function_name == "revokeToken":
