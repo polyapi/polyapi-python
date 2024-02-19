@@ -1,5 +1,7 @@
 import os
 import sys
+import truststore
+truststore.inject_into_ssl()
 from .cli import CLI_COMMANDS
 
 __all__ = ["poly"]
