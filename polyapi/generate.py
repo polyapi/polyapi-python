@@ -5,6 +5,7 @@ import shutil
 from typing import Any, Dict, List, Tuple
 
 from polyapi.auth import render_auth_function
+from polyapi.webhook import render_webhook_handle
 
 from .typedefs import PropertySpecification, SpecificationDto, VariableSpecDto
 from .api import render_api_function
@@ -17,6 +18,7 @@ SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
     "authFunction",
     "serverFunction",
+    "webhookHandle",
 }
 
 SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable"}
@@ -180,6 +182,15 @@ def add_function_file(
         )
     elif function_type == "authFunction":
         func_str, func_type_defs = render_auth_function(
+            function_type,
+            function_name,
+            function_id,
+            function_description,
+            arguments,
+            return_type,
+        )
+    elif function_type == "webhookHandle":
+        func_str, func_type_defs = render_webhook_handle(
             function_type,
             function_name,
             function_id,

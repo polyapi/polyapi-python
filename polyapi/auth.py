@@ -13,7 +13,6 @@ from typing import List, Dict, Any, TypedDict, Optional
 
 GET_TOKEN_TEMPLATE = """
 import asyncio
-import socketio  # type: ignore
 from polyapi.config import get_api_key_and_url
 
 
