@@ -2,7 +2,7 @@ import argparse
 
 from polyapi.utils import print_green
 
-from .config import clear_config
+from .config import clear_config, set_api_key_and_url
 from .generate import generate, clear
 from .function_cli import function_add_or_update
 
@@ -36,6 +36,8 @@ def execute_from_cli():
         print("Generating Poly functions...", end="")
         generate()
         print_green("DONE")
+    elif command == "setup" and len(args.subcommands) == 2:
+        set_api_key_and_url(args.subcommands[1], args.subcommands[0])
     elif command == "setup":
         clear_config()
         generate()

@@ -46,6 +46,15 @@ def get_api_key_and_url() -> Tuple[str | None, str | None]:
     return key, url
 
 
+def set_api_key_and_url(key: str, url: str):
+    config = configparser.ConfigParser()
+    config["polyapi"] = {}
+    config.set("polyapi", "poly_api_key", key)
+    config.set("polyapi", "poly_api_base_url", url)
+    with open(get_config_file_path(), "w") as f:
+        config.write(f)
+
+
 def initialize_config():
     key, url = get_api_key_and_url()
     if not key or not url:
@@ -54,12 +63,7 @@ def initialize_config():
         key = input("? Poly App Key or User Key: ")
 
         if url and key:
-            config = configparser.ConfigParser()
-            config["polyapi"] = {}
-            config.set("polyapi", "poly_api_key", key)
-            config.set("polyapi", "poly_api_base_url", url)
-            with open(get_config_file_path(), "w") as f:
-                config.write(f)
+            set_api_key_and_url(key, url)
 
     if not key or not url:
         print("Poly API Key and Poly API Base URL are required.")
