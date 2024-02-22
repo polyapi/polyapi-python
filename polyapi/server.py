@@ -13,7 +13,10 @@ SERVER_FUNCTION_TEMPLATE = """
 def {function_name}(
 {args}
 ) -> {return_type_name}:
-    "{function_description}"
+    \"""{function_description}
+
+    Function ID: {function_id}
+    \"""
     resp = execute("{function_type}", "{function_id}", {data})
     return {return_action}
 """

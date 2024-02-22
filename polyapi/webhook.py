@@ -5,7 +5,10 @@ from polyapi.typedefs import PropertySpecification
 
 WEBHOOK_TEMPLATE = """
 async def {function_name}(callback, options=None):
-    "{description}"
+    \"""{description}
+
+    Function ID: {function_id}
+    \"""
     options = options or {{}}
     eventsClientId = "{client_id}"
     function_id = "{function_id}"

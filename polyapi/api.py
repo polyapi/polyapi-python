@@ -18,7 +18,10 @@ API_FUNCTION_TEMPLATE = """
 def {function_name}(
 {args}
 ) -> {api_response_type}:
-    "{function_description}"
+    \"""{function_description}
+
+    Function ID: {function_id}
+    \"""
     resp = execute("{function_type}", "{function_id}", {data})
     return {api_response_type}(resp.json())  # type: ignore
 """

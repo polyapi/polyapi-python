@@ -13,11 +13,13 @@ from typing import List, Dict, Any, TypedDict, Optional
 
 GET_TOKEN_TEMPLATE = """
 import asyncio
-from polyapi.config import get_api_key_and_url
 
 
 async def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Optional[Dict[str, Any]] = None):
-    {description}
+    \"""{description}
+
+    Function ID: {function_id}
+    \"""
     eventsClientId = "{client_id}"
     function_id = "{function_id}"
 
@@ -102,7 +104,10 @@ async def getToken(clientId: str, clientSecret: str, scopes: List[str], callback
 
 REFRESH_TOKEN_TEMPLATE = """
 def refreshToken(token: str) -> str:
-    {description}
+    \"""{description}
+
+    Function ID: {function_id}
+    \"""
     url = "/auth-providers/{function_id}/refresh"
     resp = execute_post(url, {{"token": token}})
     assert resp.status_code == 201, (resp.status_code, resp.content)
@@ -111,7 +116,10 @@ def refreshToken(token: str) -> str:
 
 REVOKE_TOKEN_TEMPLATE = """
 def revokeToken(token: str) -> None:
-    {description}
+    \"""{description}
+
+    Function ID: {function_id}
+    \"""
     url = "/auth-providers/{function_id}/revoke"
     resp = execute_post(url, {{"token": token}})
     assert resp.status_code == 201, (resp.status_code, resp.content)
@@ -136,9 +144,6 @@ def render_auth_function(
     )
 
     func_str = ""
-
-    if function_description:
-        function_description = f'"""{function_description}"""'
 
     if function_name == "getToken":
         func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description, client_id=uuid.uuid4().hex)
