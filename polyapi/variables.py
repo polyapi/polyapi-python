@@ -16,11 +16,48 @@ GET_TEMPLATE = """
 
 
 TEMPLATE = """
+import uuid
+
+
+client_id = uuid.uuid4().hex
+
+
 class {variable_name}:{get_method}
+    variable_id = "{variable_id}"
+
     @staticmethod
     def update(value: {variable_type}):
         resp = variable_update("{variable_id}", value)
         return resp.json()
+
+    @classmethod
+    async def onUpdate(cls, callback):
+        api_key, base_url = get_api_key_and_url()
+        socket = socketio.AsyncClient()
+        await socket.connect(base_url, transports=['websocket'], namespaces=['/events'])
+
+        async def unregisterEventHandler():
+            # TODO
+            # socket.off("handleVariableChangeEvent:{variable_id}");
+            await socket.emit("unregisterVariableChangeEventHandler", {{
+                "clientID": client_id,
+                "variableId": cls.variable_id,
+                "apiKey": api_key,
+            }}, namespace='/events')
+
+        def registerCallback(registered):
+            if registered:
+                socket.on("handleVariableChangeEvent:{variable_id}", callback, namespace="/events")
+
+        await socket.emit("registerVariableChangeEventHandler", {{
+            "clientID": client_id,
+            "variableId": cls.variable_id,
+            "apiKey": api_key,
+        }}, namespace='/events', callback=registerCallback)
+
+        await socket.wait()
+
+        return unregisterEventHandler
 
     @staticmethod
     def inject(path=None) -> {variable_type}:
@@ -28,7 +65,8 @@ class {variable_name}:{get_method}
             "type": "PolyVariable",
             "id": "{variable_id}",
             "path": path,
-        }}  # type: ignore"""
+        }}  # type: ignore
+"""
 
 
 def generate_variables(variables: List[VariableSpecDto]):

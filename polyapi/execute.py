@@ -38,7 +38,7 @@ def variable_get(variable_id: str) -> Response:
 def variable_update(variable_id: str, value) -> Response:
     api_key, base_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}
-    url = f"{base_url}/variables/{variable_id}/value"
+    url = f"{base_url}/variables/{variable_id}"
     resp = requests.patch(url, data={"value": value}, headers=headers)
     if resp.status_code != 200 and resp.status_code != 201:
         error_content = resp.content.decode("utf-8", errors="ignore")
