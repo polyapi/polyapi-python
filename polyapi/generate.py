@@ -5,6 +5,7 @@ import shutil
 from typing import Any, Dict, List, Tuple
 
 from polyapi.auth import render_auth_function
+from polyapi.execute import execute_post
 from polyapi.webhook import render_webhook_handle
 
 from .typedefs import PropertySpecification, SpecificationDto, VariableSpecDto
@@ -37,8 +38,7 @@ def get_specs() -> List:
 
 
 def parse_function_specs(
-    specs: List,
-    limit_ids: List[str] | None  # optional list of ids to limit to
+    specs: List, limit_ids: List[str] | None  # optional list of ids to limit to
 ) -> List[Tuple[str, str, str, str, List[PropertySpecification], Dict[str, Any]]]:
     functions = []
     for spec in specs:
@@ -83,6 +83,13 @@ def cache_specs(specs: List[SpecificationDto]):
         f.write(json.dumps(supported))
 
 
+def read_cached_specs() -> List[SpecificationDto]:
+    full_path = os.path.dirname(os.path.abspath(__file__))
+    full_path = os.path.join(full_path, "poly")
+    with open(os.path.join(full_path, "specs.json"), "r") as f:
+        return json.loads(f.read())
+
+
 def get_functions_and_parse(limit_ids: List[str] | None = None):
     specs = get_specs()
     cache_specs(specs)
@@ -98,7 +105,7 @@ def get_variables() -> List[VariableSpecDto]:
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
         specs = resp.json()
-        return [spec for spec in specs if spec['type'] == "serverVariable"]
+        return [spec for spec in specs if spec["type"] == "serverVariable"]
     else:
         raise NotImplementedError(resp.content)
 
@@ -133,9 +140,8 @@ def generate() -> None:
         generate_variables(variables)
 
     # indicator to vscode extension that this is a polyapi-python project
-    file_path = os.path.join(os.getcwd(), '.polyapi-python')
-    open(file_path, 'w').close()
-
+    file_path = os.path.join(os.getcwd(), ".polyapi-python")
+    open(file_path, "w").close()
 
 
 def clear() -> None:
@@ -150,18 +156,39 @@ def clear() -> None:
     print("Cleared!")
 
 
-def add_function_file(
+def save_rendered_specs() -> None:
+    specs = read_cached_specs()
+    # right now we just support rendered apiFunctions
+    api_specs = [spec for spec in specs if spec["type"] == "apiFunction"]
+    for spec in api_specs:
+        assert spec["function"]
+        func_str, type_defs = render_spec(
+            spec["type"],
+            spec["name"],
+            spec["id"],
+            spec["description"],
+            spec["function"]["arguments"],
+            spec["function"]["returnType"],
+        )
+        data = {
+            "language": "python",
+            "apiFunctionId": spec["id"],
+            "signature": func_str,
+            "typedefs": type_defs,
+        }
+        resp = execute_post("/functions/rendered-specs", data)
+        print("adding", spec["context"], spec["name"])
+        assert resp.status_code == 201, (resp.text, resp.status_code)
+
+
+def render_spec(
     function_type: str,
-    full_path: str,
     function_name: str,
     function_id: str,
     function_description: str,
     arguments: List[PropertySpecification],
     return_type: Dict[str, Any],
 ):
-    # first lets add the import to the __init__
-    init_the_init(full_path)
-
     if function_type == "apiFunction":
         func_str, func_type_defs = render_api_function(
             function_type,
@@ -198,6 +225,29 @@ def add_function_file(
             arguments,
             return_type,
         )
+    return func_str, func_type_defs
+
+
+def add_function_file(
+    function_type: str,
+    full_path: str,
+    function_name: str,
+    function_id: str,
+    function_description: str,
+    arguments: List[PropertySpecification],
+    return_type: Dict[str, Any],
+):
+    # first lets add the import to the __init__
+    init_the_init(full_path)
+
+    func_str, func_type_defs = render_spec(
+        function_type,
+        function_name,
+        function_id,
+        function_description,
+        arguments,
+        return_type,
+    )
 
     if func_str:
         # add function to init

@@ -3,11 +3,11 @@ import argparse
 from polyapi.utils import print_green
 
 from .config import clear_config, set_api_key_and_url
-from .generate import generate, clear
+from .generate import generate, clear, save_rendered_specs
 from .function_cli import function_add_or_update
 
 
-CLI_COMMANDS = ["setup", "generate", "function", "clear", "help"]
+CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "save_rendered_specs"]
 
 CLIENT_DESC = """Commands
   python -m polyapi setup                Setup your Poly connection
@@ -41,6 +41,8 @@ def execute_from_cli():
     elif command == "setup":
         clear_config()
         generate()
+    elif command == "save_rendered_specs":
+        save_rendered_specs()
     elif command == "clear":
         print("Clearing the generated library...")
         clear()
