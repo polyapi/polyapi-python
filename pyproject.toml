@@ -3,10 +3,10 @@ requires = ["setuptools>=61.2", "wheel"]
 
 [project]
 name = "polyapi-python"
-version = "0.1.2"
+version = "0.1.3"
 description = "The PolyAPI Python Client"
 authors = [{ name = "Dan Fellin", email = "dan@polyapi.io" }]
-dependencies = ["requests", "typing_extensions", "jsonschema-gentypes", "pydantic>=2.5.3", "stdlib_list", "colorama", "python-socketio[asyncio_client]", "truststore"]
+dependencies = ["requests", "typing_extensions", "jsonschema-gentypes==2.4.0", "pydantic>=2.5.3", "stdlib_list", "colorama", "python-socketio[asyncio_client]", "truststore"]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"

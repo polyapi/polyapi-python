@@ -1,6 +1,6 @@
 requests
 typing_extensions
-jsonschema-gentypes
+jsonschema-gentypes==2.4.0
 pydantic>=2.5.3
 stdlib_list
 colorama
