@@ -3,7 +3,11 @@ requires = ["setuptools>=61.2", "wheel"]
 
 [project]
 name = "polyapi-python"
+<<<<<<< HEAD
 version = "0.2.0.dev6"
+=======
+version = "0.1.3"
+>>>>>>> main
 description = "The PolyAPI Python Client"
 authors = [{ name = "Dan Fellin", email = "dan@polyapi.io" }]
 dependencies = ["requests", "typing_extensions", "jsonschema-gentypes==2.4.0", "pydantic>=2.5.3", "stdlib_list", "colorama", "python-socketio[asyncio_client]", "truststore"]
