@@ -70,7 +70,7 @@ def {function_name}(callback, options=None):
 
         return closeEventHandler
 
-    return asyncio.run(inner())
+    return asyncio.run(_inner())
 """
 
 
