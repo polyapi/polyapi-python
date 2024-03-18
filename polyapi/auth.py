@@ -15,6 +15,12 @@ GET_TOKEN_TEMPLATE = """
 import asyncio
 
 
+class AuthFunctionResponse(TypedDict):
+  status: int
+  data: Any
+  headers: Dict[str, str]
+
+
 async def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Optional[Dict[str, Any]] = None):
     \"""{description}
 
@@ -102,27 +108,40 @@ async def getToken(clientId: str, clientSecret: str, scopes: List[str], callback
     return {{"close": closeEventHandler}}
 """
 
+INTROSPECT_TOKEN_TEMPLATE = """
+def introspectToken(token: str) -> AuthFunctionResponse:
+    \"""{description}
+
+    Function ID: {function_id}
+    \"""
+    url = "/auth-providers/{function_id}/introspect"
+    resp = execute_post(url, {{"token": token}})
+    return resp.json()
+"""
+
 REFRESH_TOKEN_TEMPLATE = """
-def refreshToken(token: str) -> str:
+def refreshToken(token: str) -> AuthFunctionResponse:
     \"""{description}
 
     Function ID: {function_id}
     \"""
     url = "/auth-providers/{function_id}/refresh"
     resp = execute_post(url, {{"token": token}})
-    assert resp.status_code == 201, (resp.status_code, resp.content)
-    return resp.text
+    return resp.json()
 """
 
 REVOKE_TOKEN_TEMPLATE = """
-def revokeToken(token: str) -> None:
+def revokeToken(token: str) -> Optional[AuthFunctionResponse]:
     \"""{description}
 
     Function ID: {function_id}
     \"""
     url = "/auth-providers/{function_id}/revoke"
     resp = execute_post(url, {{"token": token}})
-    assert resp.status_code == 201, (resp.status_code, resp.content)
+    try:
+        return resp.json()
+    except:
+        return None
 """
 
 
@@ -147,6 +166,8 @@ def render_auth_function(
 
     if function_name == "getToken":
         func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description, client_id=uuid.uuid4().hex)
+    elif function_name == "introspectToken":
+        func_str = INTROSPECT_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
     elif function_name == "refreshToken":
         func_str = REFRESH_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
     elif function_name == "revokeToken":
