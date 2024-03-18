@@ -4,6 +4,9 @@ from typing import Any, Dict, List, Tuple
 from polyapi.typedefs import PropertySpecification
 
 WEBHOOK_TEMPLATE = """
+import asyncio
+
+
 def {function_name}(callback, options=None):
     \"""{description}
 
