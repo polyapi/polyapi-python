@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple
 from polyapi.typedefs import PropertySpecification
 
 WEBHOOK_TEMPLATE = """
-async def {function_name}(callback, options=None):
+def {function_name}(callback, options=None):
     \"""{description}
 
     Function ID: {function_id}
@@ -14,56 +14,60 @@ async def {function_name}(callback, options=None):
     function_id = "{function_id}"
 
     api_key, base_url = get_api_key_and_url()
-    socket = socketio.AsyncClient()
-    await socket.connect(base_url, transports=['websocket'], namespaces=['/events'])
 
-    def registerCallback(registered: bool):
-        nonlocal socket
-        if registered:
-            socket.on('handleWebhookEvent:{function_id}', handleEvent, namespace="/events")
-        else:
-            print("Could not set register webhook event handler for {function_id}")
+    async def _inner():
+        socket = socketio.AsyncClient()
+        await socket.connect(base_url, transports=['websocket'], namespaces=['/events'])
 
-    async def handleEvent(data):
-        nonlocal api_key
-        nonlocal options
-        polyCustom = {{}}
-        resp = await callback(data.get("body"), data.get("headers"), data.get("params"), polyCustom)
-        if resp and options.get("waitForResponse"):
-            await socket.emit('setWebhookListenerResponse', {{
-                "webhookHandleID": function_id,
-                "apiKey": api_key,
-                "clientID": eventsClientId,
-                "executionId": data.get("executionId"),
-                "response": {{
-                    "data": resp,
-                    "statusCode": polyCustom.get("responseStatusCode", 200),
-                    "contentType": polyCustom.get("responseContentType", None),
-                }},
-            }}, namespace="/events")
+        def registerCallback(registered: bool):
+            nonlocal socket
+            if registered:
+                socket.on('handleWebhookEvent:{function_id}', handleEvent, namespace="/events")
+            else:
+                print("Could not set register webhook event handler for {function_id}")
 
-    data = {{
-        "clientID": eventsClientId,
-        "webhookHandleID": function_id,
-        "apiKey": api_key,
-        "waitForResponse": options.get("waitForResponse"),
-    }}
-    await socket.emit('registerWebhookEventHandler', data, namespace="/events", callback=registerCallback)
+        async def handleEvent(data):
+            nonlocal api_key
+            nonlocal options
+            polyCustom = {{}}
+            resp = await callback(data.get("body"), data.get("headers"), data.get("params"), polyCustom)
+            if resp and options.get("waitForResponse"):
+                await socket.emit('setWebhookListenerResponse', {{
+                    "webhookHandleID": function_id,
+                    "apiKey": api_key,
+                    "clientID": eventsClientId,
+                    "executionId": data.get("executionId"),
+                    "response": {{
+                        "data": resp,
+                        "statusCode": polyCustom.get("responseStatusCode", 200),
+                        "contentType": polyCustom.get("responseContentType", None),
+                    }},
+                }}, namespace="/events")
 
-    async def closeEventHandler():
-        nonlocal socket
-        if not socket:
-            return
-
-        await socket.emit('unregisterWebhookEventHandler', {{
+        data = {{
             "clientID": eventsClientId,
             "webhookHandleID": function_id,
-            "apiKey": api_key
-        }}, namespace="/events")
+            "apiKey": api_key,
+            "waitForResponse": options.get("waitForResponse"),
+        }}
+        await socket.emit('registerWebhookEventHandler', data, namespace="/events", callback=registerCallback)
 
-    await socket.wait()
+        async def closeEventHandler():
+            nonlocal socket
+            if not socket:
+                return
 
-    return closeEventHandler
+            await socket.emit('unregisterWebhookEventHandler', {{
+                "clientID": eventsClientId,
+                "webhookHandleID": function_id,
+                "apiKey": api_key
+            }}, namespace="/events")
+
+        await socket.wait()
+
+        return closeEventHandler
+
+    return asyncio.run(inner())
 """
 
 
