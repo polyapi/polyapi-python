@@ -34,7 +34,7 @@ def {function_name}(callback, options=None):
             nonlocal options
             polyCustom = {{}}
             resp = await callback(data.get("body"), data.get("headers"), data.get("params"), polyCustom)
-            if resp and options.get("waitForResponse"):
+            if options.get("waitForResponse"):
                 await socket.emit('setWebhookListenerResponse', {{
                     "webhookHandleID": function_id,
                     "apiKey": api_key,
