@@ -76,11 +76,14 @@ def cache_specs(specs: List[SpecificationDto]):
 
     full_path = os.path.dirname(os.path.abspath(__file__))
     full_path = os.path.join(full_path, "poly")
-    if not os.path.exists(full_path):
-        os.makedirs(full_path)
+    try:
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
 
-    with open(os.path.join(full_path, "specs.json"), "w") as f:
-        f.write(json.dumps(supported))
+        with open(os.path.join(full_path, "specs.json"), "w") as f:
+            f.write(json.dumps(supported))
+    except Exception as e:
+        print("Failed to cache specs", e)
 
 
 def read_cached_specs() -> List[SpecificationDto]:
