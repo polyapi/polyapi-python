@@ -3,7 +3,7 @@ import argparse
 import json
 import types
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List, Mapping, Optional, Tuple
 from typing_extensions import _TypedDictMeta  # type: ignore
 import requests
 from stdlib_list import stdlib_list
@@ -18,7 +18,7 @@ import importlib
 
 # these libraries are already installed in the base docker image
 # and shouldnt be included in additional requirements
-BASE_REQUIREMENTS = {"polyapi", "requests", "typing_extensions", "jsonschema-gentypes", "pydantic"}
+BASE_REQUIREMENTS = {"polyapi", "requests", "typing_extensions", "jsonschema-gentypes", "pydantic", "cloudevents"}
 all_stdlib_symbols = stdlib_list('.'.join([str(v) for v in sys.version_info[0:2]]))
 BASE_REQUIREMENTS.update(all_stdlib_symbols)  # dont need to pip install stuff in the python standard library
 
@@ -104,6 +104,19 @@ def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[str, Dict | N
     return json_type, _get_type_schema(json_type, python_type, schemas)
 
 
+def _get_req_name_if_not_in_base(n: Optional[str], pip_name_lookup: Mapping[str, List[str]]) -> Optional[str]:
+    if not n:
+        return None
+
+    if "." in n:
+        n = n.split(".")[0]
+
+    if n in BASE_REQUIREMENTS:
+        return None
+    else:
+        return pip_name_lookup[n][0]
+
+
 def _parse_code(code: str, function_name: str):
     parsed_args = []
     return_type = None
@@ -121,13 +134,16 @@ def _parse_code(code: str, function_name: str):
 
     for node in ast.iter_child_nodes(parsed_code):
         if isinstance(node, ast.Import):
+            # TODO maybe handle `import foo.bar` case?
             for name in node.names:
-                if name.name not in BASE_REQUIREMENTS:
-                    requirements.append(name.name)
+                req = _get_req_name_if_not_in_base(name.name, pip_name_lookup)
+                if req:
+                    requirements.append(req)
         elif isinstance(node, ast.ImportFrom):
-            if node.module and node.module not in BASE_REQUIREMENTS:
-                req = pip_name_lookup[node.module][0]
-                requirements.append(req)
+            if node.module:
+                req = _get_req_name_if_not_in_base(node.module, pip_name_lookup)
+                if req:
+                    requirements.append(req)
 
         elif isinstance(node, ast.FunctionDef) and node.name == function_name:
             function_args = [arg for arg in node.args.args]
