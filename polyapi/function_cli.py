@@ -8,6 +8,7 @@ from typing_extensions import _TypedDictMeta  # type: ignore
 import requests
 from stdlib_list import stdlib_list
 from pydantic import TypeAdapter
+from importlib.metadata import packages_distributions
 from polyapi.generate import get_functions_and_parse, generate_functions
 from polyapi.config import get_api_key_and_url
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
@@ -112,6 +113,12 @@ def _parse_code(code: str, function_name: str):
     schemas = _get_schemas(code)
 
     parsed_code = ast.parse(code)
+
+    # the pip name and the import name might be different
+    # e.g. kube_hunter is the import name, but the pip name is kube-hunter
+    # see https://stackoverflow.com/a/75144378
+    pip_name_lookup = packages_distributions()
+
     for node in ast.iter_child_nodes(parsed_code):
         if isinstance(node, ast.Import):
             for name in node.names:
@@ -119,7 +126,8 @@ def _parse_code(code: str, function_name: str):
                     requirements.append(name.name)
         elif isinstance(node, ast.ImportFrom):
             if node.module and node.module not in BASE_REQUIREMENTS:
-                requirements.append(node.module)
+                req = pip_name_lookup[node.module][0]
+                requirements.append(req)
 
         elif isinstance(node, ast.FunctionDef) and node.name == function_name:
             function_args = [arg for arg in node.args.args]
