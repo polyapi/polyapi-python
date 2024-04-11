@@ -184,7 +184,8 @@ def function_add_or_update(
     args = parser.parse_args(subcommands)
 
     verb = "Updating" if _func_already_exists(context, args.function_name) else "Adding"
-    print(f"{verb} custom server side function...", end="")
+    ftype = "server" if server else "client"
+    print(f"{verb} custom {ftype} function...", end="")
 
     with open(args.filename, "r") as f:
         code = f.read()
@@ -202,9 +203,6 @@ def function_add_or_update(
         print(f"Function {args.function_name} not found as top-level function in {args.filename}")
         sys.exit(1)
 
-    if requirements:
-        print_yellow('\nPlease note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi.')
-
     data = {
         "context": context,
         "name": args.function_name,
@@ -213,18 +211,20 @@ def function_add_or_update(
         "language": "python",
         "returnType": return_type,
         "returnTypeSchema": return_type_schema,
-        "requirements": requirements,
         "arguments": arguments,
         "logsEnabled": logs_enabled,
     }
+
+    if server and requirements:
+        print_yellow('\nPlease note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi.')
+        data["requirements"] = requirements
 
     api_key, api_url = get_api_key_and_url()
     assert api_key
     if server:
         url = f"{api_url}/functions/server"
     else:
-        raise NotImplementedError("Client functions not yet implemented.")
-        # url = f"{base_url}/functions/client"
+        url = f"{api_url}/functions/client"
 
     headers = get_auth_headers(api_key)
     resp = requests.post(url, headers=headers, json=data)
