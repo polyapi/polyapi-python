@@ -23,7 +23,8 @@ def execute_from_cli():
     )
     parser.add_argument("--context", required=False, default="")
     parser.add_argument("--description", required=False, default="")
-    parser.add_argument("--server", action="store_true", help="Pass --server when adding function to add a server function. By default, new functions are client.")
+    parser.add_argument("--client", action="store_true", help="Pass --client when adding function to add a client function.")
+    parser.add_argument("--server", action="store_true", help="Pass --server when adding function to add a server function.")
     parser.add_argument("--logs", action="store_true", help="Pass --logs when adding function if you want to store and see the function logs.")
     parser.add_argument("command", choices=CLI_COMMANDS)
     parser.add_argument("subcommands", nargs="*")
@@ -47,4 +48,4 @@ def execute_from_cli():
         print("Clearing the generated library...")
         clear()
     elif command == "function":
-        function_add_or_update(args.context, args.description, args.server, args.logs, args.subcommands)
+        function_add_or_update(args.context, args.description, args.client, args.server, args.logs, args.subcommands)

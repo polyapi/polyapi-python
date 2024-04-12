@@ -175,7 +175,7 @@ def _func_already_exists(context: str, function_name: str) -> bool:
 
 
 def function_add_or_update(
-    context: str, description: str, server: bool, logs_enabled: bool, subcommands: List
+    context: str, description: str, client: bool, server: bool, logs_enabled: bool, subcommands: List
 ):
     parser = argparse.ArgumentParser()
     parser.add_argument("subcommand", choices=["add"])
@@ -223,8 +223,12 @@ def function_add_or_update(
     assert api_key
     if server:
         url = f"{api_url}/functions/server"
-    else:
+    elif client:
         url = f"{api_url}/functions/client"
+    else:
+        print_red("ERROR")
+        print("Please specify type of function with --client or --server")
+        sys.exit(1)
 
     headers = get_auth_headers(api_key)
     resp = requests.post(url, headers=headers, json=data)
