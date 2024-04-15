@@ -1,5 +1,6 @@
 import re
 import os
+import logging
 from typing import Tuple, List
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
@@ -91,7 +92,11 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
         if type_spec.get("items"):
             items = type_spec["items"]
             if items.get("$ref"):
-                return "ResponseType", generate_schema_types(type_spec, root="ResponseType")  # type: ignore
+                try:
+                    return "ResponseType", generate_schema_types(type_spec, root="ResponseType")  # type: ignore
+                except:
+                    logging.exception(f"Error when generating schema type: {type_spec}")
+                    return "Dict", ""
             else:
                 item_type, _ = get_type_and_def(items)
                 title = f"List[{item_type}]"
@@ -108,7 +113,12 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
             if title:
                 assert isinstance(title, str)
                 title = clean_title(title)
-                return title, generate_schema_types(schema, root=title)  # type: ignore
+                try:
+                    return title, generate_schema_types(schema, root=title)  # type: ignore
+                except:
+                    logging.exception(f"Error when generating schema type: {schema}")
+                    return "Dict", ""
+
             elif schema.get("items"):
                 # fallback to schema $ref name if no explicit title
                 items = schema.get("items")  # type: ignore
@@ -123,7 +133,11 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
                     return "List", ""
 
                 title = f"List[{title}]"
-                return title, generate_schema_types(schema, root=title)
+                try:
+                    return title, generate_schema_types(schema, root=title)
+                except:
+                    logging.exception(f"Error when generating schema type: {schema}")
+                    return "List", ""
             else:
                 return "Any", ""
         else:
