@@ -22,4 +22,4 @@ def render_client_function(
         args_def=args_def,
         return_type_def=return_type_def,
     )
-    return code, func_type_defs
+    return code + "\n\n", func_type_defs
