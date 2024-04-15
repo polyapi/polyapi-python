@@ -6,3 +6,4 @@ stdlib_list==0.10.0
 colorama==0.4.4
 python-socketio[asyncio_client]==5.11.1
 truststore==0.8.0
+pyjwt==2.3.0
