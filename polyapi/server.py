@@ -18,7 +18,10 @@ def {function_name}(
     Function ID: {function_id}
     \"""
     resp = execute("{function_type}", "{function_id}", {data})
-    return {return_action}
+    try:
+        return {return_action}
+    except:
+        return resp.text
 """
 
 
@@ -54,14 +57,6 @@ def render_server_function(
 def _get_server_return_action(return_type_name: str) -> str:
     if return_type_name == "str":
         return_action = "resp.text"
-    elif return_type_name == "Any":
-        return_action = "resp.text"
-    elif return_type_name == "int":
-        return_action = "int(resp.text.replace('(int) ', ''))"
-    elif return_type_name == "float":
-        return_action = "float(resp.text.replace('(float) ', ''))"
-    elif return_type_name == "bool":
-        return_action = "False if resp.text == 'False' else True"
     else:
         return_action = "resp.json()"
     return return_action
