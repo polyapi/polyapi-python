@@ -47,7 +47,7 @@ async def on(
     print(f"starting error handler for {path}...")
 
     if not client:
-        raise Exception("Client not initialized. Please call error_handler.prepare() first.")
+        raise Exception("Client not initialized. Abort!")
 
     api_key, _ = get_api_key_and_url()
     handler_id = None
