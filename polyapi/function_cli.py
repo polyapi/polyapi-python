@@ -4,6 +4,7 @@ import json
 import types
 import sys
 from typing import Dict, List, Mapping, Optional, Tuple
+from typing import _TypedDictMeta as BaseTypedDict  # type: ignore
 from typing_extensions import _TypedDictMeta  # type: ignore
 import requests
 from stdlib_list import stdlib_list
@@ -18,9 +19,18 @@ import importlib
 
 # these libraries are already installed in the base docker image
 # and shouldnt be included in additional requirements
-BASE_REQUIREMENTS = {"polyapi", "requests", "typing_extensions", "jsonschema-gentypes", "pydantic", "cloudevents"}
-all_stdlib_symbols = stdlib_list('.'.join([str(v) for v in sys.version_info[0:2]]))
-BASE_REQUIREMENTS.update(all_stdlib_symbols)  # dont need to pip install stuff in the python standard library
+BASE_REQUIREMENTS = {
+    "polyapi",
+    "requests",
+    "typing_extensions",
+    "jsonschema-gentypes",
+    "pydantic",
+    "cloudevents",
+}
+all_stdlib_symbols = stdlib_list(".".join([str(v) for v in sys.version_info[0:2]]))
+BASE_REQUIREMENTS.update(
+    all_stdlib_symbols
+)  # dont need to pip install stuff in the python standard library
 
 
 def _get_schemas(code: str) -> List[Dict]:
@@ -28,7 +38,14 @@ def _get_schemas(code: str) -> List[Dict]:
     user_code = types.SimpleNamespace()
     exec(code, user_code.__dict__)
     for name, obj in user_code.__dict__.items():
-        if (
+        if isinstance(obj, BaseTypedDict):
+            print_red("ERROR")
+            print_red("\nERROR DETAILS: ")
+            print(
+                "It looks like you have used TypedDict in a custom function. Please use `from typing_extensions import TypedDict` instead. The `typing_extensions` version is more powerful and better allows us to provide rich types for your function."
+            )
+            sys.exit(1)
+        elif (
             isinstance(obj, type)
             and isinstance(obj, _TypedDictMeta)
             and name != "TypedDict"
@@ -76,6 +93,13 @@ def get_python_type_from_ast(expr: ast.expr) -> str:
         if name == "List":
             slice = getattr(expr.slice, "id", "Any")
             return f"List[{slice}]"
+        elif name == "Dict":
+            if expr.slice and isinstance(expr.slice, ast.Tuple):
+                key = get_python_type_from_ast(expr.slice.dims[0])
+                value = get_python_type_from_ast(expr.slice.dims[1])
+                return f"Dict[{key}, {value}]"
+            else:
+                return "Dict"
         return "Any"
     else:
         return "Any"
@@ -104,7 +128,9 @@ def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[str, Dict | N
     return json_type, _get_type_schema(json_type, python_type, schemas)
 
 
-def _get_req_name_if_not_in_base(n: Optional[str], pip_name_lookup: Mapping[str, List[str]]) -> Optional[str]:
+def _get_req_name_if_not_in_base(
+    n: Optional[str], pip_name_lookup: Mapping[str, List[str]]
+) -> Optional[str]:
     if not n:
         return None
 
@@ -175,7 +201,12 @@ def _func_already_exists(context: str, function_name: str) -> bool:
 
 
 def function_add_or_update(
-    context: str, description: str, client: bool, server: bool, logs_enabled: bool, subcommands: List
+    context: str,
+    description: str,
+    client: bool,
+    server: bool,
+    logs_enabled: bool,
+    subcommands: List,
 ):
     parser = argparse.ArgumentParser()
     parser.add_argument("subcommand", choices=["add"])
@@ -191,16 +222,15 @@ def function_add_or_update(
         code = f.read()
 
     # OK! let's parse the code and generate the arguments
-    (
-        arguments,
-        return_type,
-        return_type_schema,
-        requirements
-    ) = _parse_code(code, args.function_name)
+    (arguments, return_type, return_type_schema, requirements) = _parse_code(
+        code, args.function_name
+    )
 
     if not return_type:
         print_red("ERROR")
-        print(f"Function {args.function_name} not found as top-level function in {args.filename}")
+        print(
+            f"Function {args.function_name} not found as top-level function in {args.filename}"
+        )
         sys.exit(1)
 
     data = {
@@ -216,7 +246,9 @@ def function_add_or_update(
     }
 
     if server and requirements:
-        print_yellow('\nPlease note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi.')
+        print_yellow(
+            "\nPlease note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi."
+        )
         data["requirements"] = requirements
 
     api_key, api_url = get_api_key_and_url()
