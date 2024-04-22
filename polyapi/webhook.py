@@ -6,9 +6,14 @@ from typing import Any, Dict, List, Tuple
 from polyapi.config import get_api_key_and_url
 from polyapi.typedefs import PropertySpecification
 
+# all active webhook handlers, used by unregister_all to cleanup
+active_handlers: List[Dict[str, Any]] = []
+
+# global client shared by all webhooks, will be initialized by webhook.start
+client = None
+
 
 WEBHOOK_TEMPLATE = """
-from polyapi.webhook import client
 
 
 async def {function_name}(callback, options=None):
@@ -16,6 +21,10 @@ async def {function_name}(callback, options=None):
 
     Function ID: {function_id}
     \"""
+    from polyapi.webhook import client, active_handlers
+
+    print("Starting webhook for {function_name}...")
+
     if not client:
         raise Exception("Client not initialized. Abort!")
 
@@ -35,7 +44,7 @@ async def {function_name}(callback, options=None):
         nonlocal api_key
         nonlocal options
         polyCustom = {{}}
-        resp = await callback(data.get("body"), data.get("headers"), data.get("params"), polyCustom)
+        resp = callback(data.get("body"), data.get("headers"), data.get("params"), polyCustom)
         if options.get("waitForResponse"):
             await client.emit('setWebhookListenerResponse', {{
                 "webhookHandleID": function_id,
@@ -56,9 +65,8 @@ async def {function_name}(callback, options=None):
         "waitForResponse": options.get("waitForResponse"),
     }}
     await client.emit('registerWebhookEventHandler', data, namespace="/events", callback=registerCallback)
+    active_handlers.append({{"clientID": eventsClientId, "webhookHandleID": function_id, "apiKey": api_key}})
 """
-
-client = None
 
 
 async def get_client_and_connect():
@@ -68,8 +76,25 @@ async def get_client_and_connect():
     await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
 
 
-def unregister_all():
-    print("TODO unregister all webhooks")
+async def unregister(data: Dict[str, Any]):
+    print(f"stopping error handler for '{data['webhookHandleID']}'...")
+    assert client
+    await client.emit(
+        "unregisterWebhookEventHandler",
+        {
+            "clientID": data["clientID"],
+            "webhookHandleID": data["webhookHandleID"],
+            "apiKey": data["apiKey"],
+        },
+        "/events",
+    )
+
+
+async def unregister_all():
+    _, base_url = get_api_key_and_url()
+    # need to reconnect because maybe socketio client disconnected after Ctrl+C?
+    await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+    await asyncio.gather(*[unregister(handler) for handler in active_handlers])
 
 
 def render_webhook_handle(
