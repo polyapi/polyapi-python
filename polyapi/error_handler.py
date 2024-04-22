@@ -6,7 +6,10 @@ from typing import Any, Callable, Dict, List, Optional
 from polyapi.config import get_api_key_and_url
 
 
+# all active webhook handlers, used by unregister_all to cleanup
 active_handlers: List[Dict[str, Any]] = []
+
+# global client shared by all error handlers, will be initialized by webhook.start
 client = None
 
 
@@ -47,7 +50,7 @@ async def on(
     print(f"starting error handler for {path}...")
 
     if not client:
-        raise Exception("Client not initialized. Please call error_handler.prepare() first.")
+        raise Exception("Client not initialized. Abort!")
 
     api_key, _ = get_api_key_and_url()
     handler_id = None
