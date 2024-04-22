@@ -11,7 +11,7 @@ def execute(function_type, function_id, data) -> Response:
     headers = {"Authorization": f"Bearer {api_key}"}
     url = f"{api_url}/functions/{function_type}/{function_id}/execute"
     resp = requests.post(url, json=data, headers=headers)
-    if resp.status_code != 200 and resp.status_code != 201:
+    if resp.status_code < 200 or resp.status_code >= 400:
         error_content = resp.content.decode("utf-8", errors="ignore")
         raise PolyApiException(f"{resp.status_code}: {error_content}")
     return resp
