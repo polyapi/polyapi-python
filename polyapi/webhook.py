@@ -25,7 +25,7 @@ async def {function_name}(callback, options=None):
     \"""
     from polyapi.webhook import client, active_handlers
 
-    print("Starting webhook for {function_path}...")
+    print("Starting webhook handler for {function_path}...")
 
     if not client:
         raise Exception("Client not initialized. Abort!")
