@@ -176,6 +176,7 @@ def render_spec(spec: SpecificationDto):
     function_type = spec["type"]
     function_description = spec["description"]
     function_name = spec["name"]
+    function_context = spec["context"]
     function_id = spec["id"]
 
     arguments: List[PropertySpecification] = []
@@ -223,6 +224,7 @@ def render_spec(spec: SpecificationDto):
     elif function_type == "webhookHandle":
         func_str, func_type_defs = render_webhook_handle(
             function_type,
+            function_context,
             function_name,
             function_id,
             function_description,

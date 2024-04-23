@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 
 from polyapi.config import get_api_key_and_url
 from polyapi.typedefs import PropertySpecification
+from polyapi.utils import poly_full_path
 
 # all active webhook handlers, used by unregister_all to cleanup
 active_handlers: List[Dict[str, Any]] = []
@@ -24,7 +25,7 @@ async def {function_name}(callback, options=None):
     \"""
     from polyapi.webhook import client, active_handlers
 
-    print("Starting webhook for {function_name}...")
+    print("Starting webhook for {function_path}...")
 
     if not client:
         raise Exception("Client not initialized. Abort!")
@@ -66,7 +67,7 @@ async def {function_name}(callback, options=None):
         "waitForResponse": options.get("waitForResponse"),
     }}
     await client.emit('registerWebhookEventHandler', data, namespace="/events", callback=registerCallback)
-    active_handlers.append({{"clientID": eventsClientId, "webhookHandleID": function_id, "apiKey": api_key}})
+    active_handlers.append({{"clientID": eventsClientId, "webhookHandleID": function_id, "apiKey": api_key, "path": "{function_path}"}})
 """
 
 
@@ -78,7 +79,7 @@ async def get_client_and_connect():
 
 
 async def unregister(data: Dict[str, Any]):
-    print(f"stopping webhook handler for '{data['webhookHandleID']}'...")
+    print(f"Stopping webhook handler for {data['path']}...")
     assert client
     await client.emit(
         "unregisterWebhookEventHandler",
@@ -104,6 +105,7 @@ async def unregister_all():
 
 def render_webhook_handle(
     function_type: str,
+    function_context: str,
     function_name: str,
     function_id: str,
     function_description: str,
@@ -115,6 +117,7 @@ def render_webhook_handle(
         client_id=uuid.uuid4().hex,
         function_id=function_id,
         function_name=function_name,
+        function_path=poly_full_path(function_context, function_name),
     )
 
     return func_str, ""
