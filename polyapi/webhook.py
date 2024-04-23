@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Tuple
 
 from polyapi.config import get_api_key_and_url
 from polyapi.typedefs import PropertySpecification
+from polyapi.utils import parse_arguments
 
 # all active webhook handlers, used by unregister_all to cleanup
 active_handlers: List[Dict[str, Any]] = []
@@ -13,10 +14,18 @@ active_handlers: List[Dict[str, Any]] = []
 client = None
 
 
+WEBHOOK_DEFS_TEMPLATE = """
+from typing import List, Dict, Any, TypedDict
+{function_args_def}
+"""
+
+
 WEBHOOK_TEMPLATE = """
 
 
-async def {function_name}(callback, options=None):
+async def {function_name}(
+{function_args}
+):
     \"""{description}
 
     Function ID: {function_id}
@@ -105,14 +114,16 @@ def render_webhook_handle(
     arguments: List[PropertySpecification],
     return_type: Dict[str, Any],
 ) -> Tuple[str, str]:
+    function_args, function_args_def = parse_arguments(function_name, arguments)
     func_str = WEBHOOK_TEMPLATE.format(
         description=function_description,
         client_id=uuid.uuid4().hex,
         function_id=function_id,
         function_name=function_name,
+        function_args=function_args
     )
-
-    return func_str, ""
+    func_defs = WEBHOOK_DEFS_TEMPLATE.format(function_args_def=function_args_def)
+    return func_str, func_defs
 
 
 def start(*args):
