@@ -124,9 +124,7 @@ def generate() -> None:
 
     remove_old_library()
 
-    limit_ids = ['e51d81cc-ffbf-4a04-8a5c-2f54866ad322']
-
-    functions = get_functions_and_parse(limit_ids)
+    functions = get_functions_and_parse()
     if functions:
         generate_functions(functions)
     else:
@@ -134,8 +132,6 @@ def generate() -> None:
             "No functions exist yet in this tenant! Empty library initialized. Let's add some functions!"
         )
         exit()
-    print("MINIMAL DEBUG GENERATE COMPLETE")
-    return
 
     variables = get_variables()
     if variables:

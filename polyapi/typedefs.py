@@ -12,6 +12,7 @@ class PropertySpecification(TypedDict):
 
 class PropertyType(TypedDict):
     kind: Literal['void', 'primitive', 'array', 'object', 'function', 'plain']
+    spec: NotRequired[Dict]
     name: NotRequired[str]
     type: NotRequired[str]
     items: NotRequired['PropertyType']

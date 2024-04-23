@@ -15,7 +15,7 @@ client = None
 
 
 WEBHOOK_DEFS_TEMPLATE = """
-from typing import List, Dict, Any, TypedDict
+from typing import List, Dict, Any, TypedDict, Callable
 {function_args_def}
 """
 
@@ -115,6 +115,11 @@ def render_webhook_handle(
     return_type: Dict[str, Any],
 ) -> Tuple[str, str]:
     function_args, function_args_def = parse_arguments(function_name, arguments)
+
+    if "WebhookEventTypeElement" in function_args:
+        # let's add the function name import!
+        function_args = function_args.replace("WebhookEventTypeElement", f"_{function_name}.WebhookEventTypeElement")
+
     func_str = WEBHOOK_TEMPLATE.format(
         description=function_description,
         client_id=uuid.uuid4().hex,

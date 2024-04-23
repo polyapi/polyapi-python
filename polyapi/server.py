@@ -4,7 +4,7 @@ from polyapi.typedefs import PropertySpecification
 from polyapi.utils import camelCase, add_type_import_path, parse_arguments, get_type_and_def
 
 SERVER_DEFS_TEMPLATE = """
-from typing import List, Dict, Any, TypedDict
+from typing import List, Dict, Any, TypedDict, Callable
 {args_def}
 {return_type_def}
 """
