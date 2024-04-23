@@ -86,7 +86,7 @@ async def get_client_and_connect():
 
 
 async def unregister(data: Dict[str, Any]):
-    print(f"stopping error handler for '{data['webhookHandleID']}'...")
+    print(f"stopping webhook handler for '{data['webhookHandleID']}'...")
     assert client
     await client.emit(
         "unregisterWebhookEventHandler",
