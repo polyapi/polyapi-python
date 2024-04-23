@@ -1,5 +1,6 @@
 import asyncio
 import socketio  # type: ignore
+from socketio.exceptions import ConnectionError  # type: ignore
 import uuid
 from typing import Any, Dict, List, Tuple
 
@@ -92,8 +93,12 @@ async def unregister(data: Dict[str, Any]):
 
 async def unregister_all():
     _, base_url = get_api_key_and_url()
-    # need to reconnect because maybe socketio client disconnected after Ctrl+C?
-    await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+    # maybe need to reconnect because maybe socketio client disconnected after Ctrl+C?
+    # feels like Linux disconnects but Windows stays connected
+    try:
+        await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+    except ConnectionError:
+        pass
     await asyncio.gather(*[unregister(handler) for handler in active_handlers])
 
 
