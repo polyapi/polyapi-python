@@ -22,6 +22,8 @@ def {function_name}(
         return {return_action}
     except:
         return resp.text
+
+
 """
 
 
