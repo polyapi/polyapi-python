@@ -154,24 +154,6 @@ def clear() -> None:
     print("Cleared!")
 
 
-def save_rendered_specs() -> None:
-    specs = read_cached_specs()
-    # right now we just support rendered apiFunctions
-    api_specs = [spec for spec in specs if spec["type"] == "apiFunction"]
-    for spec in api_specs:
-        assert spec["function"]
-        func_str, type_defs = render_spec(spec)
-        data = {
-            "language": "python",
-            "apiFunctionId": spec["id"],
-            "signature": func_str,
-            "typedefs": type_defs,
-        }
-        resp = execute_post("/functions/rendered-specs", data)
-        print("adding", spec["context"], spec["name"])
-        assert resp.status_code == 201, (resp.text, resp.status_code)
-
-
 def render_spec(spec: SpecificationDto):
     function_type = spec["type"]
     function_description = spec["description"]
