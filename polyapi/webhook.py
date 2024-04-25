@@ -1,11 +1,12 @@
 import asyncio
 import socketio  # type: ignore
+from socketio.exceptions import ConnectionError  # type: ignore
 import uuid
 from typing import Any, Dict, List, Tuple
 
 from polyapi.config import get_api_key_and_url
 from polyapi.typedefs import PropertySpecification
-from polyapi.utils import parse_arguments
+from polyapi.utils import parse_arguments, poly_full_path
 
 # all active webhook handlers, used by unregister_all to cleanup
 active_handlers: List[Dict[str, Any]] = []
@@ -32,7 +33,7 @@ async def {function_name}(
     \"""
     from polyapi.webhook import client, active_handlers
 
-    print("Starting webhook for {function_name}...")
+    print("Starting webhook handler for {function_path}...")
 
     if not client:
         raise Exception("Client not initialized. Abort!")
@@ -74,7 +75,7 @@ async def {function_name}(
         "waitForResponse": options.get("waitForResponse"),
     }}
     await client.emit('registerWebhookEventHandler', data, namespace="/events", callback=registerCallback)
-    active_handlers.append({{"clientID": eventsClientId, "webhookHandleID": function_id, "apiKey": api_key}})
+    active_handlers.append({{"clientID": eventsClientId, "webhookHandleID": function_id, "apiKey": api_key, "path": "{function_path}"}})
 """
 
 
@@ -86,7 +87,7 @@ async def get_client_and_connect():
 
 
 async def unregister(data: Dict[str, Any]):
-    print(f"stopping webhook handler for '{data['webhookHandleID']}'...")
+    print(f"Stopping webhook handler for {data['path']}...")
     assert client
     await client.emit(
         "unregisterWebhookEventHandler",
@@ -101,13 +102,18 @@ async def unregister(data: Dict[str, Any]):
 
 async def unregister_all():
     _, base_url = get_api_key_and_url()
-    # need to reconnect because maybe socketio client disconnected after Ctrl+C?
-    await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+    # maybe need to reconnect because maybe socketio client disconnected after Ctrl+C?
+    # feels like Linux disconnects but Windows stays connected
+    try:
+        await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+    except ConnectionError:
+        pass
     await asyncio.gather(*[unregister(handler) for handler in active_handlers])
 
 
 def render_webhook_handle(
     function_type: str,
+    function_context: str,
     function_name: str,
     function_id: str,
     function_description: str,
@@ -125,7 +131,8 @@ def render_webhook_handle(
         client_id=uuid.uuid4().hex,
         function_id=function_id,
         function_name=function_name,
-        function_args=function_args
+        function_args=function_args,
+        function_path=poly_full_path(function_context, function_name),
     )
     func_defs = WEBHOOK_DEFS_TEMPLATE.format(function_args_def=function_args_def)
     return func_str, func_defs

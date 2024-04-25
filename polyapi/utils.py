@@ -189,3 +189,12 @@ def parse_arguments(function_name: str, arguments: List[PropertySpecification]) 
         else:
             arg_string += ",\n"
     return arg_string.rstrip("\n"), "\n\n".join(args_def)
+
+
+def poly_full_path(context, name) -> str:
+    """get the functions path as it will be exposed in the poly library"""
+    if context:
+        path = context + "." + name
+    else:
+        path = name
+    return f"poly.{path}"

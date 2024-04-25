@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import socketio  # type: ignore
+from socketio.exceptions import ConnectionError  # type: ignore
 from typing import Any, Callable, Dict, List, Optional
 
 from polyapi.config import get_api_key_and_url
@@ -28,7 +29,7 @@ async def get_client_and_connect():
 
 
 async def unregister(data: Dict[str, Any]):
-    print(f"stopping error handler for '{data['path']}'...")
+    print(f"Stopping error handler for {data['path']}...")
     assert client
     await client.emit(
         "unregisterErrorHandler",
@@ -40,14 +41,17 @@ async def unregister(data: Dict[str, Any]):
 async def unregister_all():
     _, base_url = get_api_key_and_url()
     # need to reconnect because maybe socketio client disconnected after Ctrl+C?
-    await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+    try:
+        await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+    except ConnectionError:
+        pass
     await asyncio.gather(*[unregister(handler) for handler in active_handlers])
 
 
 async def on(
     path: str, callback: Callable, options: Optional[Dict[str, Any]] = None
 ) -> None:
-    print(f"starting error handler for {path}...")
+    print(f"Starting error handler for {path}...")
 
     if not client:
         raise Exception("Client not initialized. Abort!")
