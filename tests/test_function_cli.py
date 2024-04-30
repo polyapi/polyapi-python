@@ -79,12 +79,12 @@ class T(unittest.TestCase):
     def test_parse_import_basic(self):
         code = "import flask\n\n\ndef foobar(n: int) -> int:\n    return 9\n"
         _, _, _, additional_requirements = _parse_code(code, "foobar")
-        self.assertEqual(additional_requirements, ["flask"])
+        self.assertEqual(additional_requirements, ["Flask"])
 
     def test_parse_import_from(self):
         code = "from flask import Request, Response\n\n\ndef foobar(n: int) -> int:\n    return 9\n"
         _, _, _, additional_requirements = _parse_code(code, "foobar")
-        self.assertEqual(additional_requirements, ["flask"])
+        self.assertEqual(additional_requirements, ["Flask"])
 
     def test_parse_import_base(self):
         code = "import requests\n\n\ndef foobar(n: int) -> int:\n    return 9\n"

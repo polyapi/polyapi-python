@@ -2,9 +2,10 @@ import json
 import requests
 import os
 import shutil
-from typing import Any, Dict, List, Tuple
+from typing import List
 
 from polyapi.auth import render_auth_function
+from polyapi.client import render_client_function
 from polyapi.execute import execute_post
 from polyapi.webhook import render_webhook_handle
 
@@ -18,6 +19,7 @@ from .config import get_api_key_and_url, initialize_config
 SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
     "authFunction",
+    "customFunction",
     "serverFunction",
     "webhookHandle",
 }
@@ -38,32 +40,29 @@ def get_specs() -> List:
 
 
 def parse_function_specs(
-    specs: List, limit_ids: List[str] | None  # optional list of ids to limit to
-) -> List[Tuple[str, str, str, str, List[PropertySpecification], Dict[str, Any]]]:
+    specs: List[SpecificationDto],
+    limit_ids: List[str] | None,  # optional list of ids to limit to
+) -> List[SpecificationDto]:
     functions = []
     for spec in specs:
+        if not spec or "function" not in spec:
+            continue
+
+        if not spec["function"]:
+            continue
+
         if limit_ids and spec["id"] not in limit_ids:
             continue
 
         if spec["type"] not in SUPPORTED_FUNCTION_TYPES:
             continue
 
-        function_type = spec["type"]
-        function_name = f"poly.{spec['context']}.{spec['name']}"
-        function_id = spec["id"]
-        arguments: List[PropertySpecification] = [
-            arg for arg in spec["function"]["arguments"]
-        ]
-        functions.append(
-            (
-                function_type,
-                function_name,
-                function_id,
-                spec["description"],
-                arguments,
-                spec["function"]["returnType"],
-            )
-        )
+        if spec["type"] == "customFunction" and spec["language"] != "python":
+            # poly libraries only support client functions of same language
+            continue
+
+        functions.append(spec)
+
     return functions
 
 
@@ -93,11 +92,10 @@ def read_cached_specs() -> List[SpecificationDto]:
         return json.loads(f.read())
 
 
-def get_functions_and_parse(limit_ids: List[str] | None = None):
+def get_functions_and_parse(limit_ids: List[str] | None = None) -> List[SpecificationDto]:
     specs = get_specs()
     cache_specs(specs)
-    functions = parse_function_specs(specs, limit_ids=limit_ids)
-    return functions
+    return parse_function_specs(specs, limit_ids=limit_ids)
 
 
 def get_variables() -> List[VariableSpecDto]:
@@ -165,14 +163,7 @@ def save_rendered_specs() -> None:
     api_specs = [spec for spec in specs if spec["type"] == "apiFunction"]
     for spec in api_specs:
         assert spec["function"]
-        func_str, type_defs = render_spec(
-            spec["type"],
-            spec["name"],
-            spec["id"],
-            spec["description"],
-            spec["function"]["arguments"],
-            spec["function"]["returnType"],
-        )
+        func_str, type_defs = render_spec(spec)
         data = {
             "language": "python",
             "apiFunctionId": spec["id"],
@@ -184,20 +175,34 @@ def save_rendered_specs() -> None:
         assert resp.status_code == 201, (resp.text, resp.status_code)
 
 
-def render_spec(
-    function_type: str,
-    function_name: str,
-    function_id: str,
-    function_description: str,
-    arguments: List[PropertySpecification],
-    return_type: Dict[str, Any],
-):
+def render_spec(spec: SpecificationDto):
+    function_type = spec["type"]
+    function_description = spec["description"]
+    function_name = spec["name"]
+    function_context = spec["context"]
+    function_id = spec["id"]
+
+    arguments: List[PropertySpecification] = []
+    return_type = {}
+    if spec["function"]:
+        arguments = [
+            arg for arg in spec["function"]["arguments"]
+        ]
+        return_type = spec["function"]["returnType"]
+
     if function_type == "apiFunction":
         func_str, func_type_defs = render_api_function(
             function_type,
             function_name,
             function_id,
             function_description,
+            arguments,
+            return_type,
+        )
+    elif function_type == "customFunction":
+        func_str, func_type_defs = render_client_function(
+            function_name,
+            spec["code"],
             arguments,
             return_type,
         )
@@ -222,6 +227,7 @@ def render_spec(
     elif function_type == "webhookHandle":
         func_str, func_type_defs = render_webhook_handle(
             function_type,
+            function_context,
             function_name,
             function_id,
             function_description,
@@ -232,25 +238,14 @@ def render_spec(
 
 
 def add_function_file(
-    function_type: str,
     full_path: str,
     function_name: str,
-    function_id: str,
-    function_description: str,
-    arguments: List[PropertySpecification],
-    return_type: Dict[str, Any],
+    spec: SpecificationDto,
 ):
     # first lets add the import to the __init__
     init_the_init(full_path)
 
-    func_str, func_type_defs = render_spec(
-        function_type,
-        function_name,
-        function_id,
-        function_description,
-        arguments,
-        return_type,
-    )
+    func_str, func_type_defs = render_spec(spec)
 
     if func_str:
         # add function to init
@@ -265,27 +260,17 @@ def add_function_file(
 
 
 def create_function(
-    function_type: str,
-    path: str,
-    function_id: str,
-    function_description: str,
-    arguments: List[PropertySpecification],
-    return_type: Dict[str, Any],
+    spec: SpecificationDto
 ) -> None:
     full_path = os.path.dirname(os.path.abspath(__file__))
-
-    folders = path.split(".")
+    folders = f"poly.{spec['context']}.{spec['name']}".split(".")
     for idx, folder in enumerate(folders):
         if idx + 1 == len(folders):
             # special handling for final level
             add_function_file(
-                function_type,
                 full_path,
                 folder,
-                function_id,
-                function_description,
-                arguments,
-                return_type,
+                spec,
             )
         else:
             full_path = os.path.join(full_path, folder)
@@ -299,9 +284,6 @@ def create_function(
                 add_import_to_init(full_path, next)
 
 
-# TODO create the socket and pass to create_function?
-
-
-def generate_functions(functions: List) -> None:
+def generate_functions(functions: List[SpecificationDto]) -> None:
     for func in functions:
-        create_function(*func)
+        create_function(func)
