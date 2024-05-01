@@ -10,7 +10,7 @@ from polyapi.schema import generate_schema_types, clean_title, map_primitive_typ
 
 # this string should be in every __init__ file.
 # it contains all the imports needed for the function or variable code to run
-CODE_IMPORTS = "from typing import List, Dict, Any, TypedDict, Optional\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
+CODE_IMPORTS = "from typing import List, Dict, Any, TypedDict, Optional, Callable\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
 
 
 def init_the_init(full_path: str) -> None:
@@ -61,6 +61,10 @@ def print_red(s: str):
 def add_type_import_path(function_name: str, arg: str) -> str:
     """ if not basic type, coerce to camelCase and add the import path
     """
+    # for now, just treat Callables as basic types
+    if arg.startswith("Callable"):
+        return arg
+
     if arg in BASIC_PYTHON_TYPES:
         return arg
 
@@ -142,6 +146,25 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
                 return "Any", ""
         else:
             return "Dict", ""
+    elif type_spec["kind"] == "function":
+        arg_types = []
+        arg_defs = []
+        if "spec" in type_spec:
+            return_type, _ = get_type_and_def(type_spec["spec"]["returnType"])
+            if return_type not in BASIC_PYTHON_TYPES:
+                # for now only Python only supports basic types as return types
+                return_type = "Any"
+
+            for argument in type_spec["spec"]["arguments"]:
+                arg_type, arg_def = get_type_and_def(argument["type"])
+                arg_types.append(arg_type)
+                if arg_def:
+                    arg_defs.append(arg_def)
+
+            final_arg_type = "Callable[[{}], {}]".format(", ".join(arg_types), return_type)
+            return final_arg_type, "\n".join(arg_defs)
+        else:
+            return "Callable", ""
     elif type_spec["kind"] == "any":
         return "Any", ""
     else:
