@@ -24,8 +24,6 @@ def {function_name}(
     \"""
     resp = execute("{function_type}", "{function_id}", {data})
     return {api_response_type}(resp.json())  # type: ignore
-
-
 """
 
 

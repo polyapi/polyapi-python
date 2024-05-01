@@ -16,9 +16,9 @@ import asyncio
 
 
 class AuthFunctionResponse(TypedDict):
-    status: int
-    data: Any
-    headers: Dict[str, str]
+  status: int
+  data: Any
+  headers: Dict[str, str]
 
 
 async def getToken(clientId: str, clientSecret: str, scopes: List[str], callback, options: Optional[Dict[str, Any]] = None):
