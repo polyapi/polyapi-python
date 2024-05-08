@@ -1,12 +1,13 @@
-from typing import Dict
+from typing import Dict, Optional
+
+import requests
+from polyapi.config import get_api_key_and_url
 from polyapi.generate import read_cached_specs, render_spec
 from polyapi.execute import execute_post
 from polyapi.typedefs import SpecificationDto
 
 
 def update_rendered_spec(spec: SpecificationDto):
-    print(spec)
-    return
     print("Updating rendered spec...")
     func_str, type_defs = render_spec(spec)
     data = {
@@ -21,17 +22,32 @@ def update_rendered_spec(spec: SpecificationDto):
     else:
         raise NotImplementedError("todo")
 
+    # use super key on develop-k8s here!
     resp = execute_post("/functions/rendered-specs", data)
     assert resp.status_code == 201, (resp.text, resp.status_code)
     # this needs to run with something like `kn func run...`
 
 
-def get_and_update_rendered_spec(spec_id: str) -> bool:
-    specs = read_cached_specs()
-    for spec in specs:
-        if spec['id'] == spec_id:
-            update_rendered_spec(spec)
-            return True
+def _get_spec(api_key: str, spec_id: str) -> Optional[SpecificationDto]:
+    base_url, _ = get_api_key_and_url()
+    url = f"{base_url}/specs"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    resp = requests.get(url, headers=headers)
+    if resp.status_code == 200:
+        specs = resp.json()
+        for spec in specs:
+            if spec['id'] == spec_id:
+                return spec
+        return None
+    else:
+        raise NotImplementedError(resp.content)
+
+
+def get_and_update_rendered_spec(api_key: str, spec_id: str) -> bool:
+    spec = _get_spec(api_key, spec_id)
+    if spec:
+        update_rendered_spec(spec)
+        return True
     return False
 
 

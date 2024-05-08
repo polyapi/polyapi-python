@@ -18,7 +18,7 @@ CLIENT_DESC = """Commands
 """
 
 
-def execute_from_cli():
+def execute_from_cli() -> None:
     parser = argparse.ArgumentParser(
         prog="python -m polyapi", description=CLIENT_DESC, formatter_class=argparse.RawTextHelpFormatter
     )
@@ -44,8 +44,8 @@ def execute_from_cli():
         clear_config()
         generate()
     elif command == "update_rendered_spec":
-        assert len(args.subcommands) == 1
-        updated = get_and_update_rendered_spec(args.subcommands[0])
+        assert len(args.subcommands) == 2
+        updated = get_and_update_rendered_spec(args.subcommands[0], args.subcommands[1])
         if updated:
             print("Updated rendered spec!")
         else:
