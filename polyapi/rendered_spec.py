@@ -5,6 +5,8 @@ from polyapi.typedefs import SpecificationDto
 
 
 def update_rendered_spec(spec: SpecificationDto):
+    print(spec)
+    return
     print("Updating rendered spec...")
     func_str, type_defs = render_spec(spec)
     data = {
@@ -22,6 +24,15 @@ def update_rendered_spec(spec: SpecificationDto):
     resp = execute_post("/functions/rendered-specs", data)
     assert resp.status_code == 201, (resp.text, resp.status_code)
     # this needs to run with something like `kn func run...`
+
+
+def get_and_update_rendered_spec(spec_id: str) -> bool:
+    specs = read_cached_specs()
+    for spec in specs:
+        if spec['id'] == spec_id:
+            update_rendered_spec(spec)
+            return True
+    return False
 
 
 def save_rendered_specs() -> None:

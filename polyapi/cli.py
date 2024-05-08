@@ -5,7 +5,7 @@ from polyapi.utils import print_green
 from .config import clear_config, set_api_key_and_url
 from .generate import generate, clear
 from .function_cli import function_add_or_update
-from .rendered_spec import save_rendered_specs
+from .rendered_spec import get_and_update_rendered_spec
 
 
 CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "save_rendered_specs"]
@@ -43,8 +43,14 @@ def execute_from_cli():
     elif command == "setup":
         clear_config()
         generate()
-    elif command == "save_rendered_specs":
-        save_rendered_specs()
+    elif command == "update_rendered_spec":
+        assert len(args.subcommands) == 1
+        updated = get_and_update_rendered_spec(args.subcommands[0])
+        if updated:
+            print("Updated rendered spec!")
+        else:
+            print("Failed to update rendered spec!")
+            exit(1)
     elif command == "clear":
         print("Clearing the generated library...")
         clear()
