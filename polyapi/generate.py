@@ -75,11 +75,14 @@ def cache_specs(specs: List[SpecificationDto]):
 
     full_path = os.path.dirname(os.path.abspath(__file__))
     full_path = os.path.join(full_path, "poly")
-    if not os.path.exists(full_path):
-        os.makedirs(full_path)
+    try:
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
 
-    with open(os.path.join(full_path, "specs.json"), "w") as f:
-        f.write(json.dumps(supported))
+        with open(os.path.join(full_path, "specs.json"), "w") as f:
+            f.write(json.dumps(supported))
+    except Exception as e:
+        print("Failed to cache specs", e)
 
 
 def read_cached_specs() -> List[SpecificationDto]:
@@ -152,6 +155,24 @@ def clear() -> None:
     if os.path.exists(vari_path):
         shutil.rmtree(vari_path)
     print("Cleared!")
+
+
+def save_rendered_specs() -> None:
+    specs = read_cached_specs()
+    # right now we just support rendered apiFunctions
+    api_specs = [spec for spec in specs if spec["type"] == "apiFunction"]
+    for spec in api_specs:
+        assert spec["function"]
+        func_str, type_defs = render_spec(spec)
+        data = {
+            "language": "python",
+            "apiFunctionId": spec["id"],
+            "signature": func_str,
+            "typedefs": type_defs,
+        }
+        resp = execute_post("/functions/rendered-specs", data)
+        print("adding", spec["context"], spec["name"])
+        assert resp.status_code == 201, (resp.text, resp.status_code)
 
 
 def render_spec(spec: SpecificationDto):
