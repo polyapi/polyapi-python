@@ -13,7 +13,7 @@ from importlib.metadata import packages_distributions
 from polyapi.generate import get_functions_and_parse, generate_functions
 from polyapi.config import get_api_key_and_url
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
-from polyapi.rendered_spec import update_rendered_spec
+# from polyapi.rendered_spec import update_rendered_spec
 from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
 import importlib
 
@@ -271,7 +271,7 @@ def function_add_or_update(
         print(f"Function ID: {function_id}")
         print("Generating new custom function...", end="")
         functions = get_functions_and_parse(limit_ids=[function_id])
-        update_rendered_spec(functions[0])
+        # update_rendered_spec(functions[0])
         generate_functions(functions)
         print_green("DONE")
     else:
