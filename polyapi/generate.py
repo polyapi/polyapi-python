@@ -6,7 +6,6 @@ from typing import List
 
 from polyapi.auth import render_auth_function
 from polyapi.client import render_client_function
-from polyapi.execute import execute_post
 from polyapi.webhook import render_webhook_handle
 
 from .typedefs import PropertySpecification, SpecificationDto, VariableSpecDto
@@ -155,24 +154,6 @@ def clear() -> None:
     if os.path.exists(vari_path):
         shutil.rmtree(vari_path)
     print("Cleared!")
-
-
-def save_rendered_specs() -> None:
-    specs = read_cached_specs()
-    # right now we just support rendered apiFunctions
-    api_specs = [spec for spec in specs if spec["type"] == "apiFunction"]
-    for spec in api_specs:
-        assert spec["function"]
-        func_str, type_defs = render_spec(spec)
-        data = {
-            "language": "python",
-            "apiFunctionId": spec["id"],
-            "signature": func_str,
-            "typedefs": type_defs,
-        }
-        resp = execute_post("/functions/rendered-specs", data)
-        print("adding", spec["context"], spec["name"])
-        assert resp.status_code == 201, (resp.text, resp.status_code)
 
 
 def render_spec(spec: SpecificationDto):

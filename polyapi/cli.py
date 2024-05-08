@@ -3,8 +3,9 @@ import argparse
 from polyapi.utils import print_green
 
 from .config import clear_config, set_api_key_and_url
-from .generate import generate, clear, save_rendered_specs
+from .generate import generate, clear
 from .function_cli import function_add_or_update
+from .rendered_spec import save_rendered_specs
 
 
 CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "save_rendered_specs"]
