@@ -18,10 +18,8 @@ def _cleanup_input_for_gentypes(input_data: Dict):
             # jsonschema_gentypes doesn't like double quotes in enums
             # TODO fix this upstream
             for idx, enum in enumerate(v):
-                assert isinstance(enum, str)
-                v[idx] = enum.replace('"', "'")
-
-
+                if isinstance(enum, str):
+                    v[idx] = enum.replace('"', "'")
 
 
 def _temp_store_input_data(input_data: Dict) -> str:
