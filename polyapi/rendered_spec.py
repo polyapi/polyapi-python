@@ -23,6 +23,10 @@ def update_rendered_spec(api_key: str, spec: SpecificationDto):
 
     # use super key on develop-k8s here!
     _, base_url = get_api_key_and_url()
+    if not base_url:
+        # local node server runs on port 8000
+        base_url = "http://localhost:8000"
+
     url = f"{base_url}/functions/rendered-specs"
     headers = {"Authorization": f"Bearer {api_key}"}
     resp = requests.post(url, json=data, headers=headers)
