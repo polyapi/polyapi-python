@@ -1,4 +1,5 @@
-from typing import Dict, Optional
+import os
+from typing import Optional
 
 import requests
 from polyapi.config import get_api_key_and_url
@@ -24,8 +25,7 @@ def update_rendered_spec(api_key: str, spec: SpecificationDto):
     # use super key on develop-k8s here!
     _, base_url = get_api_key_and_url()
     if not base_url:
-        # local node server runs on port 8000
-        base_url = "http://localhost:8000"
+        base_url = os.environ.get("HOST_URL")
 
     url = f"{base_url}/functions/rendered-specs"
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -37,8 +37,7 @@ def update_rendered_spec(api_key: str, spec: SpecificationDto):
 def _get_spec(api_key: str, spec_id: str) -> Optional[SpecificationDto]:
     _, base_url = get_api_key_and_url()
     if not base_url:
-        # local node server runs on port 8000
-        base_url = "http://localhost:8000"
+        base_url = os.environ.get("HOST_URL")
 
     url = f"{base_url}/specs"
     headers = {"Authorization": f"Bearer {api_key}"}
