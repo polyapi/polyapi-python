@@ -40,13 +40,13 @@ class T(unittest.TestCase):
         self.assertEqual(_get_spec.call_count, 1)
         self.assertFalse(updated)
 
-    @patch("polyapi.rendered_spec.execute_post")
+    @patch("polyapi.rendered_spec.requests.post")
     @patch("polyapi.rendered_spec._get_spec")
-    def test_get_and_update_rendered_spec_success(self, _get_spec, execute_post):
+    def test_get_and_update_rendered_spec_success(self, _get_spec, post):
         """ pass in a bad id to update and make sure it returns False
         """
         _get_spec.return_value = GET_PRODUCTS_COUNT
-        execute_post.return_value = Mock(status_code=201, text="Created")
+        post.return_value = Mock(status_code=201, text="Created")
         updated = get_and_update_rendered_spec("abc", "123")
         self.assertEqual(_get_spec.call_count, 1)
         self.assertTrue(updated)
