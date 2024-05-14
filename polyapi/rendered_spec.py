@@ -29,7 +29,7 @@ def update_rendered_spec(spec: SpecificationDto):
 
 
 def _get_spec(api_key: str, spec_id: str) -> Optional[SpecificationDto]:
-    base_url, _ = get_api_key_and_url()
+    _, base_url = get_api_key_and_url()
     url = f"{base_url}/specs"
     headers = {"Authorization": f"Bearer {api_key}"}
     resp = requests.get(url, headers=headers)

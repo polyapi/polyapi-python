@@ -8,7 +8,7 @@ from .function_cli import function_add_or_update
 from .rendered_spec import get_and_update_rendered_spec
 
 
-CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "save_rendered_specs"]
+CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "update_rendered_spec"]
 
 CLIENT_DESC = """Commands
   python -m polyapi setup                Setup your Poly connection
