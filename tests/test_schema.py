@@ -14,7 +14,7 @@ SCHEMA = {
 class T(unittest.TestCase):
     def test_fix_titles(self):
         output = wrapped_generate_schema_types(SCHEMA, "", "Dict")
-        self.assertIn("MyDict", output[0])
+        self.assertEqual("MyDict", output[0])
         self.assertIn("class MyDict", output[1])
 
         # should not throw with unknown dialect error
