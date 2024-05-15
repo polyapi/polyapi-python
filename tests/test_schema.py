@@ -1,14 +1,20 @@
 import unittest
-from polyapi.schema import generate_schema_types
+from polyapi.schema import wrapped_generate_schema_types
+
+SCHEMA = {
+    "$schema": "http://json-schema.org/draft-06/schema#",
+    "type": "object",
+    "properties": {"name": {"type": "string"}},
+    "required": ["name"],
+    "additionalProperties": False,
+    "definitions": {},
+}
 
 
 class T(unittest.TestCase):
     def test_fix_titles(self):
-        # schema = json.loads(SCHEMA)
-        schema = {"$schema": "http://json-schema.org/draft-06/schema#"}
-        try:
-            a, b = generate_schema_types(schema)
-        except AssertionError:
-            pass
+        output = wrapped_generate_schema_types(SCHEMA, "", "Dict")
+        self.assertIn("MyDict", output[0])
+        self.assertIn("class MyDict", output[1])
 
         # should not throw with unknown dialect error
