@@ -36,8 +36,10 @@ def wrapped_generate_schema_types(type_spec: dict, root, fallback_type):
     if not root:
         root = "MyList" if fallback_type == "List" else "MyDict"
 
+    root = clean_title(root)
+
     try:
-        return clean_title(root), generate_schema_types(type_spec, root=root)
+        return root, generate_schema_types(type_spec, root=root)
     except RecursionError:
         # some schemas are so huge, our library cant handle it
         # TODO identify critical recursion penalty and maybe switch underlying logic to iterative?
