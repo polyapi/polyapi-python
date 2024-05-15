@@ -1,16 +1,16 @@
 import re
 import os
-import logging
 from typing import Tuple, List
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
 from polyapi.typedefs import PropertySpecification, PropertyType
-from polyapi.schema import generate_schema_types, clean_title, map_primitive_types
+from polyapi.schema import wrapped_generate_schema_types, clean_title, map_primitive_types
 
 
 # this string should be in every __init__ file.
 # it contains all the imports needed for the function or variable code to run
 CODE_IMPORTS = "from typing import List, Dict, Any, TypedDict, Optional, Callable\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
+FALLBACK_TYPES = {"Dict", "List"}
 
 
 def init_the_init(full_path: str) -> None:
@@ -96,11 +96,7 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
         if type_spec.get("items"):
             items = type_spec["items"]
             if items.get("$ref"):
-                try:
-                    return "ResponseType", generate_schema_types(type_spec, root="ResponseType")  # type: ignore
-                except:
-                    logging.exception(f"Error when generating schema type: {type_spec}")
-                    return "Dict", ""
+                return wrapped_generate_schema_types(type_spec, "ResponseType", "Dict")  # type: ignore
             else:
                 item_type, _ = get_type_and_def(items)
                 title = f"List[{item_type}]"
@@ -116,12 +112,7 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
             title = schema.get("title", "")
             if title:
                 assert isinstance(title, str)
-                title = clean_title(title)
-                try:
-                    return title, generate_schema_types(schema, root=title)  # type: ignore
-                except:
-                    logging.exception(f"Error when generating schema type: {schema}")
-                    return "Dict", ""
+                return wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
 
             elif schema.get("items"):
                 # fallback to schema $ref name if no explicit title
@@ -132,16 +123,11 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
                     title = items.get("$ref", "")  # type: ignore
 
                 title = title.rsplit("/", 1)[-1]
-                title = clean_title(title)
                 if not title:
                     return "List", ""
 
                 title = f"List[{title}]"
-                try:
-                    return title, generate_schema_types(schema, root=title)
-                except:
-                    logging.exception(f"Error when generating schema type: {schema}")
-                    return "List", ""
+                return wrapped_generate_schema_types(schema, title, "List")
             else:
                 return "Any", ""
         else:

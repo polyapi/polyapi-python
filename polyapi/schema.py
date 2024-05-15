@@ -1,3 +1,4 @@
+import logging
 import contextlib
 from typing import Dict
 from jsonschema_gentypes.cli import process_config
@@ -29,6 +30,21 @@ def _temp_store_input_data(input_data: Dict) -> str:
     ) as temp_file:
         json.dump(input_data, temp_file)
         return temp_file.name
+
+
+def wrapped_generate_schema_types(type_spec: dict, root, fallback_type):
+    if not root:
+        root = "MyList" if fallback_type == "List" else "MyDict"
+
+    try:
+        return clean_title(root), generate_schema_types(type_spec, root=root)
+    except RecursionError:
+        # some schemas are so huge, our library cant handle it
+        # TODO identify critical recursion penalty and maybe switch underlying logic to iterative?
+        return fallback_type, ""
+    except:
+        logging.exception(f"Error when generating schema type: {type_spec}")
+        return fallback_type, ""
 
 
 def generate_schema_types(input_data: Dict, root=None):
