@@ -19,6 +19,8 @@ def update_rendered_spec(api_key: str, spec: SpecificationDto):
         data["apiFunctionId"] = spec["id"]
     elif spec["type"] == "serverFunction":
         data["customFunctionId"] = spec["id"]
+    elif spec["type"] == "clientFunction":
+        data["customFunctionId"] = spec["id"]
     else:
         raise NotImplementedError("todo")
 
@@ -31,7 +33,6 @@ def update_rendered_spec(api_key: str, spec: SpecificationDto):
     headers = {"Authorization": f"Bearer {api_key}"}
     resp = requests.post(url, json=data, headers=headers)
     assert resp.status_code == 201, (resp.text, resp.status_code)
-    # this needs to run with something like `kn func run...`
 
 
 def _get_spec(api_key: str, spec_id: str) -> Optional[SpecificationDto]:
