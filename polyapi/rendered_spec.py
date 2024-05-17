@@ -21,8 +21,8 @@ def update_rendered_spec(api_key: str, spec: SpecificationDto):
         data["customFunctionId"] = spec["id"]
     elif spec["type"] == "clientFunction":
         data["customFunctionId"] = spec["id"]
-    elif spec["type"] == "webhookFunction":
-        data["webhookId"] = spec["id"]
+    elif spec["type"] == "webhookHandle":
+        data["webhookHandleId"] = spec["id"]
     else:
         raise NotImplementedError("todo")
 
