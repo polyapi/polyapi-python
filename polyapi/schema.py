@@ -64,6 +64,7 @@ def generate_schema_types(input_data: Dict, root=None):
                 "source": tmp_input,
                 "destination": tmp_output,
                 "root_name": root,
+                "api_arguments": {"get_name_properties": "UpperFirst"},
             }
         ],
     }
@@ -71,7 +72,7 @@ def generate_schema_types(input_data: Dict, root=None):
     # jsonschema_gentypes prints source to stdout
     # no option to surpress so we do this
     with contextlib.redirect_stdout(None):
-        process_config(config)
+        process_config(config, [tmp_input])
 
     with open(tmp_output) as f:
         output = f.read()
