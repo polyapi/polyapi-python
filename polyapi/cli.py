@@ -3,11 +3,12 @@ import argparse
 from polyapi.utils import print_green
 
 from .config import clear_config, set_api_key_and_url
-from .generate import generate, clear, save_rendered_specs
+from .generate import generate, clear
 from .function_cli import function_add_or_update
+from .rendered_spec import get_and_update_rendered_spec
 
 
-CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "save_rendered_specs"]
+CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "update_rendered_spec"]
 
 CLIENT_DESC = """Commands
   python -m polyapi setup                Setup your Poly connection
@@ -17,7 +18,7 @@ CLIENT_DESC = """Commands
 """
 
 
-def execute_from_cli():
+def execute_from_cli() -> None:
     parser = argparse.ArgumentParser(
         prog="python -m polyapi", description=CLIENT_DESC, formatter_class=argparse.RawTextHelpFormatter
     )
@@ -42,8 +43,14 @@ def execute_from_cli():
     elif command == "setup":
         clear_config()
         generate()
-    elif command == "save_rendered_specs":
-        save_rendered_specs()
+    elif command == "update_rendered_spec":
+        assert len(args.subcommands) == 2
+        updated = get_and_update_rendered_spec(args.subcommands[0], args.subcommands[1])
+        if updated:
+            print("Updated rendered spec!")
+        else:
+            print("Failed to update rendered spec!")
+            exit(1)
     elif command == "clear":
         print("Clearing the generated library...")
         clear()

@@ -5,6 +5,8 @@ JSONSCHEMA_TO_PYTHON_TYPE_MAP = {
     "boolean": "bool",
     "array": "List",
     "object": "Dict",
+    "function": "Callable",
+    "void": "None",
 }
 
 
@@ -15,6 +17,8 @@ PYTHON_TO_JSONSCHEMA_TYPE_MAP = {
     "bool": "boolean",
     "List": "array",
     "Dict": "object",
+    "Callable": "function",
+    "None": "void",
 }
 
 BASIC_PYTHON_TYPES = set(PYTHON_TO_JSONSCHEMA_TYPE_MAP.keys())
