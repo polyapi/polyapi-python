@@ -1,5 +1,7 @@
 import unittest
 
+from polyapi.utils import upper_first
+
 from .test_api import TWILIO
 from polyapi.server import render_server_function
 
@@ -45,7 +47,7 @@ class T(unittest.TestCase):
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
-        self.assertIn(f"-> _{name}.ResponseType", func_str)
+        self.assertIn(f"-> {upper_first(name)}.ResponseType", func_str)
 
     def test_render_function_get_products_count(self):
         return_type = GET_PRODUCTS_COUNT["function"]["returnType"]

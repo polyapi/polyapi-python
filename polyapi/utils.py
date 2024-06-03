@@ -75,11 +75,11 @@ def add_type_import_path(function_name: str, arg: str) -> str:
         else:
             if '"' in sub:
                 sub = sub.replace('"', "")
-                return f'List["_{function_name}.{camelCase(sub)}"]'
+                return f'List["{upper_first(function_name)}.{camelCase(sub)}"]'
             else:
-                return f'List[_{function_name}.{camelCase(sub)}]'
+                return f'List[{upper_first(function_name)}.{camelCase(sub)}]'
 
-    return f'_{function_name}.{camelCase(arg)}'
+    return f'{upper_first(function_name)}.{camelCase(arg)}'
 
 
 def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
@@ -184,3 +184,7 @@ def poly_full_path(context, name) -> str:
     else:
         path = name
     return f"poly.{path}"
+
+
+def upper_first(s: str) -> str:
+    return s[0].upper() + s[1:]

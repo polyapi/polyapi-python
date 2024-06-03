@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Tuple
 
 from polyapi.config import get_api_key_and_url
 from polyapi.typedefs import PropertySpecification
-from polyapi.utils import parse_arguments, poly_full_path
+from polyapi.utils import parse_arguments, poly_full_path, upper_first
 
 # all active webhook handlers, used by unregister_all to cleanup
 active_handlers: List[Dict[str, Any]] = []
@@ -124,7 +124,7 @@ def render_webhook_handle(
 
     if "WebhookEventType" in function_args:
         # let's add the function name import!
-        function_args = function_args.replace("WebhookEventType", f"_{function_name}.WebhookEventType")
+        function_args = function_args.replace("WebhookEventType", f"{upper_first(function_name)}.WebhookEventType")
 
     func_str = WEBHOOK_TEMPLATE.format(
         description=function_description,
