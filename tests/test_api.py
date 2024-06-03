@@ -1,7 +1,7 @@
 import unittest
 
 from polyapi.api import render_api_function
-from polyapi.utils import upper_first
+from polyapi.utils import to_func_namespace
 
 ACCUWEATHER = {
     "id": "f7588018-2364-4586-b60d",
@@ -236,7 +236,7 @@ class T(unittest.TestCase):
         )
         self.assertIn(ACCUWEATHER["id"], func_str)
         self.assertIn("locationId: int,", func_str)
-        self.assertIn(f"-> {upper_first(name)}.{name}Response", func_str)
+        self.assertIn(f"-> {to_func_namespace(name)}.{name}Response", func_str)
 
     def test_render_function_zillow(self):
         name = ZILLOW["name"]
@@ -250,7 +250,7 @@ class T(unittest.TestCase):
         )
         self.assertIn(ZILLOW["id"], func_str)
         self.assertIn("locationId: int,", func_str)
-        self.assertIn(f"-> {upper_first(name)}.{name}Response", func_str)
+        self.assertIn(f"-> {to_func_namespace(name)}.{name}Response", func_str)
 
     def test_render_function_twilio_api(self):
         name = TWILIO["name"]
@@ -265,7 +265,7 @@ class T(unittest.TestCase):
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
-        self.assertIn(f"-> {upper_first(name)}.{name}Response", func_str)
+        self.assertIn(f"-> {to_func_namespace(name)}.{name}Response", func_str)
 
     def test_render_function_twilio_get_details(self):
         # same test but try it as a serverFunction rather than an apiFunction
@@ -279,6 +279,6 @@ class T(unittest.TestCase):
             TWILIO_GET_DETAILS["function"]["returnType"],
         )
         self.assertIn(TWILIO_GET_DETAILS["id"], func_str)
-        self.assertIn(f"-> {upper_first(name)}.{name}Response", func_str)
+        self.assertIn(f"-> {to_func_namespace(name)}.{name}Response", func_str)
         self.assertIn("class SubresourceUris", func_type_defs)
         # self.assertIn('Required["SubresourceUris"]', func_type_defs)
