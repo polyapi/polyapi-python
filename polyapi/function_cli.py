@@ -207,6 +207,7 @@ def function_add_or_update(
     server: bool,
     logs_enabled: bool,
     subcommands: List,
+    generate: bool = True,
 ):
     parser = argparse.ArgumentParser()
     parser.add_argument("subcommand", choices=["add"])
@@ -268,10 +269,11 @@ def function_add_or_update(
         print_green("DEPLOYED")
         function_id = resp.json()["id"]
         print(f"Function ID: {function_id}")
-        print("Generating new custom function...", end="")
-        functions = get_functions_and_parse(limit_ids=[function_id])
-        generate_functions(functions)
-        print_green("DONE")
+        if generate:
+            print("Generating new custom function...", end="")
+            functions = get_functions_and_parse(limit_ids=[function_id])
+            generate_functions(functions)
+            print_green("DONE")
     else:
         print("Error adding function.")
         print(resp.status_code)
