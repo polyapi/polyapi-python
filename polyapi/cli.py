@@ -45,8 +45,8 @@ def execute_from_cli() -> None:
         clear_config()
         generate()
     elif command == "update_rendered_spec":
-        assert len(args.subcommands) == 2
-        updated = get_and_update_rendered_spec(args.subcommands[0], args.subcommands[1])
+        assert len(args.subcommands) == 1
+        updated = get_and_update_rendered_spec(args.subcommands[0])
         if updated:
             print("Updated rendered spec!")
         else:
