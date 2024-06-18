@@ -7,7 +7,7 @@ from polyapi.generate import read_cached_specs, render_spec
 from polyapi.typedefs import SpecificationDto
 
 
-def update_rendered_spec(api_key: str, spec: SpecificationDto):
+def update_rendered_spec(spec: SpecificationDto):
     print("Updating rendered spec...")
     func_str, type_defs = render_spec(spec)
     data = {
@@ -27,9 +27,7 @@ def update_rendered_spec(api_key: str, spec: SpecificationDto):
         raise NotImplementedError("todo")
 
     # use super key on develop-k8s here!
-    _, base_url = get_api_key_and_url()
-    if not base_url:
-        base_url = os.environ.get("HOST_URL")
+    api_key, base_url = get_api_key_and_url()
 
     url = f"{base_url}/functions/rendered-specs"
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -37,11 +35,8 @@ def update_rendered_spec(api_key: str, spec: SpecificationDto):
     assert resp.status_code == 201, (resp.text, resp.status_code)
 
 
-def _get_spec(api_key: str, spec_id: str) -> Optional[SpecificationDto]:
-    _, base_url = get_api_key_and_url()
-    if not base_url:
-        base_url = os.environ.get("HOST_URL")
-
+def _get_spec(spec_id: str) -> Optional[SpecificationDto]:
+    api_key, base_url = get_api_key_and_url()
     url = f"{base_url}/specs"
     headers = {"Authorization": f"Bearer {api_key}"}
     resp = requests.get(url, headers=headers)
@@ -55,10 +50,10 @@ def _get_spec(api_key: str, spec_id: str) -> Optional[SpecificationDto]:
         raise NotImplementedError(resp.content)
 
 
-def get_and_update_rendered_spec(api_key: str, spec_id: str) -> bool:
-    spec = _get_spec(api_key, spec_id)
+def get_and_update_rendered_spec(spec_id: str) -> bool:
+    spec = _get_spec(spec_id)
     if spec:
-        update_rendered_spec(api_key, spec)
+        update_rendered_spec(spec)
         return True
     return False
 
@@ -70,4 +65,4 @@ def save_rendered_specs() -> None:
     for spec in api_specs:
         assert spec["function"]
         print("adding", spec["context"], spec["name"])
-        update_rendered_spec("FIXME", spec)
+        update_rendered_spec(spec)

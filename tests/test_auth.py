@@ -136,4 +136,3 @@ class T(unittest.TestCase):
         self.assertIn(GET_TOKEN["id"], func_str)
         # self.assertIn("conversationSID: str", func_str)
         # self.assertIn("authToken: str", func_str)
-        # self.assertIn(f"-> _{name}.ResponseType", func_str)

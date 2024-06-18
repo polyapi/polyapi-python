@@ -11,7 +11,7 @@ from polyapi.webhook import render_webhook_handle
 from .typedefs import PropertySpecification, SpecificationDto, VariableSpecDto
 from .api import render_api_function
 from .server import render_server_function
-from .utils import add_import_to_init, get_auth_headers, init_the_init
+from .utils import add_import_to_init, get_auth_headers, init_the_init, to_func_namespace
 from .variables import generate_variables
 from .config import get_api_key_and_url, initialize_config
 
@@ -232,10 +232,10 @@ def add_function_file(
         # add function to init
         init_path = os.path.join(full_path, "__init__.py")
         with open(init_path, "a") as f:
-            f.write(f"\n\nfrom . import _{function_name}\n\n{func_str}")
+            f.write(f"\n\nfrom . import {to_func_namespace(function_name)}\n\n{func_str}")
 
         # add type_defs to underscore file
-        file_path = os.path.join(full_path, f"_{function_name}.py")
+        file_path = os.path.join(full_path, f"{to_func_namespace(function_name)}.py")
         with open(file_path, "w") as f:
             f.write(func_type_defs)
 
