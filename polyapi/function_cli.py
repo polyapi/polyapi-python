@@ -3,7 +3,7 @@ import argparse
 import json
 import types
 import sys
-from typing import Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 from typing import _TypedDictMeta as BaseTypedDict  # type: ignore
 from typing_extensions import _TypedDictMeta  # type: ignore
 import requests
@@ -279,3 +279,11 @@ def function_add_or_update(
         print(resp.status_code)
         print(resp.content)
         sys.exit(1)
+
+
+def function_execute(context: str, subcommands: List) -> Any:
+    assert subcommands[0] == "execute"
+    context_code = importlib.import_module(f"polyapi.poly.{context}")
+    print(f"Executing poly.{context}.{subcommands[1]}... ")
+    fn = getattr(context_code, subcommands[1])
+    return fn(*subcommands[2:])
