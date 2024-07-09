@@ -36,7 +36,7 @@ class T(unittest.TestCase):
         """ pass in a bad id to update and make sure it returns False
         """
         _get_spec.return_value = None
-        updated = get_and_update_rendered_spec("abc", "123")
+        updated = get_and_update_rendered_spec("123")
         self.assertEqual(_get_spec.call_count, 1)
         self.assertFalse(updated)
 
@@ -47,6 +47,6 @@ class T(unittest.TestCase):
         """
         _get_spec.return_value = GET_PRODUCTS_COUNT
         post.return_value = Mock(status_code=201, text="Created")
-        updated = get_and_update_rendered_spec("abc", "123")
+        updated = get_and_update_rendered_spec("123")
         self.assertEqual(_get_spec.call_count, 1)
         self.assertTrue(updated)
