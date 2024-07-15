@@ -287,3 +287,23 @@ def function_execute(context: str, subcommands: List) -> Any:
     print(f"Executing poly.{context}.{subcommands[1]}... ")
     fn = getattr(context_code, subcommands[1])
     return fn(*subcommands[2:])
+
+
+def spec_delete(function_type: str, function_id: str):
+    api_key, api_url = get_api_key_and_url()
+    assert api_key
+    if function_type == "api":
+        url = f"{api_url}/functions/api/{function_id}"
+    elif function_type == "serverFunction":
+        url = f"{api_url}/functions/server/{function_id}"
+    elif function_type == "customFunction":
+        url = f"{api_url}/functions/client/{function_id}"
+    elif function_type == "webhookHandle":
+        url = f"{api_url}/webhooks/{function_id}"
+    else:
+        print_red("ERROR")
+        print(f"Unknown function type: {function_type}")
+        sys.exit(1)
+    headers = get_auth_headers(api_key)
+    resp = requests.delete(url, headers=headers)
+    return resp
