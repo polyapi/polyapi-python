@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Tuple
 
 from polyapi.typedefs import PropertySpecification
-from polyapi.utils import camelCase, add_type_import_path, parse_arguments, get_type_and_def
+from polyapi.utils import add_type_import_path, parse_arguments, get_type_and_def, rewrite_arg_name
 
 SERVER_DEFS_TEMPLATE = """
 from typing import List, Dict, Any, TypedDict, Callable
@@ -38,7 +38,7 @@ def render_server_function(
     arg_names = [a["name"] for a in arguments]
     args, args_def = parse_arguments(function_name, arguments)
     return_type_name, return_type_def = get_type_and_def(return_type)  # type: ignore
-    data = "{" + ", ".join([f"'{arg}': {camelCase(arg)}" for arg in arg_names]) + "}"
+    data = "{" + ", ".join([f"'{arg}': {rewrite_arg_name(arg)}" for arg in arg_names]) + "}"
     func_type_defs = SERVER_DEFS_TEMPLATE.format(
         args_def=args_def,
         return_type_def=return_type_def,
