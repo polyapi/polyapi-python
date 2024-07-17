@@ -1,3 +1,4 @@
+import keyword
 import re
 import os
 from typing import Tuple, List
@@ -164,9 +165,10 @@ def parse_arguments(function_name: str, arguments: List[PropertySpecification]) 
         arg_type, arg_def = get_type_and_def(a["type"])
         if arg_def:
             args_def.append(arg_def)
-        a["name"] = camelCase(a["name"])
+        a["name"] = rewrite_arg_name(a["name"])
         arg_string += f"    {a['name']}: {add_type_import_path(function_name, arg_type)}"
         description = a.get("description", "")
+        description = description.replace("\n", " ")
         if description:
             if idx == len(arguments) - 1:
                 arg_string += f"  # {description}\n"
@@ -186,7 +188,7 @@ def poly_full_path(context, name) -> str:
     return f"poly.{path}"
 
 
-RESERVED_TYPES = {"List", "Dict", "Any", "Optional", "Callable"}
+RESERVED_WORDS = {"List", "Dict", "Any", "Optional", "Callable"} | set(keyword.kwlist)
 
 
 def to_func_namespace(s: str) -> str:
@@ -194,7 +196,16 @@ def to_func_namespace(s: str) -> str:
     by default it is
     """
     rv = s[0].upper() + s[1:]
-    if rv in RESERVED_TYPES:
-        return "_" + rv
+    rv = rewrite_reserved(rv)
+    return rv
+
+
+def rewrite_reserved(s: str) -> str:
+    if s in RESERVED_WORDS:
+        return "_" + s
     else:
-        return rv
+        return s
+
+
+def rewrite_arg_name(s: str):
+    return rewrite_reserved(camelCase(s))

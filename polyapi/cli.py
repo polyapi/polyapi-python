@@ -4,7 +4,7 @@ from polyapi.utils import print_green
 
 from .config import clear_config, set_api_key_and_url
 from .generate import generate, clear
-from .function_cli import function_add_or_update
+from .function_cli import function_add_or_update, function_execute
 from .rendered_spec import get_and_update_rendered_spec
 
 
@@ -56,4 +56,7 @@ def execute_from_cli() -> None:
         print("Clearing the generated library...")
         clear()
     elif command == "function":
-        function_add_or_update(args.context, args.description, args.client, args.server, args.logs, args.subcommands, not args.skip_generate)
+        if args.subcommands[0] == "execute":
+            print(function_execute(args.context, args.subcommands))
+        else:
+            function_add_or_update(args.context, args.description, args.client, args.server, args.logs, args.subcommands, not args.skip_generate)

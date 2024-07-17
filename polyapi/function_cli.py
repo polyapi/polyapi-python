@@ -3,7 +3,7 @@ import argparse
 import json
 import types
 import sys
-from typing import Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 from typing import _TypedDictMeta as BaseTypedDict  # type: ignore
 from typing_extensions import _TypedDictMeta  # type: ignore
 import requests
@@ -279,3 +279,31 @@ def function_add_or_update(
         print(resp.status_code)
         print(resp.content)
         sys.exit(1)
+
+
+def function_execute(context: str, subcommands: List) -> Any:
+    assert subcommands[0] == "execute"
+    context_code = importlib.import_module(f"polyapi.poly.{context}")
+    print(f"Executing poly.{context}.{subcommands[1]}... ")
+    fn = getattr(context_code, subcommands[1])
+    return fn(*subcommands[2:])
+
+
+def spec_delete(function_type: str, function_id: str):
+    api_key, api_url = get_api_key_and_url()
+    assert api_key
+    if function_type == "api":
+        url = f"{api_url}/functions/api/{function_id}"
+    elif function_type == "serverFunction":
+        url = f"{api_url}/functions/server/{function_id}"
+    elif function_type == "customFunction":
+        url = f"{api_url}/functions/client/{function_id}"
+    elif function_type == "webhookHandle":
+        url = f"{api_url}/webhooks/{function_id}"
+    else:
+        print_red("ERROR")
+        print(f"Unknown function type: {function_type}")
+        sys.exit(1)
+    headers = get_auth_headers(api_key)
+    resp = requests.delete(url, headers=headers)
+    return resp
