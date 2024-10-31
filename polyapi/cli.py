@@ -28,6 +28,7 @@ def execute_from_cli() -> None:
     parser.add_argument("--server", action="store_true", help="Pass --server when adding function to add a server function.")
     parser.add_argument("--logs", action="store_true", help="Pass --logs when adding function if you want to store and see the function logs.")
     parser.add_argument("--skip-generate", action="store_true", help="Pass --skip-generate to skip generating the library after adding a function.")
+    parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
     parser.add_argument("command", choices=CLI_COMMANDS)
     parser.add_argument("subcommands", nargs="*")
     args = parser.parse_args()
@@ -60,3 +61,13 @@ def execute_from_cli() -> None:
             print(function_execute(args.context, args.subcommands))
         else:
             function_add_or_update(args.context, args.description, args.client, args.server, args.logs, args.subcommands, not args.skip_generate)
+            function_add_or_update(
+                context=args.context,
+                description=args.description,
+                client=args.client,
+                server=args.server,
+                logs_enabled=args.logs,
+                subcommands=args.subcommands,
+                generate=not args.skip_generate,
+                execution_api_key=args.execution_api_key
+            )
