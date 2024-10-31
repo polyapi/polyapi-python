@@ -208,6 +208,7 @@ def function_add_or_update(
     logs_enabled: bool,
     subcommands: List,
     generate: bool = True,
+    execution_api_key: str = ""
 ):
     parser = argparse.ArgumentParser()
     parser.add_argument("subcommand", choices=["add"])
@@ -256,6 +257,10 @@ def function_add_or_update(
     assert api_key
     if server:
         url = f"{api_url}/functions/server"
+
+        if execution_api_key:
+            data["executionApiKey"] = execution_api_key
+
     elif client:
         url = f"{api_url}/functions/client"
     else:
