@@ -60,7 +60,6 @@ def execute_from_cli() -> None:
         if args.subcommands[0] == "execute":
             print(function_execute(args.context, args.subcommands))
         else:
-            function_add_or_update(args.context, args.description, args.client, args.server, args.logs, args.subcommands, not args.skip_generate)
             function_add_or_update(
                 context=args.context,
                 description=args.description,
