@@ -26,7 +26,7 @@ def execute_from_cli() -> None:
     parser.add_argument("--description", required=False, default="")
     parser.add_argument("--client", action="store_true", help="Pass --client when adding function to add a client function.")
     parser.add_argument("--server", action="store_true", help="Pass --server when adding function to add a server function.")
-    parser.add_argument("--logs", action="store_true", help="Pass --logs when adding function if you want to store and see the function logs.")
+    parser.add_argument("--logs", choices=["enabled", "disabled"], default="disabled", help="Enable or disable logs for the function.")
     parser.add_argument("--skip-generate", action="store_true", help="Pass --skip-generate to skip generating the library after adding a function.")
     parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
     parser.add_argument("command", choices=CLI_COMMANDS)
@@ -57,6 +57,7 @@ def execute_from_cli() -> None:
         print("Clearing the generated library...")
         clear()
     elif command == "function":
+        logs_enabled = args.logs == "enabled"
         if args.subcommands[0] == "execute":
             print(function_execute(args.context, args.subcommands))
         else:
@@ -65,7 +66,7 @@ def execute_from_cli() -> None:
                 description=args.description,
                 client=args.client,
                 server=args.server,
-                logs_enabled=args.logs,
+                logs_enabled=logs_enabled,
                 subcommands=args.subcommands,
                 generate=not args.skip_generate,
                 execution_api_key=args.execution_api_key
