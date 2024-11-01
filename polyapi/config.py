@@ -55,12 +55,13 @@ def set_api_key_and_url(key: str, url: str):
         config.write(f)
 
 
-def initialize_config():
+def initialize_config(force=False):
     key, url = get_api_key_and_url()
-    if not key or not url:
+    if force or (not key or not url):
+        url = url or "https://na1.polyapi.io"
         print("Please setup your connection to PolyAPI.")
-        url = input("? Poly API Base URL (https://na1.polyapi.io): ") or "https://na1.polyapi.io"
-        key = input("? Poly App Key or User Key: ")
+        url = input(f"? Poly API Base URL ({url}): ") or url
+        key = input(f"? Poly App Key or User Key ({key}): " if key else "? Poly App Key or User Key: ") or key
 
         if url and key:
             set_api_key_and_url(key, url)
