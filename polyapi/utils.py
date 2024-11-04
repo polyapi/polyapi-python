@@ -209,3 +209,19 @@ def rewrite_reserved(s: str) -> str:
 
 def rewrite_arg_name(s: str):
     return rewrite_reserved(camelCase(s))
+
+
+valid_subdomains = ["na[1-2]", "eu[1-2]", "dev"]
+
+
+def is_valid_polyapi_url(_url: str):
+    # Join the subdomains into a pattern
+    subdomain_pattern = "|".join(valid_subdomains)
+    pattern = rf"^https://({subdomain_pattern})\.polyapi\.io$"
+    return re.match(pattern, _url) is not None
+
+
+def is_valid_uuid(uuid_string):
+    # Regular expression for UUID
+    pattern = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[1-5][a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$"
+    return re.match(pattern, uuid_string) is not None
