@@ -1,6 +1,7 @@
 import keyword
 import re
 import os
+import uuid
 from typing import Tuple, List
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
@@ -221,7 +222,10 @@ def is_valid_polyapi_url(_url: str):
     return re.match(pattern, _url) is not None
 
 
-def is_valid_uuid(uuid_string):
-    # Regular expression for UUID
-    pattern = r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[1-5][a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$"
-    return re.match(pattern, uuid_string) is not None
+def is_valid_uuid(uuid_string, version=4):
+    try:
+        uuid_obj = uuid.UUID(uuid_string, version=version)
+    except ValueError:
+        return False
+
+    return str(uuid_obj) == uuid_string
