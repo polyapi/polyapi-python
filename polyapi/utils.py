@@ -1,6 +1,7 @@
 import keyword
 import re
 import os
+import uuid
 from typing import Tuple, List
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
@@ -209,3 +210,22 @@ def rewrite_reserved(s: str) -> str:
 
 def rewrite_arg_name(s: str):
     return rewrite_reserved(camelCase(s))
+
+
+valid_subdomains = ["na[1-2]", "eu[1-2]", "dev"]
+
+
+def is_valid_polyapi_url(_url: str):
+    # Join the subdomains into a pattern
+    subdomain_pattern = "|".join(valid_subdomains)
+    pattern = rf"^https://({subdomain_pattern})\.polyapi\.io$"
+    return re.match(pattern, _url) is not None
+
+
+def is_valid_uuid(uuid_string, version=4):
+    try:
+        uuid_obj = uuid.UUID(uuid_string, version=version)
+    except ValueError:
+        return False
+
+    return str(uuid_obj) == uuid_string

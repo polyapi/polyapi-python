@@ -3,6 +3,8 @@ import os
 import configparser
 from typing import Tuple
 
+from polyapi.utils import is_valid_polyapi_url, is_valid_uuid, print_green, print_yellow
+
 # cached values
 API_KEY = None
 API_URL = None
@@ -55,18 +57,34 @@ def set_api_key_and_url(key: str, url: str):
         config.write(f)
 
 
-def initialize_config():
+def initialize_config(force=False):
     key, url = get_api_key_and_url()
-    if not key or not url:
+    if force or (not key or not url):
+        url = url or "https://na1.polyapi.io"
         print("Please setup your connection to PolyAPI.")
-        url = input("? Poly API Base URL (https://na1.polyapi.io): ") or "https://na1.polyapi.io"
-        key = input("? Poly App Key or User Key: ")
+        url = input(f"? Poly API Base URL ({url}): ").strip() or url
+
+        if not key:
+            key = input("? Poly App Key or User Key: ").strip()
+        else:
+            key_input = input(f"? Poly App Key or User Key ({key}): ").strip()
+            key = key_input if key_input else key
 
         if url and key:
+            errors = []
+            if not is_valid_polyapi_url(url):
+                errors.append(f"{url} is not a valid Poly API Base URL")
+            if not is_valid_uuid(key):
+                errors.append(f"{key} is not a valid Poly App Key or User Key")
+            if errors:
+                print_yellow("\n".join(errors))
+                sys.exit(1)
+
             set_api_key_and_url(key, url)
+            print_green(f"Poly setup complete.")
 
     if not key or not url:
-        print("Poly API Key and Poly API Base URL are required.")
+        print_yellow("Poly API Key and Poly API Base URL are required.")
         sys.exit(1)
 
     return key, url
