@@ -1,5 +1,6 @@
 import unittest
 
+from polyapi.parser import parse_function_code
 from polyapi.deployables import update_deployable_function_comments, update_deployment_comments
 
 
@@ -102,22 +103,12 @@ class T(unittest.TestCase):
         updated_file_contents = update_deployment_comments(INITIAL_SERVER_FN_DEPLOYMENTS, test_deployable)
         self.assertEqual(updated_file_contents, EXPECTED_SERVER_FN_DEPLOYMENTS)
 
-    def test_write_deployable_docstring(self):
-        self.maxDiff = None
-        test_deployable = {
-            "types": {
-                "description": "A function that does something really import.",
-                "params": [
-                    { "name": "foo", "type": "str", "description": "" },
-                    { "name": "bar", "type": "Dict[str, str]", "description": "" },
-                ],
-                "returns": {
-                    "type": "int",
-                    "description": ""
-                }
-            },
-            "docStartIndex": 239,
-            "docEndIndex": 295,
-        }
-        updated_file_contents = update_deployable_function_comments(INITIAL_SERVER_FN_DOCSTRINGS, test_deployable)
+    def test_parse_and_write_deployable_docstring(self):
+        parsed_deployable = parse_function_code(INITIAL_SERVER_FN_DOCSTRINGS)
+        updated_file_contents = update_deployable_function_comments(INITIAL_SERVER_FN_DOCSTRINGS, parsed_deployable)
         self.assertEqual(updated_file_contents, EXPECTED_SERVER_FN_DOCSTRINGS)
+
+    def test_parse_and_overwrite_docstring(self):
+        parsed_deployable = parse_function_code(EXPECTED_SERVER_FN_DOCSTRINGS)
+        updated_file_contents = update_deployable_function_comments(EXPECTED_SERVER_FN_DOCSTRINGS, parsed_deployable)
+        self.assertEqual(EXPECTED_SERVER_FN_DOCSTRINGS, updated_file_contents)
