@@ -1,5 +1,5 @@
-from typing import Any, List, Literal, Dict, TypedDict
-from typing_extensions import NotRequired
+from typing import Any, List, Literal, Dict, Union, Optional
+from typing_extensions import NotRequired, TypedDict
 
 
 class PropertySpecification(TypedDict):
@@ -54,3 +54,21 @@ class VariableSpecDto(TypedDict):
     description: str
     variable: VariableSpecification
     type: Literal['serverVariable']
+
+Visibility = Union[Literal['PUBLIC'], Literal['TENANT'], Literal['ENVIRONMENT']]
+
+
+class PolyDeployable(TypedDict, total=False):
+    context: str
+    name: str
+    disable_ai: Optional[bool]  # Optional field to disable AI
+
+
+class PolyServerFunction(PolyDeployable):
+    logs_enabled: Optional[bool]
+    always_on: Optional[bool]
+    visibility: Optional[Visibility]
+
+class PolyClientFunction(PolyDeployable):
+    logs_enabled: Optional[bool]
+    visibility: Optional[Visibility]
