@@ -3,7 +3,7 @@ import argparse
 
 from polyapi.utils import print_green, print_red
 
-from .config import clear_config, set_api_key_and_url, initialize_config
+from .config import initialize_config, set_api_key_and_url
 from .generate import generate, clear
 from .function_cli import function_add_or_update, function_execute
 from .rendered_spec import get_and_update_rendered_spec
@@ -34,7 +34,7 @@ def execute_from_cli():
         if args.api_key and args.url:
             set_api_key_and_url(args.url, args.api_key)
         else:
-            clear_config()
+            initialize_config(force=True)
             generate()
 
     setup_parser.set_defaults(command=setup)
@@ -66,17 +66,19 @@ def execute_from_cli():
     fn_add_parser.add_argument("--description", required=False, default="", help="Description of the function")
     fn_add_parser.add_argument("--server", action="store_true", help="Marks the function as a server function")
     fn_add_parser.add_argument("--client", action="store_true", help="Marks the function as a client function")
-    fn_add_parser.add_argument("--logs", "--logs-enabled", action="store_true", help="Pass --logs if you want to store and see server function logs.")
+    fn_add_parser.add_argument("--logs", choices=["enabled", "disabled"], default="disabled", help="Enable or disable logs for the function.")
+    fn_add_parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
     fn_add_parser.add_argument("--disable-ai", "--skip-generate", action="store_true", help="Pass --disable-ai skip AI generation of missing descriptions")
 
     def add_function(args):
         initialize_config()
+        logs_enabled = args.logs == "enabled"
         err = ""
         if args.server and args.client:
             err = "Specify either `--server` or `--client`. Found both."
         elif not args.server and not args.client:
             err = "You must specify `--server` or `--client`."
-        elif args.logs and not args.server:
+        elif logs_enabled and not args.server:
             err = "Option `logs` is only for server functions (--server)."
 
         if err:
@@ -84,7 +86,15 @@ def execute_from_cli():
             print(err)
             exit(1)
 
-        function_add_or_update(args.name, args.file, args.context, args.description, args.client, args.server, args.logs, not args.disable_ai)
+        function_add_or_update(
+            context=args.context,
+            description=args.description,
+            client=args.client,
+            server=args.server,
+            logs_enabled=logs_enabled,
+            generate=not args.disable_ai,
+            execution_api_key=args.execution_api_key
+        )
 
     fn_add_parser.set_defaults(command=add_function)
 

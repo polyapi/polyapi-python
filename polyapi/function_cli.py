@@ -25,6 +25,7 @@ def function_add_or_update(
     server: bool,
     logs_enabled: bool,
     generate: bool = True,
+    execution_api_key: str = ""
 ):
     verb = "Updating" if _func_already_exists(context, name) else "Adding"
     ftype = "server" if server else "client"
@@ -66,6 +67,10 @@ def function_add_or_update(
     assert api_key
     if server:
         url = f"{api_url}/functions/server"
+
+        if execution_api_key:
+            data["executionApiKey"] = execution_api_key
+
     elif client:
         url = f"{api_url}/functions/client"
     else:
