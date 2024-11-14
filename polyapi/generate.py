@@ -13,7 +13,7 @@ from .api import render_api_function
 from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, to_func_namespace
 from .variables import generate_variables
-from .config import get_api_key_and_url, initialize_config
+from .config import get_api_key_and_url
 
 SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
@@ -122,7 +122,6 @@ def remove_old_library():
 
 
 def generate() -> None:
-    initialize_config()
 
     remove_old_library()
 
