@@ -107,5 +107,6 @@ jobs:
       with:
         name: python-package-distributions
         path: dist/
+        verbose: true
     - name: Publish distribution 📦 to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
