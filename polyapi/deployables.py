@@ -3,13 +3,13 @@ import subprocess
 import json
 import hashlib
 from pathlib import Path
-from typing import TypedDict, List, Dict, Tuple, Optional, Any
+from typing import TypedDict, List, Dict, Tuple, Optional, Any, Union
 from subprocess import check_output, CalledProcessError
 
 
 # Constants
-CACHE_VERSION_FILE = "./poly/deployments_revision"
-CACHE_DIR = Path("./poly/deployables")
+CACHE_VERSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "poly/deployments_revision")
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "poly/deployables")
 
 
 class DeployableTypes(str):
@@ -85,21 +85,21 @@ def prepare_deployable_directory() -> None:
     Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
 def load_deployable_records() -> List[DeployableRecord]:
-    return [read_json_file(CACHE_DIR / name) for name in os.listdir(CACHE_DIR) if name.endswith(".json")]
+    return [read_json_file(os.path.join(CACHE_DIR, name)) for name in os.listdir(CACHE_DIR) if name.endswith(".json")]
 
 def save_deployable_records(records: List[DeployableRecord]) -> None:
     for record in records:
-        write_json_file(Path(CACHE_DIR) / f'{record["context"]}.{record["name"]}.json', record)
+        write_json_file(os.path.join(CACHE_DIR, f'{record["context"]}.{record["name"]}.json'), record)
 
 def remove_deployable_records(records: List[DeployableRecord]) -> None:
     for record in records:
-        os.remove(Path(CACHE_DIR) / f'{record["context"]}.{record["name"]}.json')
+        os.remove(os.path.join(CACHE_DIR, f'{record["context"]}.{record["name"]}.json'))
 
-def read_json_file(path: Path) -> Any:
+def read_json_file(path: Union[str, Path]) -> Any:
     with open(path, "r", encoding="utf-8") as file:
         return json.load(file)
 
-def write_json_file(path: Path, contents: Any) -> None:
+def write_json_file(path: Union[str, Path], contents: Any) -> None:
     with open(path, "w", encoding="utf-8") as file:
         json.dump(contents, file, indent=2)
 
