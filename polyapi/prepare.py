@@ -132,4 +132,4 @@ def prepare_deployables(lazy: bool = False, disable_docs: bool = False, disable_
     print("Poly deployments are prepared.")
     save_deployable_records(parsed_deployables)
     write_cache_revision(git_revision)
-    print("Cached deployables and generated typedefs into mode_modules/.poly/deployables directory.")
+    print("Cached deployables and generated typedefs into polyapi/cached_deployables directory.")

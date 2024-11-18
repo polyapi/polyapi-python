@@ -28,4 +28,4 @@ packages = ["polyapi"]
 
 [tools.setuptools.packages.find]
 include = ["polyapi"]
-exclude = ["polyapi/poly*", "polyapi/vari*", "polyapi/.config.env", "polyapi/deployables*", "polyapi/deployments_revision"]  # exclude the generated libraries from builds
+exclude = ["polyapi/poly*", "polyapi/vari*", "polyapi/.config.env", "polyapi/cached_deployables*", "polyapi/deployments_revision"]  # exclude the generated libraries from builds
