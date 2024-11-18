@@ -8,8 +8,8 @@ from subprocess import check_output, CalledProcessError
 
 
 # Constants
-CACHE_VERSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "poly/deployments_revision")
-CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "poly/deployables")
+CACHE_VERSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deployments_revision")
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deployables")
 
 
 class DeployableTypes(str):
