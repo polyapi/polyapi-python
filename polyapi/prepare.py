@@ -3,6 +3,8 @@ import sys
 from typing import List, Tuple, Literal
 import requests
 
+from polyapi.utils import get_auth_headers
+from polyapi.config import get_api_key_and_url
 from polyapi.parser import parse_function_code
 from polyapi.deployables import (
     prepare_deployable_directory, write_cache_revision,
@@ -26,15 +28,18 @@ def get_function_description(deploy_type: Literal["server-function", "client-fun
         raise ValueError("Unsupported deployable type")
 
 def get_server_function_description(description: str, arguments, code: str) -> str:
-    # Simulated API call to generate server function descriptions
+    api_key, api_url = get_api_key_and_url()
+    headers = get_auth_headers(api_key)
     data = {"description": description, "arguments": arguments, "code": code}
-    response = requests.post("http://your-api-url/server-function-description", json=data)
+    response = requests.post(f"{api_url}/server-function-description", headers=headers, json=data)
     return response.json()
 
 def get_client_function_description(description: str, arguments, code: str) -> str:
+    api_key, api_url = get_api_key_and_url()
+    headers = get_auth_headers(api_key)
     # Simulated API call to generate client function descriptions
     data = {"description": description, "arguments": arguments, "code": code}
-    response = requests.post("http://your-api-url/client-function-description", json=data)
+    response = requests.post(f"{api_url}/client-function-description", headers=headers, json=data)
     return response.json()
 
 def fill_in_missing_function_details(deployable: DeployableRecord, code: str) -> DeployableRecord:

@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import List, Dict
 import requests
 
+from polyapi.utils import get_auth_headers
+from polyapi.config import get_api_key_and_url
 from polyapi.parser import get_jsonschema_type
 from polyapi.deployables import (
     prepare_deployable_directory, load_deployable_records,
@@ -27,11 +29,13 @@ def group_by(items: List[Dict], key: str) -> Dict[str, List[Dict]]:
     return grouped
 
 def remove_deployable_function(deployable: SyncDeployment) -> bool:
+    api_key, _ = get_api_key_and_url()
+    headers = get_auth_headers(api_key)
     url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}/{deployable["id"]}'
-    response = requests.get(url)
+    response = requests.get(url, headers=headers)
     if response.status_code != 200:
         return False
-    requests.delete(url)
+    requests.delete(url, headers)
     return True
 
 def remove_deployable(deployable: SyncDeployment) -> bool:
@@ -42,6 +46,8 @@ def remove_deployable(deployable: SyncDeployment) -> bool:
     raise Exception(f"Unsupported deployable type '{deployable['type']}'")
 
 def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
+    api_key, _ = get_api_key_and_url()
+    headers = get_auth_headers(api_key)
     url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}'
     payload = {
         "context": deployable["context"],
@@ -52,7 +58,7 @@ def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
         **deployable["config"],
         "arguments": [{**p, "type": get_jsonschema_type(p["type"])  } for p in deployable["types"]["params"]],
     }
-    response = requests.post(url, json=payload)
+    response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
     return response.json()['id']
 
