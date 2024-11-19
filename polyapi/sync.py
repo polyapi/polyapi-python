@@ -54,7 +54,9 @@ def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
         "name": deployable["name"],
         "description": deployable["description"],
         "code": code,
-        "typeSchemas": deployable["typeSchemas"],
+        "language": "python",
+        "returnType": deployable["types"]["returns"]["type"],
+        "returnTypeSchema": deployable["types"]["returns"]["typeSchema"],
         **deployable["config"],
         "arguments": [{**p, "type": get_jsonschema_type(p["type"])  } for p in deployable["types"]["params"]],
     }
