@@ -27,7 +27,7 @@ def group_by(items: List[Dict], key: str) -> Dict[str, List[Dict]]:
     return grouped
 
 def remove_deployable_function(deployable: SyncDeployment) -> bool:
-    url = f"{deployable['instance']}/functions/{deployable["type"].replace("-function", "")}/{deployable['id']}"
+    url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}/{deployable['id']}'
     response = requests.get(url)
     if response.status_code != 200:
         return False
@@ -39,10 +39,10 @@ def remove_deployable(deployable: SyncDeployment) -> bool:
     if deployable["type"] == 'client-function' or deployable["type"] == 'server-function':
         return remove_deployable_function(deployable)
 
-    raise Exception(f"Unsupported deployable type '{deployable["type"]}'")
+    raise Exception(f"Unsupported deployable type '{deployable['type']}'")
 
 def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
-    url = f"{deployable['instance']}/functions/{deployable["type"].replace("-function", "")}"
+    url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}'
     payload = {
         "context": deployable["context"],
         "name": deployable["name"],
@@ -61,7 +61,7 @@ def sync_deployable_and_get_id(deployable: SyncDeployment, code: str) -> str:
     if deployable["type"] == 'client-function' or deployable["type"] == 'server-function':
         return sync_function_and_get_id(deployable, code)
 
-    raise Exception(f"Unsupported deployable type '{deployable["type"]}'")
+    raise Exception(f"Unsupported deployable type '{deployable['type']}'")
 
 def sync_deployable(deployable: SyncDeployment) -> Deployment:
     code = read_file(deployable['file'])
