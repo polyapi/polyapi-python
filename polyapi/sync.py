@@ -27,7 +27,7 @@ def group_by(items: List[Dict], key: str) -> Dict[str, List[Dict]]:
     return grouped
 
 def remove_deployable_function(deployable: SyncDeployment) -> bool:
-    url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}/{deployable['id']}'
+    url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}/{deployable["id"]}'
     response = requests.get(url)
     if response.status_code != 200:
         return False
