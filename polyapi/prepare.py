@@ -60,10 +60,12 @@ def fill_in_missing_function_details(deployable: DeployableRecord, code: str) ->
                 deployable["types"]["description"] = ai_generated["description"]
                 deployable["dirty"] = True
 
-            deployable["types"]["params"] = [
-                {**p, "description": ai_arg["description"]} if ai_arg and ai_arg.get("description") else p
-                for p, ai_arg in zip(deployable["types"]["params"], ai_generated.get("arguments", []))
-            ]
+            for i, p in enumerate(deployable["types"]["params"]):
+                ai_params = ai_generated.get("arguments", [])
+                ai_param = ai_params[i] if ai_params else None
+                if ai_param and not p.get("description"):
+                    deployable["types"]["params"][i]["description"] =  ai_param["description"]
+
         except Exception as e:
             print(f"Failed to generate descriptions due to: {str(e)}")
     return deployable

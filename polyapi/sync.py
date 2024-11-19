@@ -102,7 +102,11 @@ def sync_deployables(dry_run: bool, instance: str = os.getenv('POLY_API_BASE_URL
     for type_name in DEPLOY_ORDER:
         deployables = grouped_deployables.get(type_name, [])
         for deployable in deployables:
-            previous_deployment = next((d for d in deployable.get('deployments', []) if d['instance'] == instance), None)
+            previous_deployment = None
+            try:
+                previous_deployment = next((d for d in deployable.get('deployments', []) if d['instance'] == instance), None)
+            except:
+                pass    
             git_revision_changed = git_revision != deployable['gitRevision']
             file_revision_changed = not previous_deployment or previous_deployment['fileRevision'] != deployable['fileRevision']
 

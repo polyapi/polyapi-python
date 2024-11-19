@@ -475,11 +475,14 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                         json_arg["typeSchema"] = json.dumps(type_schema)
 
                     if docstring_params:
-                        type_index = next(i for i, d in enumerate(docstring_params) if d["name"] == arg.arg)
-                        if type_index >= 0:
-                            json_arg["description"] = docstring_params[type_index]["description"]
-                            if docstring_params[type_index]["type"] != python_type:
-                                deployable["dirty"] = True
+                        try:
+                            type_index = next(i for i, d in enumerate(docstring_params) if d["name"] == arg.arg)
+                            if type_index >= 0:
+                                json_arg["description"] = docstring_params[type_index]["description"]
+                                if docstring_params[type_index]["type"] != python_type:
+                                    deployable["dirty"] = True
+                        except:
+                            pass    
                     else:
                         deployable["dirty"] = True
 
