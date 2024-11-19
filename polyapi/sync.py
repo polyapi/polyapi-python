@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Dict
 import requests
 
+from polyapi.parser import get_jsonschema_type
 from polyapi.deployables import (
     prepare_deployable_directory, load_deployable_records,
     save_deployable_records, remove_deployable_records,
@@ -25,30 +26,42 @@ def group_by(items: List[Dict], key: str) -> Dict[str, List[Dict]]:
         grouped.setdefault(item[key], []).append(item)
     return grouped
 
-def remove_deployable(deployable: SyncDeployment) -> bool:
-    # Example function call, adjust as needed
-    url = f"{deployable['instance']}/{deployable['type']}/{deployable['name']}"
+def remove_deployable_function(deployable: SyncDeployment) -> bool:
+    url = f"{deployable['instance']}/functions/{deployable["type"].replace("-function", "")}/{deployable['id']}"
     response = requests.get(url)
     if response.status_code != 200:
         return False
     requests.delete(url)
     return True
 
-def sync_deployable_and_get_id(deployable: SyncDeployment, code: str) -> str:
-    # Example function call, adjust as needed
-    url = f"{deployable['instance']}/{deployable['type']}"
-    print(deployable)
+def remove_deployable(deployable: SyncDeployment) -> bool:
+
+    if deployable["type"] == 'client-function' or deployable["type"] == 'server-function':
+        return remove_deployable_function(deployable)
+
+    raise Exception(f"Unsupported deployable type '{deployable["type"]}'")
+
+def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
+    url = f"{deployable['instance']}/functions/{deployable["type"].replace("-function", "")}"
     payload = {
         "context": deployable["context"],
         "name": deployable["name"],
         "description": deployable["description"],
         "code": code,
         "typeSchemas": deployable["typeSchemas"],
-        "config": deployable["config"]
+        **deployable["config"],
+        "arguments": [{**p, "type": get_jsonschema_type(p["type"])  } for p in deployable["types"]["params"]],
     }
     response = requests.post(url, json=payload)
     response.raise_for_status()
     return response.json()['id']
+
+def sync_deployable_and_get_id(deployable: SyncDeployment, code: str) -> str:
+
+    if deployable["type"] == 'client-function' or deployable["type"] == 'server-function':
+        return sync_function_and_get_id(deployable, code)
+
+    raise Exception(f"Unsupported deployable type '{deployable["type"]}'")
 
 def sync_deployable(deployable: SyncDeployment) -> Deployment:
     code = read_file(deployable['file'])
@@ -93,12 +106,16 @@ def sync_deployables(dry_run: bool, instance: str = os.getenv('POLY_API_BASE_URL
                 # Any deployable may be deployed to multiple instances/environments at the same time
                 # So we reduce the deployable record down to a single instance we want to deploy to
                 if previous_deployment:
-                    sync_deployment = { **deployable, **previous_deployment, "instance": instance }
+                    sync_deployment = {
+                        **deployable,
+                        **previous_deployment,
+                        "description": deployable["types"]["description"],
+                        "instance": instance
+                    }
                 else:
                     sync_deployment = { **deployable, "instance": instance }
                 if git_revision == deployable['gitRevision']:
                     deployment = sync_deployable(sync_deployment)
-                    print(deployment)
                     if previous_deployment:
                         previous_deployment.update(deployment)
                     else:

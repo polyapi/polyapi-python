@@ -64,9 +64,10 @@ class SyncDeployment(TypedDict, total=False):
     context: str
     name: str
     description: str
-    type: str  # This should be an enumeration or a predefined set of strings if you have known types.
+    type: str
     fileRevision: str
     file: str
+    types: DeployableFunctionTypes
     typeSchemas: Dict[str, any]
     dependencies: List[str]
     config: Dict[str, any]
