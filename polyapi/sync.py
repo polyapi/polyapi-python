@@ -84,7 +84,9 @@ def sync_deployable(deployable: SyncDeployment) -> Deployment:
         "fileRevision": deployable["fileRevision"],
     }
 
-def sync_deployables(dry_run: bool, instance: str = os.getenv('POLY_API_BASE_URL')):
+def sync_deployables(dry_run: bool, instance: str | None = None):
+    if not instance:
+        _, instance = get_api_key_and_url()
     prepare_deployable_directory()
     git_revision = get_cache_deployments_revision()
     all_deployables = load_deployable_records()
