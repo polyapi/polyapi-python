@@ -58,7 +58,7 @@ def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
         "returnType": deployable["types"]["returns"]["type"],
         "returnTypeSchema": deployable["types"]["returns"]["typeSchema"],
         **deployable["config"],
-        "arguments": [{**p, "type": get_jsonschema_type(p["type"])  } for p in deployable["types"]["params"]],
+        "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])  } for p in deployable["types"]["params"]],
     }
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()

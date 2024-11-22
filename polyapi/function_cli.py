@@ -53,7 +53,7 @@ def function_add_or_update(
         "language": "python",
         "returnType": return_type,
         "returnTypeSchema": parsed["types"]["returns"]["typeSchema"],
-        "arguments": [{**p, "type": get_jsonschema_type(p["type"])  } for p in parsed["types"]["params"]],
+        "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])  } for p in parsed["types"]["params"]],
         "logsEnabled": logs_enabled or parsed["config"].get("logs_enabled", False),
     }
 

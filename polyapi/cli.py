@@ -87,6 +87,8 @@ def execute_from_cli():
             exit(1)
 
         function_add_or_update(
+            name=args.name,
+            file=args.file,
             context=args.context,
             description=args.description,
             client=args.client,
