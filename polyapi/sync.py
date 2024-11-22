@@ -50,14 +50,14 @@ def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
     headers = get_auth_headers(api_key)
     url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}'
     payload = {
+        **deployable["config"],
         "context": deployable["context"],
         "name": deployable["name"],
         "description": deployable["description"],
         "code": code,
         "language": "python",
-        "returnType": deployable["types"]["returns"]["type"],
+        "returnType": get_jsonschema_type(deployable["types"]["returns"]["type"]),
         "returnTypeSchema": deployable["types"]["returns"]["typeSchema"],
-        **deployable["config"],
         "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])  } for p in deployable["types"]["params"]],
     }
     response = requests.post(url, headers=headers, json=payload)
