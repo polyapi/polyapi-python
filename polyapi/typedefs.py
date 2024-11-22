@@ -1,4 +1,4 @@
-from typing import Any, List, Literal, Dict, Union, Optional
+from typing import Any, List, Literal, Dict, Union
 from typing_extensions import NotRequired, TypedDict
 
 
@@ -61,14 +61,14 @@ Visibility = Union[Literal['PUBLIC'], Literal['TENANT'], Literal['ENVIRONMENT']]
 class PolyDeployable(TypedDict, total=False):
     context: str
     name: str
-    disable_ai: Optional[bool]  # Optional field to disable AI
+    disable_ai: NotRequired[bool]  # Optional field to disable AI
 
 
 class PolyServerFunction(PolyDeployable):
-    logs_enabled: Optional[bool]
-    always_on: Optional[bool]
-    visibility: Optional[Visibility]
+    logs_enabled: NotRequired[bool]
+    always_on: NotRequired[bool]
+    visibility: NotRequired[Visibility]
 
 class PolyClientFunction(PolyDeployable):
-    logs_enabled: Optional[bool]
-    visibility: Optional[Visibility]
+    logs_enabled: NotRequired[bool]
+    visibility: NotRequired[Visibility]
