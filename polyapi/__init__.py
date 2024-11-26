@@ -16,8 +16,8 @@ if len(sys.argv) > 1 and sys.argv[1] not in CLI_COMMANDS:
 
 
 polyCustom: Dict[str, Any] = {
-  "executionId": None,
-  "executionApiKey": None,
-  "responseStatusCode": 200,
-  "responseContentType": None,
+    "executionId": None,
+    "executionApiKey": None,
+    "responseStatusCode": 200,
+    "responseContentType": None,
 }
