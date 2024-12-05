@@ -66,13 +66,13 @@ def execute_from_cli():
     fn_add_parser.add_argument("--description", required=False, default="", help="Description of the function")
     fn_add_parser.add_argument("--server", action="store_true", help="Marks the function as a server function")
     fn_add_parser.add_argument("--client", action="store_true", help="Marks the function as a client function")
-    fn_add_parser.add_argument("--logs", choices=["enabled", "disabled"], default="disabled", help="Enable or disable logs for the function.")
+    fn_add_parser.add_argument("--logs", choices=["enabled", "disabled"], default=None, help="Enable or disable logs for the function.")
     fn_add_parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
     fn_add_parser.add_argument("--disable-ai", "--skip-generate", action="store_true", help="Pass --disable-ai skip AI generation of missing descriptions")
 
     def add_function(args):
         initialize_config()
-        logs_enabled = args.logs == "enabled"
+        logs_enabled = args.logs == "enabled" if args.logs else None
         err = ""
         if args.server and args.client:
             err = "Specify either `--server` or `--client`. Found both."
