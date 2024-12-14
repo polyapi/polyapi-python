@@ -21,6 +21,7 @@ def foobar() -> int:
 
 EXPECTED_SERVER_FN_DEPLOYMENTS = '''# Poly deployed @ 2024-11-12T14:43:22.631113 - testing.foobar - https://na1.polyapi.io/canopy/polyui/collections/server-functions/jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h - 086aedd
 # Poly deployed @ 2024-11-11T14:43:22.631113 - testing.foobar - https://dev.polyapi.io/canopy/polyui/collections/server-functions/jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h - 086aedd
+
 from polyapi.typedefs import PolyServerFunction
 
 polyConfig: PolyServerFunction = {
