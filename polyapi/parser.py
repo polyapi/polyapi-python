@@ -181,7 +181,7 @@ def _get_schemas(code: str) -> List[Dict]:
 
 def get_jsonschema_type(python_type: str):
     if python_type == "Any":
-        return "Any"
+        return "any"
 
     if python_type == "List":
         return "array"
@@ -338,6 +338,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             "params": [],
             "returns": {
                 "type": "",
+                "typeSchema": None,
                 "description": "",
             }
         },
@@ -435,13 +436,14 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
 
         def _extract_deploy_comments(self):
             for i in range(len(self._lines)):
-                line = self._lines[i].strip()
+                line = self._lines[i]
                 if line and not line.startswith("#"):
                     return
-                deployment = _parse_deploy_comment(line)
+                deployment = _parse_deploy_comment(line.strip())
                 if deployment:
+                    start = self._line_offsets[i]
                     deployable["deployments"].append(deployment)
-                    deployable["deploymentCommentRanges"].append([self._line_offsets[i], len(line)])
+                    deployable["deploymentCommentRanges"].append([start, start + len(line)])
 
         def visit_Import(self, node: ast.Import):
             # TODO maybe handle `import foo.bar` case?
@@ -471,8 +473,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                         "type": python_type,
                         "description": "",
                     }
-                    if type_schema:
-                        json_arg["typeSchema"] = json.dumps(type_schema)
+                    json_arg["typeSchema"] = json.dumps(type_schema) if type_schema else None
 
                     if docstring_params:
                         try:

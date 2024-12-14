@@ -245,7 +245,7 @@ def update_deployment_comments(file_content: str, deployable: dict) -> str:
     if deployable['deployments']:
         deployment_comments = write_deploy_comments(deployable['deployments'])
         deployable['deploymentCommentRanges'] = [(0, len(deployment_comments) + 1)]
-        file_content = f"{deployment_comments}{file_content}"
+        file_content = f"{deployment_comments}\n{file_content}"
     return file_content
 
 def update_deployable_function_comments(file_content: str, deployable: dict, disable_docs: bool = False) -> str:

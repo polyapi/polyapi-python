@@ -55,7 +55,6 @@ def function_add_or_update(
         "code": code,
         "language": "python",
         "returnType": get_jsonschema_type(return_type),
-        "returnTypeSchema": parsed["types"]["returns"]["typeSchema"],
         "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])  } for p in parsed["types"]["params"]],
         "logsEnabled": logs_enabled,
     }
