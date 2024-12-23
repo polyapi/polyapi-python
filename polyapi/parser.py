@@ -47,7 +47,7 @@ def _parse_sphinx_docstring(docstring: str) -> Dict[str, Any]:
         "type": "Any"
     }
     current_section = None
-    
+
     for line in lines:
         stripped_line = line.strip()
         if stripped_line.startswith(":param "):
@@ -56,7 +56,7 @@ def _parse_sphinx_docstring(docstring: str) -> Dict[str, Any]:
             param_name = param_name.strip()
             if param_name in params:
                 params[param_name]["description"] = param_desc.strip()
-            else:    
+            else:
                 params[param_name] = { "name": param_name, "type": "", "description": param_desc.strip() }
             current_section = param_name
 
@@ -118,7 +118,7 @@ def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
     for line in lines:
         line = line.rstrip()
         section_match = section_pattern.match(line)
-        
+
         if section_match:
             mode = section_match.group(1).lower()
             continue
@@ -181,7 +181,7 @@ def _get_schemas(code: str) -> List[Dict]:
 
 def get_jsonschema_type(python_type: str):
     if python_type == "Any":
-        return "Any"
+        return "any"
 
     if python_type == "List":
         return "array"
@@ -338,6 +338,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             "params": [],
             "returns": {
                 "type": "",
+                "typeSchema": None,
                 "description": "",
             }
         },
@@ -364,7 +365,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 self._line_offsets.append(
                     self._line_offsets[i-1] + len(self._lines[i-1])
                 )
-            
+
             self._extract_deploy_comments()
 
         def visit_AnnAssign(self, node):
@@ -435,13 +436,14 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
 
         def _extract_deploy_comments(self):
             for i in range(len(self._lines)):
-                line = self._lines[i].strip()
+                line = self._lines[i]
                 if line and not line.startswith("#"):
                     return
-                deployment = _parse_deploy_comment(line)
+                deployment = _parse_deploy_comment(line.strip())
                 if deployment:
+                    start = self._line_offsets[i]
                     deployable["deployments"].append(deployment)
-                    deployable["deploymentCommentRanges"].append([self._line_offsets[i], len(line)])
+                    deployable["deploymentCommentRanges"].append([start, start + len(line)])
 
         def visit_Import(self, node: ast.Import):
             # TODO maybe handle `import foo.bar` case?
@@ -471,8 +473,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                         "type": python_type,
                         "description": "",
                     }
-                    if type_schema:
-                        json_arg["typeSchema"] = json.dumps(type_schema)
+                    json_arg["typeSchema"] = json.dumps(type_schema) if type_schema else None
 
                     if docstring_params:
                         try:
@@ -482,7 +483,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                                 if docstring_params[type_index]["type"] != python_type:
                                     deployable["dirty"] = True
                         except:
-                            pass    
+                            pass
                     else:
                         deployable["dirty"] = True
 
@@ -496,7 +497,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                     deployable["types"]["returns"]["typeSchema"] = return_type_schema
                 else:
                     deployable["types"]["returns"]["type"] = "Any"
-                
+
         def generic_visit(self, node):
             if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
                 self._current_offset = self._line_offsets[node.lineno - 1] + node.col_offset

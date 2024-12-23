@@ -65,17 +65,26 @@ def foobar(foo: str, bar: Dict[str, str]) -> int:
     """A function that does something really import.
 
     Args:
-        foo (str): 
-        bar (Dict[str, str]): 
+        foo (str):
+        bar (Dict[str, str]):
 
     Returns:
-        int: 
+        int:
     """
     print("Okay then!")
     return 7
 '''
 
 class T(unittest.TestCase):
+    def test_parse_and_write_deployment_comment(self):
+        test_deployable = parse_function_code(EXPECTED_SERVER_FN_DEPLOYMENTS, "foobar")
+        deployable_comment_ranges = test_deployable["deploymentCommentRanges"]
+        updated_file_contents = update_deployment_comments(EXPECTED_SERVER_FN_DEPLOYMENTS, test_deployable)
+        self.assertEqual(updated_file_contents, EXPECTED_SERVER_FN_DEPLOYMENTS)
+        # Deployment comment ranges collapsed into one of equal size
+        self.assertEqual(test_deployable["deploymentCommentRanges"][0][0], deployable_comment_ranges[0][0])
+        self.assertEqual(test_deployable["deploymentCommentRanges"][0][1], deployable_comment_ranges[1][1])
+
     def test_write_deployment_comment(self):
         test_deployable = {
             "deployments": [
@@ -98,7 +107,7 @@ class T(unittest.TestCase):
                     'type': 'server-function'
                 }
             ],
-            "deploymentCommentRanges": [[0, 178]]
+            "deploymentCommentRanges": [[0, 177]]
         }
         updated_file_contents = update_deployment_comments(INITIAL_SERVER_FN_DEPLOYMENTS, test_deployable)
         self.assertEqual(updated_file_contents, EXPECTED_SERVER_FN_DEPLOYMENTS)

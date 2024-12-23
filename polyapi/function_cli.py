@@ -1,5 +1,5 @@
 import sys
-from typing import Any, List
+from typing import Any, List, Optional
 import requests
 from polyapi.generate import get_functions_and_parse, generate_functions
 from polyapi.config import get_api_key_and_url
@@ -23,7 +23,7 @@ def function_add_or_update(
     description: str,
     client: bool,
     server: bool,
-    logs_enabled: bool,
+    logs_enabled: Optional[bool],
     generate: bool = True,
     execution_api_key: str = ""
 ):
@@ -45,6 +45,9 @@ def function_add_or_update(
         )
         sys.exit(1)
 
+    if logs_enabled is None:
+        logs_enabled = parsed["config"].get("logs_enabled", None)
+
     data = {
         "context": context or parsed["context"],
         "name": name,
@@ -52,9 +55,8 @@ def function_add_or_update(
         "code": code,
         "language": "python",
         "returnType": get_jsonschema_type(return_type),
-        "returnTypeSchema": parsed["types"]["returns"]["typeSchema"],
-        "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])  } for p in parsed["types"]["params"]],
-        "logsEnabled": logs_enabled or parsed["config"].get("logs_enabled", False),
+        "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])} for p in parsed["types"]["params"]],
+        "logsEnabled": logs_enabled,
     }
 
     if server and parsed["dependencies"]:

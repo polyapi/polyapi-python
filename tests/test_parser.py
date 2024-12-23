@@ -3,6 +3,11 @@ import unittest
 from polyapi.parser import parse_function_code
 
 
+CODE_NO_TYPES = """
+def foobar(a, b):
+    return a + b
+"""
+
 SIMPLE_CODE = """
 def foobar(n: int) -> int:
     return 9
@@ -124,11 +129,21 @@ def foobar(foo: str, bar: Dict[str, str]) -> int:
 '''
 
 class T(unittest.TestCase):
+    def test_no_types(self):
+        deployable = parse_function_code(CODE_NO_TYPES, "foobar")
+        types = deployable["types"]
+        self.assertEqual(len(types["params"]), 2)
+        self.assertEqual(types["params"][0], {"name": "a", "type": "Any", "typeSchema": None, "description": ""})
+        self.assertEqual(types["params"][1], {"name": "b", "type": "Any", "typeSchema": None, "description": ""})
+        self.assertEqual(types["returns"]["type"], "Any")
+        self.assertIsNone(types["returns"]["typeSchema"])
+        self.assertEqual(deployable["dependencies"], [])
+
     def test_simple_types(self):
         deployable = parse_function_code(SIMPLE_CODE, "foobar")
         types = deployable["types"]
         self.assertEqual(len(types["params"]), 1)
-        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "description": ""})
+        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "typeSchema": None, "description": ""})
         self.assertEqual(types["returns"]["type"], "int")
         self.assertIsNone(types["returns"]["typeSchema"])
         self.assertEqual(deployable["dependencies"], [])
@@ -137,7 +152,7 @@ class T(unittest.TestCase):
         deployable = parse_function_code(COMPLEX_RETURN_TYPE, "foobar")
         types = deployable["types"]
         self.assertEqual(len(types["params"]), 1)
-        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "description": ""})
+        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "typeSchema": None, "description": ""})
         self.assertEqual(types["returns"]["type"], "Barbar")
         self.assertEqual(types["returns"]["typeSchema"]['title'], "Barbar")
 
@@ -153,7 +168,7 @@ class T(unittest.TestCase):
         deployable = parse_function_code(LIST_COMPLEX_RETURN_TYPE, "foobar")
         types = deployable["types"]
         self.assertEqual(len(types["params"]), 1)
-        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "description": ""})
+        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "typeSchema": None, "description": ""})
         self.assertEqual(types["returns"]["type"], "List[Barbar]")
         self.assertEqual(types["returns"]["typeSchema"]["items"]['title'], "Barbar")
 
@@ -171,7 +186,7 @@ class T(unittest.TestCase):
         code = "import requests\n\n\ndef foobar(n: int) -> int:\n    return 9\n"
         deployable = parse_function_code(code, "foobar")
         self.assertEqual(deployable["dependencies"], [])
-    
+
     def test_parse_glide_server_function_no_docstring(self):
         code = GLIDE_SIMPLE_SERVER_FN
         deployable = parse_function_code(code, "foobar")
@@ -186,11 +201,13 @@ class T(unittest.TestCase):
         self.assertEqual(deployable["types"]["params"][0], {
             "name": "foo",
             "type": "Any",
+            "typeSchema": None,
             "description": "The foo in question"
         })
         self.assertEqual(deployable["types"]["params"][1], {
             "name": "bar",
             "type": "Any",
+            "typeSchema": None,
             "description": "Configuration of bars"
         })
         self.assertEqual(deployable["types"]["returns"], {
@@ -205,11 +222,13 @@ class T(unittest.TestCase):
         self.assertEqual(deployable["types"]["params"][0], {
             "name": "foo",
             "type": "str",
+            "typeSchema": None,
             "description": "The foo in question"
         })
         self.assertEqual(deployable["types"]["params"][1], {
             "name": "bar",
             "type": "Dict[str, str]",
+            "typeSchema": None,
             "description": "Configuration of bars"
         })
         self.assertEqual(deployable["types"]["returns"], {
