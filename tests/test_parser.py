@@ -186,7 +186,7 @@ class T(unittest.TestCase):
         code = "import requests\n\n\ndef foobar(n: int) -> int:\n    return 9\n"
         deployable = parse_function_code(code, "foobar")
         self.assertEqual(deployable["dependencies"], [])
-    
+
     def test_parse_glide_server_function_no_docstring(self):
         code = GLIDE_SIMPLE_SERVER_FN
         deployable = parse_function_code(code, "foobar")

@@ -21,7 +21,7 @@ def execute_from_cli():
         description="Manage your Poly API configurations and functions",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    
+
     subparsers = parser.add_subparsers(help="Available commands")
 
     ###########################################################################

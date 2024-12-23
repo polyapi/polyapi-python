@@ -261,7 +261,7 @@ def update_deployable_function_comments(file_content: str, deployable: dict, dis
         if deployable["docStartIndex"] == deployable["docEndIndex"]:
             # Function doesn't yet have any docstrings so we need to add additional whitespace
             docstring = "    " + docstring + "\n"
-        
+
         return f"{file_content[:deployable['docStartIndex']]}{docstring}{file_content[deployable['docEndIndex']:]}"
     return file_content
 
@@ -271,17 +271,17 @@ def write_updated_deployable(deployable: dict, disable_docs: bool = False) -> di
     """
     with open(deployable['file'], 'r', encoding='utf-8') as file:
         file_contents = file.read()
-    
+
     if deployable['type'] in ['client-function', 'server-function']:
         file_contents = update_deployable_function_comments(file_contents, deployable, disable_docs)
     else:
         raise ValueError(f"Unsupported deployable type: '{deployable['type']}'")
 
     file_contents = update_deployment_comments(file_contents, deployable)
-    
+
     with open(deployable['file'], 'w', encoding='utf-8') as file:
         file.write(file_contents)
-    
+
     deployable['fileRevision'] = get_deployable_file_revision(file_contents)
     return deployable
 
