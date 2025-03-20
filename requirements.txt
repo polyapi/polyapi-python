@@ -1,4 +1,4 @@
-requests==2.32.3
+requests>=2.32.3
 typing_extensions>=4.10.0
 jsonschema-gentypes==2.10.0
 pydantic==2.6.4
