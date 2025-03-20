@@ -23,7 +23,7 @@ SUPPORTED_FUNCTION_TYPES = {
     "webhookHandle",
 }
 
-SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable"}
+SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema"}
 
 
 def get_specs() -> List:
