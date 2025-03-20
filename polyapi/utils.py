@@ -11,8 +11,7 @@ from polyapi.schema import wrapped_generate_schema_types, clean_title, map_primi
 
 # this string should be in every __init__ file.
 # it contains all the imports needed for the function or variable code to run
-CODE_IMPORTS = "from typing import List, Dict, Any, TypedDict, Optional, Callable\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
-FALLBACK_TYPES = {"Dict", "List"}
+CODE_IMPORTS = "from typing import List, Dict, Any, Optional, Callable\nfrom typing_extensions import TypedDict, NotRequired\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
 
 
 def init_the_init(full_path: str) -> None:
@@ -38,7 +37,7 @@ def get_auth_headers(api_key: str):
     return {"Authorization": f"Bearer {api_key}"}
 
 
-def camelCase(s):
+def camelCase(s: str) -> str:
     s = s.strip()
     if " " in s or "-" in s:
         s = re.sub(r"(_|-)+", " ", s).title().replace(" ", "")
@@ -46,6 +45,10 @@ def camelCase(s):
     else:
         # s is already in camelcase as best as we can tell, just move on!
         return s
+
+
+def pascalCase(s) -> str:
+    return re.sub(r"(^|_)([a-z])", lambda match: match.group(2).upper(), s)
 
 
 def print_green(s: str):

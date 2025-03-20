@@ -1,43 +1,46 @@
+import os
 from typing import Any, Dict, List, Tuple
 
-from polyapi.typedefs import PropertySpecification
-from polyapi.utils import parse_arguments, get_type_and_def
+from polyapi.utils import add_import_to_init, init_the_init, pascalCase
 
-DEFS_TEMPLATE = """
-from typing import List, Dict, Any, TypedDict
-{args_def}
-{return_type_def}
+from .typedefs import SchemaSpecDto
+
+
+SPEC_TEMPLATE = """class {name}(TypedDict):
+    pass
 """
 
 
-def _wrap_code_in_try_except(code: str) -> str:
-    """ this is necessary because client functions with imports will blow up ALL server functions,
-    even if they don't use them.
-    because the server function will try to load all client functions when loading the library
-    """
-    prefix = """logger = logging.getLogger("poly")
-try:
-    """
-    suffix = """except ImportError as e:
-    logger.debug(e)"""
-
-    lines = code.split("\n")
-    code = "\n    ".join(lines)
-    return "".join([prefix, code, "\n", suffix])
+def generate_schemas(specs: List[SchemaSpecDto]):
+    for spec in specs:
+        create_schema(spec)
 
 
-def render_poly_schema(
-    function_name: str,
-    code: str,
-    arguments: List[PropertySpecification],
-    return_type: Dict[str, Any],
-) -> Tuple[str, str]:
-    # args, args_def = parse_arguments(function_name, arguments)
-    # return_type_name, return_type_def = get_type_and_def(return_type)  # type: ignore
-    # func_type_defs = DEFS_TEMPLATE.format(
-    #     args_def=args_def,
-    #     return_type_def=return_type_def,
-    # )
-    # code = _wrap_code_in_try_except(code)
-    # return code + "\n\n", func_type_defs
-    return "'TODO'", "'TODO'"
+def create_schema(spec: SchemaSpecDto) -> None:
+    folders = ["schemas"]
+    if spec["context"]:
+        folders += [pascalCase(s) for s in spec["context"].split(".")]
+
+    # build up the full_path by adding all the folders
+    full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+
+    for idx, folder in enumerate(folders):
+        full_path = os.path.join(full_path, folder)
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
+        next = folders[idx + 1] if idx + 1 < len(folders) else None
+        if next:
+            add_import_to_init(full_path, next)
+
+    add_schema_to_init(full_path, spec)
+
+
+def add_schema_to_init(full_path: str, spec: SchemaSpecDto):
+    init_the_init(full_path)
+    init_path = os.path.join(full_path, "__init__.py")
+    with open(init_path, "a") as f:
+        f.write(render_poly_schema(spec) + "\n\n")
+
+
+def render_poly_schema(spec: SchemaSpecDto) -> str:
+    return SPEC_TEMPLATE.format(name=pascalCase(spec["name"]))

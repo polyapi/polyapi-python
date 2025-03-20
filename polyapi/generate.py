@@ -2,13 +2,14 @@ import json
 import requests
 import os
 import shutil
-from typing import List
+from typing import List, cast
 
 from polyapi.auth import render_auth_function
 from polyapi.client import render_client_function
+from polyapi.poly_schemas import generate_schemas
 from polyapi.webhook import render_webhook_handle
 
-from .typedefs import PropertySpecification, SpecificationDto, VariableSpecDto
+from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto
 from .api import render_api_function
 from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, to_func_namespace
@@ -98,16 +99,13 @@ def get_functions_and_parse(limit_ids: List[str] | None = None) -> List[Specific
 
 
 def get_variables() -> List[VariableSpecDto]:
-    api_key, api_url = get_api_key_and_url()
-    headers = {"Authorization": f"Bearer {api_key}"}
-    # TODO do some caching so this and get_functions just do 1 function call
-    url = f"{api_url}/specs"
-    resp = requests.get(url, headers=headers)
-    if resp.status_code == 200:
-        specs = resp.json()
-        return [spec for spec in specs if spec["type"] == "serverVariable"]
-    else:
-        raise NotImplementedError(resp.content)
+    specs = read_cached_specs()
+    return [cast(VariableSpecDto, spec) for spec in specs if spec["type"] == "serverVariable"]
+
+
+def get_schemas() -> List[SchemaSpecDto]:
+    specs = read_cached_specs()
+    return [cast(SchemaSpecDto, spec) for spec in specs if spec["type"] == "schema"]
 
 
 def remove_old_library():
@@ -117,6 +115,10 @@ def remove_old_library():
         shutil.rmtree(path)
 
     path = os.path.join(currdir, "vari")
+    if os.path.exists(path):
+        shutil.rmtree(path)
+
+    path = os.path.join(currdir, "schemas")
     if os.path.exists(path):
         shutil.rmtree(path)
 
@@ -137,6 +139,10 @@ def generate() -> None:
     variables = get_variables()
     if variables:
         generate_variables(variables)
+
+    schemas = get_schemas()
+    if schemas:
+        generate_schemas(schemas)
 
     # indicator to vscode extension that this is a polyapi-python project
     file_path = os.path.join(os.getcwd(), ".polyapi-python")
