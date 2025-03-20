@@ -60,7 +60,11 @@ class SchemaSpecDto(TypedDict):
     id: str
     context: str
     name: str
+    contextName: str
     type: Literal['schema']
+    definition: Dict[Any, Any]
+    visibilityMetadata: object
+    unresolvedPolySchemaRefs: List
     # TODO add more
 
 

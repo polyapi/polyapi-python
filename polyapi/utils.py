@@ -14,15 +14,16 @@ from polyapi.schema import wrapped_generate_schema_types, clean_title, map_primi
 CODE_IMPORTS = "from typing import List, Dict, Any, Optional, Callable\nfrom typing_extensions import TypedDict, NotRequired\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
 
 
-def init_the_init(full_path: str) -> None:
+def init_the_init(full_path: str, code_imports="") -> None:
     init_path = os.path.join(full_path, "__init__.py")
     if not os.path.exists(init_path):
+        code_imports = code_imports or CODE_IMPORTS
         with open(init_path, "w") as f:
-            f.write(CODE_IMPORTS)
+            f.write(code_imports)
 
 
-def add_import_to_init(full_path: str, next: str) -> None:
-    init_the_init(full_path)
+def add_import_to_init(full_path: str, next: str, code_imports="") -> None:
+    init_the_init(full_path, code_imports=code_imports)
 
     init_path = os.path.join(full_path, "__init__.py")
     with open(init_path, "a+") as f:
