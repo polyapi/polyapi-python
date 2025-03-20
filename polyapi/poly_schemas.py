@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, List, Tuple
 
-from polyapi.schema import generate_schema_types
+from polyapi.schema import wrapped_generate_schema_types
 from polyapi.utils import add_import_to_init, init_the_init
 from tests.test_schema import SCHEMA
 
@@ -44,17 +44,18 @@ def create_schema(spec: SchemaSpecDto) -> None:
 
 
 def add_schema_to_init(full_path: str, spec: SchemaSpecDto):
-    init_the_init(
-        full_path,
-        code_imports=SCHEMA_CODE_IMPORTS
-    )
+    init_the_init(full_path, code_imports="")
     init_path = os.path.join(full_path, "__init__.py")
     with open(init_path, "a") as f:
         f.write(render_poly_schema(spec) + "\n\n")
 
 
 def render_poly_schema(spec: SchemaSpecDto) -> str:
-    print(spec['name'])
     definition = spec["definition"]
-    return generate_schema_types(definition, root=spec["name"])
+    if not definition.get("type"):
+        definition["type"] = "object"
+    root, schema_types = wrapped_generate_schema_types(
+        definition, root=spec["name"], fallback_type=Dict
+    )
+    return schema_types
     # return FALLBACK_SPEC_TEMPLATE.format(name=spec["name"])

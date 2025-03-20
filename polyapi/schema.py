@@ -1,5 +1,7 @@
 """ NOTE: this file represents the schema parsing logic for jsonschema_gentypes
 """
+import random
+import string
 import logging
 import contextlib
 from typing import Dict
@@ -35,8 +37,18 @@ def _temp_store_input_data(input_data: Dict) -> str:
 
 
 def wrapped_generate_schema_types(type_spec: dict, root, fallback_type):
+    from polyapi.utils import pascalCase
     if not root:
-        root = "MyList" if fallback_type == "List" else "MyDict"
+        root = "List" if fallback_type == "List" else "Dict"
+        if type_spec.get("x-poly-ref") and type_spec["x-poly-ref"].get("path"):
+            # x-poly-ref occurs when we have an unresolved reference
+            # lets name the root after the reference for some level of visibility
+            root += pascalCase(type_spec["x-poly-ref"]["path"].replace(".", " "))
+        else:
+            # add three random letters for uniqueness
+            root += random.choice(string.ascii_letters).upper()
+            root += random.choice(string.ascii_letters).upper()
+            root += random.choice(string.ascii_letters).upper()
 
     root = clean_title(root)
 

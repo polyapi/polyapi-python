@@ -4,6 +4,7 @@ import os
 import shutil
 from typing import List, cast
 
+from polyapi import schema
 from polyapi.auth import render_auth_function
 from polyapi.client import render_client_function
 from polyapi.poly_schemas import generate_schemas
@@ -27,6 +28,15 @@ SUPPORTED_FUNCTION_TYPES = {
 SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema"}
 
 
+X_POLY_REF_WARNING = '''"""
+x-poly-ref:
+  path:'''
+
+X_POLY_REF_BETTER_WARNING = '''"""
+Unresolved schema, please add the following schema to complete it:
+  path:'''
+
+
 def get_specs() -> List:
     api_key, api_url = get_api_key_and_url()
     assert api_key
@@ -37,6 +47,40 @@ def get_specs() -> List:
         return resp.json()
     else:
         raise NotImplementedError(resp.content)
+
+
+def build_schema_index(items):
+    index = {}
+    for item in items:
+        if item.get("type") == "schema" and "contextName" in item:
+            index[item["contextName"]] = {**item.get("definition", {}), "name": item.get("name")}
+    return index
+
+
+def resolve_poly_refs(obj, schema_index):
+    if isinstance(obj, dict):
+        if "x-poly-ref" in obj:
+            ref = obj["x-poly-ref"]
+            if isinstance(ref, dict) and "path" in ref:
+                path = ref["path"]
+                if path in schema_index:
+                    return resolve_poly_refs(schema_index[path], schema_index)
+                else:
+                    return obj
+        return {k: resolve_poly_refs(v, schema_index) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [resolve_poly_refs(item, schema_index) for item in obj]
+    else:
+        return obj
+
+
+def replace_poly_refs_in_functions(data: List[SpecificationDto], schema_index):
+    for item in data:
+        if item.get("type") == "apiFunction":
+            func = item.get("function")
+            if func:
+                item["function"] = resolve_poly_refs(func, schema_index)
+    return data
 
 
 def parse_function_specs(
@@ -127,7 +171,16 @@ def generate() -> None:
 
     remove_old_library()
 
-    functions = get_functions_and_parse()
+    limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
+    functions = get_functions_and_parse(limit_ids=limit_ids)
+
+    schemas = get_schemas()
+    if schemas:
+        generate_schemas(schemas)
+
+    schema_index = build_schema_index(schemas)
+    functions = replace_poly_refs_in_functions(functions, schema_index)
+
     if functions:
         generate_functions(functions)
     else:
@@ -140,9 +193,6 @@ def generate() -> None:
     if variables:
         generate_variables(variables)
 
-    schemas = get_schemas()
-    if schemas:
-        generate_schemas(schemas)
 
     # indicator to vscode extension that this is a polyapi-python project
     file_path = os.path.join(os.getcwd(), ".polyapi-python")
@@ -220,6 +270,12 @@ def render_spec(spec: SpecificationDto):
             arguments,
             return_type,
         )
+
+    if X_POLY_REF_WARNING in func_type_defs:
+        # this indicates that jsonschema_gentypes has detected an x-poly-ref
+        # let's add a more user friendly error explaining what is going on
+        func_type_defs = func_type_defs.replace(X_POLY_REF_WARNING, X_POLY_REF_BETTER_WARNING)
+
     return func_str, func_type_defs
 
 

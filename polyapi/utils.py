@@ -115,15 +115,20 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
     elif type_spec["kind"] == "object":
         if type_spec.get("schema"):
             schema = type_spec["schema"]
-            title = schema.get("title", "")
+            title = schema.get("title", schema.get("name", ""))
             if title:
                 assert isinstance(title, str)
                 return wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
-
+            elif schema.get("allOf") and len(schema['allOf']):
+                # we are in a case of a single allOf, lets strip off the allOf and move on!
+                # our library doesn't handle allOf well yet
+                allOf = schema['allOf'][0]
+                title = allOf.get("title", allOf.get("name", ""))
+                return wrapped_generate_schema_types(allOf, title, "Dict")
             elif schema.get("items"):
                 # fallback to schema $ref name if no explicit title
                 items = schema.get("items")  # type: ignore
-                title = items.get("title", "")  # type: ignore
+                title = items.get("title")  # type: ignore
                 if not title:
                     # title is actually a reference to another schema
                     title = items.get("$ref", "")  # type: ignore
