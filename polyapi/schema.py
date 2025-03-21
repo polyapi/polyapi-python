@@ -7,8 +7,11 @@ import contextlib
 from typing import Dict
 from jsonschema_gentypes.cli import process_config
 from jsonschema_gentypes import configuration
+import referencing
 import tempfile
 import json
+
+import referencing.exceptions
 
 from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 
@@ -58,8 +61,13 @@ def wrapped_generate_schema_types(type_spec: dict, root, fallback_type):
         # some schemas are so huge, our library cant handle it
         # TODO identify critical recursion penalty and maybe switch underlying logic to iterative?
         return fallback_type, ""
+    except referencing.exceptions.CannotDetermineSpecification:
+        # just go with fallback_type here
+        # we couldn't match the right $ref earlier in resolve_poly_refs
+        # {'$ref': '#/definitions/FinanceAccountListModel'}
+        return fallback_type, ""
     except:
-        logging.exception(f"Error when generating schema type: {type_spec}")
+        logging.error(f"Error when generating schema type: {type_spec}\nusing fallback type '{fallback_type}'")
         return fallback_type, ""
 
 
