@@ -74,13 +74,26 @@ def resolve_poly_refs(obj, schema_index):
         return obj
 
 
-def replace_poly_refs_in_functions(data: List[SpecificationDto], schema_index):
-    for item in data:
-        if item.get("type") == "apiFunction":
-            func = item.get("function")
+def replace_poly_refs_in_functions(specs: List[SpecificationDto], schema_index):
+    spec_idxs_to_remove = []
+    for idx, spec in enumerate(specs):
+        if spec.get("type") == "apiFunction":
+            func = spec.get("function")
             if func:
-                item["function"] = resolve_poly_refs(func, schema_index)
-    return data
+                try:
+                    spec["function"] = resolve_poly_refs(func, schema_index)
+                except Exception:
+                    print()
+                    print(f"{spec['context']}.{spec['name']} (id: {spec['id']}) failed to resolve poly refs, skipping!")
+                    spec_idxs_to_remove.append(idx)
+
+    # reverse the list so we pop off later indexes first
+    spec_idxs_to_remove.reverse()
+
+    for idx in spec_idxs_to_remove:
+        specs.pop(idx)
+
+    return specs
 
 
 def parse_function_specs(
