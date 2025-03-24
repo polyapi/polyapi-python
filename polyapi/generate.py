@@ -77,7 +77,7 @@ def resolve_poly_refs(obj, schema_index):
 def replace_poly_refs_in_functions(specs: List[SpecificationDto], schema_index):
     spec_idxs_to_remove = []
     for idx, spec in enumerate(specs):
-        if spec.get("type") in ("apiFunction", "clientFunction", "serverFunction"):
+        if spec.get("type") in ("apiFunction", "customFunction", "serverFunction"):
             func = spec.get("function")
             if func:
                 try:
