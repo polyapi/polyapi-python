@@ -25,7 +25,7 @@ SUPPORTED_FUNCTION_TYPES = {
     "webhookHandle",
 }
 
-SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema"}
+SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema", "snippet"}
 
 
 X_POLY_REF_WARNING = '''"""
