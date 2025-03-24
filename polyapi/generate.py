@@ -20,7 +20,7 @@ from .config import get_api_key_and_url
 SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
     "authFunction",
-    "customFunction",
+    "customFunction",  # client function - this is badly named in /specs atm
     "serverFunction",
     "webhookHandle",
 }
