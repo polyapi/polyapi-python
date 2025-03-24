@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Tuple
 
 from polyapi.schema import wrapped_generate_schema_types
 from polyapi.utils import add_import_to_init, init_the_init
-from tests.test_schema import SCHEMA
 
 from .typedefs import SchemaSpecDto
 
