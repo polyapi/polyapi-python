@@ -98,7 +98,7 @@ def replace_poly_refs_in_functions(specs: List[SpecificationDto], schema_index):
 
 def parse_function_specs(
     specs: List[SpecificationDto],
-    limit_ids: List[str] | None,  # optional list of ids to limit to
+    limit_ids: List[str] | None = None,  # optional list of ids to limit to
 ) -> List[SpecificationDto]:
     functions = []
     for spec in specs:
@@ -149,12 +149,6 @@ def read_cached_specs() -> List[SpecificationDto]:
         return json.loads(f.read())
 
 
-def get_functions_and_parse(limit_ids: List[str] | None = None) -> List[SpecificationDto]:
-    specs = get_specs()
-    cache_specs(specs)
-    return parse_function_specs(specs, limit_ids=limit_ids)
-
-
 def get_variables() -> List[VariableSpecDto]:
     specs = read_cached_specs()
     return [cast(VariableSpecDto, spec) for spec in specs if spec["type"] == "serverVariable"]
@@ -185,7 +179,10 @@ def generate() -> None:
     remove_old_library()
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
-    functions = get_functions_and_parse(limit_ids=limit_ids)
+
+    specs = get_specs()
+    cache_specs(specs)
+    functions = parse_function_specs(specs, limit_ids=limit_ids)
 
     schemas = get_schemas()
     if schemas:
