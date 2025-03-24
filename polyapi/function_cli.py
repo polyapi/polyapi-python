@@ -1,7 +1,7 @@
 import sys
 from typing import Any, List, Optional
 import requests
-from polyapi.generate import get_functions_and_parse, generate_functions
+from polyapi.generate import cache_specs, generate_functions, get_specs, parse_function_specs
 from polyapi.config import get_api_key_and_url
 from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
 from polyapi.parser import parse_function_code, get_jsonschema_type
@@ -88,7 +88,10 @@ def function_add_or_update(
         print(f"Function ID: {function_id}")
         if generate:
             print("Generating new custom function...", end="")
-            functions = get_functions_and_parse(limit_ids=[function_id])
+            # TODO do something more efficient here rather than regetting ALL the specs again
+            specs = get_specs()
+            cache_specs(specs)
+            functions = parse_function_specs(specs)
             generate_functions(functions)
             print_green("DONE")
     else:

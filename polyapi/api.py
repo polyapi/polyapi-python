@@ -8,6 +8,7 @@ API_DEFS_TEMPLATE = """
 from typing import List, Dict, Any, TypedDict
 {args_def}
 {return_type_def}
+
 class {api_response_type}(TypedDict):
     status: int
     headers: Dict

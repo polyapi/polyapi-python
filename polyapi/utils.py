@@ -11,19 +11,19 @@ from polyapi.schema import wrapped_generate_schema_types, clean_title, map_primi
 
 # this string should be in every __init__ file.
 # it contains all the imports needed for the function or variable code to run
-CODE_IMPORTS = "from typing import List, Dict, Any, TypedDict, Optional, Callable\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
-FALLBACK_TYPES = {"Dict", "List"}
+CODE_IMPORTS = "from typing import List, Dict, Any, Optional, Callable\nfrom typing_extensions import TypedDict, NotRequired\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update\n\n"
 
 
-def init_the_init(full_path: str) -> None:
+def init_the_init(full_path: str, code_imports="") -> None:
     init_path = os.path.join(full_path, "__init__.py")
     if not os.path.exists(init_path):
+        code_imports = code_imports or CODE_IMPORTS
         with open(init_path, "w") as f:
-            f.write(CODE_IMPORTS)
+            f.write(code_imports)
 
 
-def add_import_to_init(full_path: str, next: str) -> None:
-    init_the_init(full_path)
+def add_import_to_init(full_path: str, next: str, code_imports="") -> None:
+    init_the_init(full_path, code_imports=code_imports)
 
     init_path = os.path.join(full_path, "__init__.py")
     with open(init_path, "a+") as f:
@@ -38,7 +38,7 @@ def get_auth_headers(api_key: str):
     return {"Authorization": f"Bearer {api_key}"}
 
 
-def camelCase(s):
+def camelCase(s: str) -> str:
     s = s.strip()
     if " " in s or "-" in s:
         s = re.sub(r"(_|-)+", " ", s).title().replace(" ", "")
@@ -46,6 +46,10 @@ def camelCase(s):
     else:
         # s is already in camelcase as best as we can tell, just move on!
         return s
+
+
+def pascalCase(s) -> str:
+    return re.sub(r"(^|_)([a-z])", lambda match: match.group(2).upper(), s)
 
 
 def print_green(s: str):
@@ -111,15 +115,20 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
     elif type_spec["kind"] == "object":
         if type_spec.get("schema"):
             schema = type_spec["schema"]
-            title = schema.get("title", "")
+            title = schema.get("title", schema.get("name", ""))
             if title:
                 assert isinstance(title, str)
                 return wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
-
+            elif schema.get("allOf") and len(schema['allOf']):
+                # we are in a case of a single allOf, lets strip off the allOf and move on!
+                # our library doesn't handle allOf well yet
+                allOf = schema['allOf'][0]
+                title = allOf.get("title", allOf.get("name", ""))
+                return wrapped_generate_schema_types(allOf, title, "Dict")
             elif schema.get("items"):
                 # fallback to schema $ref name if no explicit title
                 items = schema.get("items")  # type: ignore
-                title = items.get("title", "")  # type: ignore
+                title = items.get("title")  # type: ignore
                 if not title:
                     # title is actually a reference to another schema
                     title = items.get("$ref", "")  # type: ignore
