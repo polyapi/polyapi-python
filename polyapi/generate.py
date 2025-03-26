@@ -83,8 +83,8 @@ def replace_poly_refs_in_functions(specs: List[SpecificationDto], schema_index):
                 try:
                     spec["function"] = resolve_poly_refs(func, schema_index)
                 except Exception:
-                    print()
-                    print(f"{spec['context']}.{spec['name']} (id: {spec['id']}) failed to resolve poly refs, skipping!")
+                    # print()
+                    # print(f"{spec['context']}.{spec['name']} (id: {spec['id']}) failed to resolve poly refs, skipping!")
                     spec_idxs_to_remove.append(idx)
 
     # reverse the list so we pop off later indexes first
