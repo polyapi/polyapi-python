@@ -47,9 +47,7 @@ def execute_from_cli():
 
     def generate_command(args):
         initialize_config()
-        print("Generating Poly Python SDK...", end="")
         generate()
-        print_green("DONE")
 
     generate_parser.set_defaults(command=generate_command)
 

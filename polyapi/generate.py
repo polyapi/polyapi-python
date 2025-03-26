@@ -4,16 +4,15 @@ import os
 import shutil
 from typing import List, cast
 
-from polyapi import schema
-from polyapi.auth import render_auth_function
-from polyapi.client import render_client_function
-from polyapi.poly_schemas import generate_schemas
-from polyapi.webhook import render_webhook_handle
+from .auth import render_auth_function
+from .client import render_client_function
+from .poly_schemas import generate_schemas
+from .webhook import render_webhook_handle
 
 from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto
 from .api import render_api_function
 from .server import render_server_function
-from .utils import add_import_to_init, get_auth_headers, init_the_init, to_func_namespace
+from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
 from .variables import generate_variables
 from .config import get_api_key_and_url
 
@@ -175,7 +174,7 @@ def remove_old_library():
 
 
 def generate() -> None:
-
+    print("Generating Poly Python SDK...", end="", flush=True)
     remove_old_library()
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
@@ -207,6 +206,8 @@ def generate() -> None:
     # indicator to vscode extension that this is a polyapi-python project
     file_path = os.path.join(os.getcwd(), ".polyapi-python")
     open(file_path, "w").close()
+
+    print_green("DONE")
 
 
 def clear() -> None:
