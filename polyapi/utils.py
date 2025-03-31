@@ -88,7 +88,7 @@ def add_type_import_path(function_name: str, arg: str) -> str:
     return f'{to_func_namespace(function_name)}.{camelCase(arg)}'
 
 
-def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
+def get_type_and_def(type_spec: PropertyType, title_fallback: str = "") -> Tuple[str, str]:
     if type_spec["kind"] == "plain":
         value = type_spec["value"]
         if value.endswith("[]"):
@@ -115,7 +115,7 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
     elif type_spec["kind"] == "object":
         if type_spec.get("schema"):
             schema = type_spec["schema"]
-            title = schema.get("title", schema.get("name", ""))
+            title = schema.get("title", schema.get("name", title_fallback))
             if title:
                 assert isinstance(title, str)
                 return wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
@@ -153,6 +153,7 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
                 return_type = "Any"
 
             for argument in type_spec["spec"]["arguments"]:
+                _maybe_add_fallback_schema_name(argument)
                 arg_type, arg_def = get_type_and_def(argument["type"])
                 arg_types.append(arg_type)
                 if arg_def:
@@ -168,10 +169,18 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
         return "Any", ""
 
 
+def _maybe_add_fallback_schema_name(a: PropertySpecification):
+    if a["type"]["kind"] == "object" and a["type"].get("schema"):
+        schema = a['type'].get("schema")
+        if not schema.get("title") and not schema.get("name") and a['name']:
+            schema['title'] = a['name'].title()
+
+
 def parse_arguments(function_name: str, arguments: List[PropertySpecification]) -> Tuple[str, str]:
     args_def = []
     arg_string = ""
     for idx, a in enumerate(arguments):
+        _maybe_add_fallback_schema_name(a)
         arg_type, arg_def = get_type_and_def(a["type"])
         if arg_def:
             args_def.append(arg_def)
@@ -219,6 +228,10 @@ def rewrite_reserved(s: str) -> str:
 
 def rewrite_arg_name(s: str):
     return rewrite_reserved(camelCase(s))
+
+
+def get_return_type_name(function_name: str) -> str:
+    return function_name[0].upper() + function_name[1:] + "ReturnType"
 
 
 valid_subdomains = ["na[1-2]", "eu[1-2]", "dev"]
