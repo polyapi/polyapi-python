@@ -153,6 +153,16 @@ When hacking on this library, please enable flake8 and add this line to your fla
 --config=.flake8
 ```
 
+## Mypy Type Improvements
+
+This command is handy for checking for any mypy types that need to be cleaned up in the generated library:
+
+```bash
+python3 -m polyapi generate && mypy polyapi/poly/ && mypy polyapi/vari/ && mypy polyapi/schemas
+```
+
+Please ignore \[no-redef\] errors for now. This is a known bug we are working to fix!
+
 ## Support
 
 If you run into any issues or want help getting started with this project, please contact support@polyapi.io

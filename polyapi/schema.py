@@ -1,7 +1,5 @@
 """ NOTE: this file represents the schema parsing logic for jsonschema_gentypes
 """
-import random
-import string
 import logging
 import contextlib
 from typing import Dict

@@ -180,7 +180,7 @@ def generate() -> None:
     specs = get_specs()
     cache_specs(specs)
 
-    limit_ids: List[str] = ['b1aa5457-6a17-497b-9164-5c9ce2df8140']  # useful for narrowing down generation to a single function to debug
+    limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
     functions = parse_function_specs(specs, limit_ids=limit_ids)
 
     schemas = get_schemas()

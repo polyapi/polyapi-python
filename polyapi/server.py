@@ -1,7 +1,7 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, cast
 
-from polyapi.typedefs import PropertySpecification
-from polyapi.utils import add_type_import_path, parse_arguments, get_type_and_def, rewrite_arg_name
+from polyapi.typedefs import PropertySpecification, PropertyType
+from polyapi.utils import add_type_import_path, parse_arguments, get_type_and_def, return_type_already_defined_in_args, rewrite_arg_name
 
 SERVER_DEFS_TEMPLATE = """
 from typing import List, Dict, Any, TypedDict, Callable
@@ -21,7 +21,7 @@ def {function_name}(
     try:
         return {return_action}
     except:
-        return resp.text
+        return resp.text  # type: ignore # fallback for debugging
 
 
 """
@@ -37,7 +37,11 @@ def render_server_function(
 ) -> Tuple[str, str]:
     arg_names = [a["name"] for a in arguments]
     args, args_def = parse_arguments(function_name, arguments)
-    return_type_name, return_type_def = get_type_and_def(return_type, "ReturnType")
+    return_type_name, return_type_def = get_type_and_def(cast(PropertyType, return_type), "ReturnType")
+
+    if return_type_def and return_type_already_defined_in_args(return_type_name, args_def):
+        return_type_def = ""
+
     data = "{" + ", ".join([f"'{arg}': {rewrite_arg_name(arg)}" for arg in arg_names]) + "}"
     func_type_defs = SERVER_DEFS_TEMPLATE.format(
         args_def=args_def,
