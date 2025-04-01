@@ -2,6 +2,7 @@
 """
 import logging
 import contextlib
+import re
 from typing import Dict
 from jsonschema_gentypes.cli import process_config
 from jsonschema_gentypes import configuration
@@ -95,7 +96,21 @@ def generate_schema_types(input_data: Dict, root=None):
     with open(tmp_output) as f:
         output = f.read()
 
+    output = clean_malformed_examples(output)
+
     return output
+
+
+# Regex to match everything between "# example: {\n" and "^}$"
+MALFORMED_EXAMPLES_PATTERN = re.compile(r"# example: \{\n.*?^\}$", flags=re.DOTALL | re.MULTILINE)
+
+
+def clean_malformed_examples(example: str) -> str:
+    """ there is a bug in the `jsonschmea_gentypes` library where if an example from a jsonchema is an object,
+    it will break the code because the object won't be properly commented out
+    """
+    cleaned_example = MALFORMED_EXAMPLES_PATTERN.sub("", example)
+    return cleaned_example
 
 
 def clean_title(title: str) -> str:
