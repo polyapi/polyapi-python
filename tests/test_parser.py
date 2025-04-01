@@ -128,7 +128,10 @@ def foobar(foo: str, bar: Dict[str, str]) -> int:
     return 7
 '''
 
+
 class T(unittest.TestCase):
+    maxDiff = 640
+
     def test_no_types(self):
         deployable = parse_function_code(CODE_NO_TYPES, "foobar")
         types = deployable["types"]

@@ -48,10 +48,8 @@ def wrapped_generate_schema_types(type_spec: dict, root, fallback_type):
             # lets name the root after the reference for some level of visibility
             root += pascalCase(type_spec["x-poly-ref"]["path"].replace(".", " "))
         else:
-            # add three random letters for uniqueness
-            root += random.choice(string.ascii_letters).upper()
-            root += random.choice(string.ascii_letters).upper()
-            root += random.choice(string.ascii_letters).upper()
+            # if we have no root, just add "My"
+            root = "My" + root
 
     root = clean_title(root)
 

@@ -230,8 +230,8 @@ def rewrite_arg_name(s: str):
     return rewrite_reserved(camelCase(s))
 
 
-def get_return_type_name(function_name: str) -> str:
-    return function_name[0].upper() + function_name[1:] + "ReturnType"
+# def get_return_type_name(function_name: str) -> str:
+#     return function_name[0].upper() + function_name[1:] + "ReturnType"
 
 
 valid_subdomains = ["na[1-2]", "eu[1-2]", "dev"]
