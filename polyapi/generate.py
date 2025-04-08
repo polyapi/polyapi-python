@@ -2,7 +2,7 @@ import json
 import requests
 import os
 import shutil
-from typing import List, cast
+from typing import List, Tuple, cast
 
 from .auth import render_auth_function
 from .client import render_client_function
@@ -177,10 +177,10 @@ def generate() -> None:
     print("Generating Poly Python SDK...", end="", flush=True)
     remove_old_library()
 
-    limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
-
     specs = get_specs()
     cache_specs(specs)
+
+    limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
     functions = parse_function_specs(specs, limit_ids=limit_ids)
 
     schemas = get_schemas()
@@ -222,7 +222,7 @@ def clear() -> None:
     print("Cleared!")
 
 
-def render_spec(spec: SpecificationDto):
+def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
     function_type = spec["type"]
     function_description = spec["description"]
     function_name = spec["name"]

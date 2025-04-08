@@ -158,6 +158,7 @@ def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
 
     return parsed
 
+
 def _get_schemas(code: str) -> List[Dict]:
     schemas = []
     user_code = types.SimpleNamespace()

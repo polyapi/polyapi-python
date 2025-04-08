@@ -6,7 +6,11 @@ from typing import Tuple, List
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
 from polyapi.typedefs import PropertySpecification, PropertyType
-from polyapi.schema import wrapped_generate_schema_types, clean_title, map_primitive_types
+from polyapi.schema import (
+    wrapped_generate_schema_types,
+    clean_title,
+    map_primitive_types,
+)
 
 
 # this string should be in every __init__ file.
@@ -42,7 +46,7 @@ def camelCase(s: str) -> str:
     s = s.strip()
     if " " in s or "-" in s:
         s = re.sub(r"(_|-)+", " ", s).title().replace(" ", "")
-        return ''.join([s[0].lower(), s[1:]])
+        return "".join([s[0].lower(), s[1:]])
     else:
         # s is already in camelcase as best as we can tell, just move on!
         return s
@@ -65,8 +69,7 @@ def print_red(s: str):
 
 
 def add_type_import_path(function_name: str, arg: str) -> str:
-    """ if not basic type, coerce to camelCase and add the import path
-    """
+    """if not basic type, coerce to camelCase and add the import path"""
     # for now, just treat Callables as basic types
     if arg.startswith("Callable"):
         return arg
@@ -83,12 +86,16 @@ def add_type_import_path(function_name: str, arg: str) -> str:
                 sub = sub.replace('"', "")
                 return f'List["{to_func_namespace(function_name)}.{camelCase(sub)}"]'
             else:
-                return f'List[{to_func_namespace(function_name)}.{camelCase(sub)}]'
+                return f"List[{to_func_namespace(function_name)}.{camelCase(sub)}]"
 
-    return f'{to_func_namespace(function_name)}.{camelCase(arg)}'
+    return f"{to_func_namespace(function_name)}.{camelCase(arg)}"
 
 
-def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
+def get_type_and_def(
+    type_spec: PropertyType, title_fallback: str = ""
+) -> Tuple[str, str]:
+    """ returns type and type definition for a given PropertyType
+    """
     if type_spec["kind"] == "plain":
         value = type_spec["value"]
         if value.endswith("[]"):
@@ -115,15 +122,19 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
     elif type_spec["kind"] == "object":
         if type_spec.get("schema"):
             schema = type_spec["schema"]
-            title = schema.get("title", schema.get("name", ""))
-            if title:
+            title = schema.get("title", schema.get("name", title_fallback))
+            if title and schema.get("type") == "array":
+                # TODO fix me
+                # we don't use ReturnType as name for the list type here, we use _ReturnTypeItem
+                return "List", ""
+            elif title:
                 assert isinstance(title, str)
                 return wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
-            elif schema.get("allOf") and len(schema['allOf']):
+            elif schema.get("allOf") and len(schema["allOf"]):
                 # we are in a case of a single allOf, lets strip off the allOf and move on!
                 # our library doesn't handle allOf well yet
-                allOf = schema['allOf'][0]
-                title = allOf.get("title", allOf.get("name", ""))
+                allOf = schema["allOf"][0]
+                title = allOf.get("title", allOf.get("name", title_fallback))
                 return wrapped_generate_schema_types(allOf, title, "Dict")
             elif schema.get("items"):
                 # fallback to schema $ref name if no explicit title
@@ -131,7 +142,7 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
                 title = items.get("title")  # type: ignore
                 if not title:
                     # title is actually a reference to another schema
-                    title = items.get("$ref", "")  # type: ignore
+                    title = items.get("$ref", title_fallback)  # type: ignore
 
                 title = title.rsplit("/", 1)[-1]
                 if not title:
@@ -153,12 +164,18 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
                 return_type = "Any"
 
             for argument in type_spec["spec"]["arguments"]:
+                # do NOT add this fallback here
+                # callable arguments don't understand the imports yet
+                # if it's not a basic type here, we'll just do Any
+                # _maybe_add_fallback_schema_name(argument)
                 arg_type, arg_def = get_type_and_def(argument["type"])
                 arg_types.append(arg_type)
                 if arg_def:
                     arg_defs.append(arg_def)
 
-            final_arg_type = "Callable[[{}], {}]".format(", ".join(arg_types), return_type)
+            final_arg_type = "Callable[[{}], {}]".format(
+                ", ".join(arg_types), return_type
+            )
             return final_arg_type, "\n".join(arg_defs)
         else:
             return "Callable", ""
@@ -168,15 +185,27 @@ def get_type_and_def(type_spec: PropertyType) -> Tuple[str, str]:
         return "Any", ""
 
 
-def parse_arguments(function_name: str, arguments: List[PropertySpecification]) -> Tuple[str, str]:
+def _maybe_add_fallback_schema_name(a: PropertySpecification):
+    if a["type"]["kind"] == "object" and a["type"].get("schema"):
+        schema = a["type"].get("schema", {})
+        if not schema.get("title") and not schema.get("name") and a["name"]:
+            schema["title"] = a["name"].title()
+
+
+def parse_arguments(
+    function_name: str, arguments: List[PropertySpecification]
+) -> Tuple[str, str]:
     args_def = []
     arg_string = ""
     for idx, a in enumerate(arguments):
+        _maybe_add_fallback_schema_name(a)
         arg_type, arg_def = get_type_and_def(a["type"])
         if arg_def:
             args_def.append(arg_def)
         a["name"] = rewrite_arg_name(a["name"])
-        arg_string += f"    {a['name']}: {add_type_import_path(function_name, arg_type)}"
+        arg_string += (
+            f"    {a['name']}: {add_type_import_path(function_name, arg_type)}"
+        )
         description = a.get("description", "")
         description = description.replace("\n", " ")
         if description:
@@ -202,7 +231,7 @@ RESERVED_WORDS = {"List", "Dict", "Any", "Optional", "Callable"} | set(keyword.k
 
 
 def to_func_namespace(s: str) -> str:
-    """ convert a function name to some function namespace
+    """convert a function name to some function namespace
     by default it is
     """
     rv = s[0].upper() + s[1:]
@@ -219,6 +248,10 @@ def rewrite_reserved(s: str) -> str:
 
 def rewrite_arg_name(s: str):
     return rewrite_reserved(camelCase(s))
+
+
+# def get_return_type_name(function_name: str) -> str:
+#     return function_name[0].upper() + function_name[1:] + "ReturnType"
 
 
 valid_subdomains = ["na[1-2]", "eu[1-2]", "dev"]
@@ -238,3 +271,21 @@ def is_valid_uuid(uuid_string, version=4):
         return False
 
     return str(uuid_obj) == uuid_string
+
+
+def return_type_already_defined_in_args(return_type_name: str, args_def: str) -> bool:
+    """
+    Checks if the return_type_name preceded optionally by 'class ' and followed by ' =' exists in args_def.
+
+    Args:
+        return_type_name (str): The name of the return type to check.
+        args_def (str): The string containing argument definitions.
+
+    Returns:
+        bool: True if the pattern exists, False otherwise.
+    """
+    basic_pattern = rf"^{re.escape(return_type_name)}\s="
+    basic_match = bool(re.search(basic_pattern, args_def, re.MULTILINE))
+    class_pattern = rf"^class {re.escape(return_type_name)}\(TypedDict"
+    class_match = bool(re.search(class_pattern, args_def, re.MULTILINE))
+    return basic_match or class_match
