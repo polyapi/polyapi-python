@@ -158,7 +158,7 @@ When hacking on this library, please enable flake8 and add this line to your fla
 This script is handy for checking for any mypy types:
 
 ```bash
-./check_mypy_types.sh
+./check_mypy.sh
 ```
 
 Please ignore \[name-defined\] errors for now. This is a known bug we are working to fix!
