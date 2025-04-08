@@ -24,5 +24,3 @@ class T(unittest.TestCase):
     def test_clean_malformed_examples(self):
         output = clean_malformed_examples(APALEO_MALFORMED_EXAMPLE)
         self.assertNotIn("# example: {", output)
-        print(output)
-
