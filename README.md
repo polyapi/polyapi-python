@@ -155,13 +155,13 @@ When hacking on this library, please enable flake8 and add this line to your fla
 
 ## Mypy Type Improvements
 
-This command is handy for checking for any mypy types that need to be cleaned up in the generated library:
+This script is handy for checking for any mypy types:
 
 ```bash
-python3 -m polyapi generate && mypy polyapi/poly/ && mypy polyapi/vari/ && mypy polyapi/schemas
+./check_mypy_types.sh
 ```
 
-Please ignore \[no-redef\] errors for now. This is a known bug we are working to fix!
+Please ignore \[name-defined\] errors for now. This is a known bug we are working to fix!
 
 ## Support
 
