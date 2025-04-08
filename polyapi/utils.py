@@ -164,7 +164,10 @@ def get_type_and_def(
                 return_type = "Any"
 
             for argument in type_spec["spec"]["arguments"]:
-                _maybe_add_fallback_schema_name(argument)
+                # do NOT add this fallback here
+                # callable arguments don't understand the imports yet
+                # if it's not a basic type here, we'll just do Any
+                # _maybe_add_fallback_schema_name(argument)
                 arg_type, arg_def = get_type_and_def(argument["type"])
                 arg_types.append(arg_type)
                 if arg_def:

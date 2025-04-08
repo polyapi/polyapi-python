@@ -78,7 +78,7 @@ class T(unittest.TestCase):
         arg_type, arg_def = get_type_and_def(OPENAPI_FUNCTION)
         self.assertEqual(
             arg_type,
-            "Callable[[Event, Dict, Dict, Dict], None]",
+            "Callable[[List[WebhookEventTypeElement], Dict, Dict, Dict], None]",
         )
 
     def test_rewrite_reserved(self):

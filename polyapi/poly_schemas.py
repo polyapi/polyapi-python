@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict, List, Tuple
 
 from polyapi.schema import wrapped_generate_schema_types
-from polyapi.utils import add_import_to_init, init_the_init
+from polyapi.utils import add_import_to_init, init_the_init, to_func_namespace
 
 from .typedefs import SchemaSpecDto
 
@@ -23,23 +23,71 @@ def generate_schemas(specs: List[SchemaSpecDto]):
         create_schema(spec)
 
 
-def create_schema(spec: SchemaSpecDto) -> None:
-    folders = ["schemas"]
-    if spec["context"]:
-        folders += [s for s in spec["context"].split(".")]
+# def create_schema(spec: SchemaSpecDto) -> None:
+#     folders = ["schemas"]
+#     if spec["context"]:
+#         folders += [s for s in spec["context"].split(".")]
 
-    # build up the full_path by adding all the folders
-    full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+#     # build up the full_path by adding all the folders
+#     full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 
+#     for idx, folder in enumerate(folders):
+#         full_path = os.path.join(full_path, folder)
+#         if not os.path.exists(full_path):
+#             os.makedirs(full_path)
+#         next = folders[idx + 1] if idx + 1 < len(folders) else None
+#         if next:
+#             add_import_to_init(full_path, next, code_imports=SCHEMA_CODE_IMPORTS)
+
+#     add_schema_to_init(full_path, spec)
+
+
+def add_schema_file(
+    full_path: str,
+    schema_name: str,
+    spec: SchemaSpecDto,
+):
+    # first lets add the import to the __init__
+    init_the_init(full_path, SCHEMA_CODE_IMPORTS)
+
+    schema_defs = render_poly_schema(spec)
+
+    if schema_defs:
+        # add function to init
+        init_path = os.path.join(full_path, "__init__.py")
+        with open(init_path, "a") as f:
+            f.write(f"\n\nfrom _{to_func_namespace(schema_name)} import {schema_name}")
+
+        # add type_defs to underscore file
+        file_path = os.path.join(full_path, f"_{to_func_namespace(schema_name)}.py")
+        with open(file_path, "w") as f:
+            f.write(schema_defs)
+
+
+def create_schema(
+    spec: SchemaSpecDto
+) -> None:
+    full_path = os.path.dirname(os.path.abspath(__file__))
+    folders = f"schemas.{spec['context']}.{spec['name']}".split(".")
     for idx, folder in enumerate(folders):
-        full_path = os.path.join(full_path, folder)
-        if not os.path.exists(full_path):
-            os.makedirs(full_path)
-        next = folders[idx + 1] if idx + 1 < len(folders) else None
-        if next:
-            add_import_to_init(full_path, next, code_imports=SCHEMA_CODE_IMPORTS)
+        if idx + 1 == len(folders):
+            # special handling for final level
+            add_schema_file(
+                full_path,
+                folder,
+                spec,
+            )
+        else:
+            full_path = os.path.join(full_path, folder)
+            if not os.path.exists(full_path):
+                os.makedirs(full_path)
 
-    add_schema_to_init(full_path, spec)
+            # append to __init__.py file if nested folders
+            next = folders[idx + 1] if idx + 2 < len(folders) else ""
+            if next:
+                init_the_init(full_path, SCHEMA_CODE_IMPORTS)
+                add_import_to_init(full_path, next)
+
 
 
 def add_schema_to_init(full_path: str, spec: SchemaSpecDto):
