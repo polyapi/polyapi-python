@@ -8,6 +8,8 @@ from .typedefs import SchemaSpecDto
 
 SCHEMA_CODE_IMPORTS = """from typing_extensions import TypedDict, NotRequired
 
+__all__ = []
+
 
 """
 
@@ -42,7 +44,7 @@ def add_schema_file(
         # add function to init
         init_path = os.path.join(full_path, "__init__.py")
         with open(init_path, "a") as f:
-            f.write(f"\n\nfrom ._{to_func_namespace(schema_name)} import {schema_name}")
+            f.write(f"\n\nfrom ._{to_func_namespace(schema_name)} import {schema_name}\n__all__.append('{schema_name}')\n")
 
         # add type_defs to underscore file
         file_path = os.path.join(full_path, f"_{to_func_namespace(schema_name)}.py")
@@ -73,7 +75,6 @@ def create_schema(
             if next:
                 init_the_init(full_path, SCHEMA_CODE_IMPORTS)
                 add_import_to_init(full_path, next)
-
 
 
 def add_schema_to_init(full_path: str, spec: SchemaSpecDto):
