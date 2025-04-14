@@ -55,6 +55,10 @@ def set_api_key_and_url(key: str, url: str):
     config.set("polyapi", "poly_api_base_url", url)
     with open(get_config_file_path(), "w") as f:
         config.write(f)
+    global API_KEY
+    global API_URL
+    API_KEY = key
+    API_URL = url
 
 
 def initialize_config(force=False):
@@ -81,7 +85,7 @@ def initialize_config(force=False):
                 sys.exit(1)
 
             set_api_key_and_url(key, url)
-            print_green(f"Poly setup complete.")
+            print_green("Poly setup complete.")
 
     if not key or not url:
         print_yellow("Poly API Key and Poly API Base URL are required.")
