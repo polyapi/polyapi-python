@@ -246,7 +246,7 @@ def _get_type_schema(json_type: str, python_type: str, schemas: List[Dict]):
                 return schema
 
 
-def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[str, Dict | None]:
+def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[Any, Any, Any]:
     if not expr:
         return "any", "Any", None
     python_type = get_python_type_from_ast(expr)

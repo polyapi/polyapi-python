@@ -206,6 +206,9 @@ def parse_arguments(
         arg_string += (
             f"    {a['name']}: {add_type_import_path(function_name, arg_type)}"
         )
+        if not a["required"]:
+            arg_string += " = None"
+
         description = a.get("description", "")
         description = description.replace("\n", " ")
         if description:
