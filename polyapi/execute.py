@@ -1,3 +1,4 @@
+from typing import Dict
 import requests
 from requests import Response
 from polyapi.config import get_api_key_and_url
@@ -7,10 +8,14 @@ from polyapi.exceptions import PolyApiException
 def execute(function_type, function_id, data) -> Response:
     """ execute a specific function id/type
     """
+    data_without_None = data
+    if isinstance(data, Dict):
+        data_without_None = {k: v for k, v in data.items() if v is not None}
+
     api_key, api_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}
     url = f"{api_url}/functions/{function_type}/{function_id}/execute"
-    resp = requests.post(url, json=data, headers=headers)
+    resp = requests.post(url, json=data_without_None, headers=headers)
     # print(resp.status_code)
     # print(resp.headers["content-type"])
     if resp.status_code < 200 or resp.status_code >= 300:
