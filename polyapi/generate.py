@@ -76,7 +76,7 @@ def resolve_poly_refs(obj, schema_index):
 def replace_poly_refs_in_functions(specs: List[SpecificationDto], schema_index):
     spec_idxs_to_remove = []
     for idx, spec in enumerate(specs):
-        if spec.get("type") in ("apiFunction", "customFunction", "serverFunction"):
+        if spec.get("type") in ("apiFunction", "customFunction", "serverFunction", "schema"):
             func = spec.get("function")
             if func:
                 try:
@@ -85,6 +85,25 @@ def replace_poly_refs_in_functions(specs: List[SpecificationDto], schema_index):
                     # print()
                     # print(f"{spec['context']}.{spec['name']} (id: {spec['id']}) failed to resolve poly refs, skipping!")
                     spec_idxs_to_remove.append(idx)
+
+    # reverse the list so we pop off later indexes first
+    spec_idxs_to_remove.reverse()
+
+    for idx in spec_idxs_to_remove:
+        specs.pop(idx)
+
+    return specs
+
+
+def replace_poly_refs_in_schemas(specs: List[SchemaSpecDto], schema_index):
+    spec_idxs_to_remove = []
+    for idx, spec in enumerate(specs):
+        try:
+            spec["definition"] = resolve_poly_refs(spec["definition"], schema_index)
+        except Exception:
+            # print()
+            print(f"{spec['context']}.{spec['name']} (id: {spec['id']}) failed to resolve poly refs, skipping!")
+            spec_idxs_to_remove.append(idx)
 
     # reverse the list so we pop off later indexes first
     spec_idxs_to_remove.reverse()
@@ -184,10 +203,12 @@ def generate() -> None:
     functions = parse_function_specs(specs, limit_ids=limit_ids)
 
     schemas = get_schemas()
-    if schemas:
-        generate_schemas(schemas)
-
     schema_index = build_schema_index(schemas)
+    if schemas:
+        schema_limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
+        schemas = replace_poly_refs_in_schemas(schemas, schema_index)
+        generate_schemas(schemas, limit_ids=schema_limit_ids)
+
     functions = replace_poly_refs_in_functions(functions, schema_index)
 
     if functions:

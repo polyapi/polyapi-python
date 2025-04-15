@@ -20,9 +20,14 @@ FALLBACK_SPEC_TEMPLATE = """class {name}(TypedDict, total=False):
 """
 
 
-def generate_schemas(specs: List[SchemaSpecDto]):
-    for spec in specs:
-        create_schema(spec)
+def generate_schemas(specs: List[SchemaSpecDto], limit_ids: List[str] = None):
+    if limit_ids:
+        for spec in specs:
+            if spec["id"] in limit_ids:
+                create_schema(spec)
+    else:
+        for spec in specs:
+            create_schema(spec)
 
 
 def add_schema_file(
