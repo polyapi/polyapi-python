@@ -91,6 +91,28 @@ def add_type_import_path(function_name: str, arg: str) -> str:
     return f"{to_func_namespace(function_name)}.{camelCase(arg)}"
 
 
+def _get_type_and_def_schema_array(schema, title: str = "", title_fallback: str = "") -> Tuple[str, str]:
+    if title and schema.get("type") == "array":
+        schema["title"] = title
+        return wrapped_generate_schema_types(schema, title, "Array")
+
+    if schema.get("items"):
+        # fallback to schema $ref name if no explicit title
+        items = schema.get("items")  # type: ignore
+        title = items.get("title")  # type: ignore
+        if not title:
+            # title is actually a reference to another schema
+            title = items.get("$ref", title_fallback)  # type: ignore
+
+        title = title.rsplit("/", 1)[-1]
+        if not title:
+            return "List", ""
+
+        title = f"List[{title}]"
+        return wrapped_generate_schema_types(schema, title, "List")
+    return "", ""
+
+
 def get_type_and_def(
     type_spec: PropertyType, title_fallback: str = ""
 ) -> Tuple[str, str]:
@@ -123,33 +145,31 @@ def get_type_and_def(
         if type_spec.get("schema"):
             schema = type_spec["schema"]
             title = schema.get("title", schema.get("name", title_fallback))
-            if title and schema.get("type") == "array":
-                # TODO fix me
-                # we don't use ReturnType as name for the list type here, we use _ReturnTypeItem
-                return "List", ""
-            elif title:
-                assert isinstance(title, str)
-                return wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
-            elif schema.get("allOf") and len(schema["allOf"]):
-                # we are in a case of a single allOf, lets strip off the allOf and move on!
-                # our library doesn't handle allOf well yet
-                allOf = schema["allOf"][0]
-                title = allOf.get("title", allOf.get("name", title_fallback))
-                return wrapped_generate_schema_types(allOf, title, "Dict")
-            elif schema.get("items"):
-                # fallback to schema $ref name if no explicit title
-                items = schema.get("items")  # type: ignore
-                title = items.get("title")  # type: ignore
-                if not title:
-                    # title is actually a reference to another schema
-                    title = items.get("$ref", title_fallback)  # type: ignore
+            if not schema.get("type"):
+                # if no type is specified, we assume it's an object
+                # you MUST specify type object for jsonschema_gentypes to work correctly
+                # even though technically a schema without type is valid
+                schema["type"] = "object"
 
-                title = title.rsplit("/", 1)[-1]
-                if not title:
-                    return "List", ""
-
-                title = f"List[{title}]"
-                return wrapped_generate_schema_types(schema, title, "List")
+            if schema.get("type") == "object":
+                if schema.get("allOf") and len(schema["allOf"]) == 1:
+                    # we are in a case of a single allOf, lets strip off the allOf and move on!
+                    # our library doesn't handle allOf well yet
+                    allOf = schema["allOf"][0]
+                    if not allOf.get("type"):
+                        # if no type is specified, we assume it's an object
+                        # you MUST specify type object for jsonschema_gentypes to work correctly
+                        # even though technically a schema without type is valid
+                        allOf["type"] = "object"
+                    title = allOf.get("title", allOf.get("name", title_fallback))
+                    return wrapped_generate_schema_types(allOf, title, "Dict")
+                elif title:
+                    assert isinstance(title, str)
+                    return wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
+                else:
+                    return "Any", ""
+            elif schema.get("type") == "array":
+                return _get_type_and_def_schema_array(schema, title, "List")
             else:
                 return "Any", ""
         else:
