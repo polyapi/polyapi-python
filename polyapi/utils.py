@@ -110,7 +110,7 @@ def _get_type_and_def_schema_array(schema, title: str = "", title_fallback: str 
 
         title = f"List[{title}]"
         return wrapped_generate_schema_types(schema, title, "List")
-    return "", ""
+    return "Any", ""
 
 
 def get_type_and_def(

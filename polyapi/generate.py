@@ -21,7 +21,7 @@ SUPPORTED_FUNCTION_TYPES = {
     "authFunction",
     "customFunction",  # client function - this is badly named in /specs atm
     "serverFunction",
-    # "webhookHandle",
+    "webhookHandle",
 }
 
 SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema", "snippet"}
