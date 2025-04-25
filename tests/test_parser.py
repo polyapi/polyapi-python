@@ -193,11 +193,11 @@ class T(unittest.TestCase):
             types["params"][0],
             {"name": "n", "type": "int", "typeSchema": None, "description": ""},
         )
-        self.assertEqual(types["returns"]["type"], "Barbar")
+        self.assertEqual(types["returns"]["type"], "schemas.foo.Barbar")  # will be coerced to jsonschema type by later code
         self.assertEqual(types["returns"]["typeSchema"]["title"], "Barbar")
         self.assertEqual(
             types["returns"]["typeSchema"].get("allOf"),
-            [{"x-poly-ref": {"path": "petStore.Pet"}}],
+            [{"x-poly-ref": {"path": "foo.Barbar"}}],
         )
 
     def test_complex_arg_type(self):

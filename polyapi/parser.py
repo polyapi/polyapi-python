@@ -9,6 +9,7 @@ from typing_extensions import _TypedDictMeta, cast  # type: ignore
 from stdlib_list import stdlib_list
 from pydantic import TypeAdapter
 from importlib.metadata import packages_distributions
+from polyapi import schema
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
 from polyapi.generate import build_poly_schema_index, get_poly_schemas
 from polyapi.utils import print_red
@@ -152,6 +153,10 @@ def get_jsonschema_type(python_type: str):
         # schemas logic will handle deeper object type
         return "object"
 
+    if python_type.startswith("schemas."):
+        # this is a polyapi schema
+        return "object"
+
     rv = PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(python_type)
     if rv:
         return rv
@@ -184,12 +189,27 @@ def get_python_type_from_ast(expr: ast.expr) -> str:
         # this recursively unwraps the structure to like it appears in code: schemas.petStore.Pet
         val = expr.value
         output = get_python_type_from_ast(val)
-        return output + '.' + expr.attr
+        return output + "." + expr.attr
     else:
         return "Any"
 
 
 def _get_type_schema(json_type: str, python_type: str, schemas: Dict[str, Dict]):
+    if python_type.startswith("schemas."):
+        schema_context_name = python_type[8:]
+        title = schema_context_name.rsplit(".", 1)[-1]
+        return {
+            "title": title,
+            "$schema": "http://json-schema.org/draft-06/schema#",
+            "allOf": [
+                {
+                    "x-poly-ref": {
+                        "path": schema_context_name,
+                    }
+                }
+            ],
+        }
+
     if python_type.startswith("List["):
         subtype = python_type[5:-1]
         schema = schemas.get(subtype, "Any")
@@ -238,7 +258,7 @@ def _parse_deploy_comment(comment: str) -> Optional[Deployment]:
 
     # Local development puts canopy on a different port than the poly-server
     if instance.endswith("localhost:3000"):
-        instance = instance.replace(':3000', ':8000')
+        instance = instance.replace(":3000", ":8000")
 
     return {
         "name": name,
@@ -441,7 +461,9 @@ def parse_function_code(  # noqa: C901
                 parsed_params = []
                 # parse params from actual function and merge in any data from the docstring
                 for arg in function_args:
-                    _, python_type, type_schema = _get_type(arg.annotation, schema_index)
+                    _, python_type, type_schema = _get_type(
+                        arg.annotation, schema_index
+                    )
                     json_arg = {
                         "name": arg.arg,
                         "type": python_type,
