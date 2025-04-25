@@ -48,7 +48,7 @@ def get_specs() -> List:
         raise NotImplementedError(resp.content)
 
 
-def build_schema_index(items):
+def build_poly_schema_index(items):
     index = {}
     for item in items:
         if item.get("type") == "schema" and "contextName" in item:
@@ -172,7 +172,7 @@ def get_variables() -> List[VariableSpecDto]:
     return [cast(VariableSpecDto, spec) for spec in specs if spec["type"] == "serverVariable"]
 
 
-def get_schemas() -> List[SchemaSpecDto]:
+def get_poly_schemas() -> List[SchemaSpecDto]:
     specs = read_cached_specs()
     return [cast(SchemaSpecDto, spec) for spec in specs if spec["type"] == "schema"]
 
@@ -202,8 +202,8 @@ def generate() -> None:
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
     functions = parse_function_specs(specs, limit_ids=limit_ids)
 
-    schemas = get_schemas()
-    schema_index = build_schema_index(schemas)
+    schemas = get_poly_schemas()
+    schema_index = build_poly_schema_index(schemas)
     if schemas:
         schema_limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
         schemas = replace_poly_refs_in_schemas(schemas, schema_index)

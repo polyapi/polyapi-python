@@ -10,6 +10,7 @@ from stdlib_list import stdlib_list
 from pydantic import TypeAdapter
 from importlib.metadata import packages_distributions
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
+from polyapi.generate import build_poly_schema_index, get_poly_schemas
 from polyapi.utils import print_red
 from polyapi.deployables import (
     DeployableFunctionTypes,
@@ -106,8 +107,8 @@ def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
     return parsed
 
 
-def _get_schemas(code: str) -> List[Dict]:
-    schemas = []
+def _get_schemas(code: str) -> Dict[str, Dict]:
+    schemas = {}
     user_code = types.SimpleNamespace()
     exec(code, user_code.__dict__)
     for name, obj in user_code.__dict__.items():
@@ -123,7 +124,8 @@ def _get_schemas(code: str) -> List[Dict]:
             and isinstance(obj, _TypedDictMeta)
             and name != "TypedDict"
         ):
-            schemas.append(TypeAdapter(obj).json_schema())
+            schemas[name] = TypeAdapter(obj).json_schema()
+        
     return schemas
 
 
@@ -176,45 +178,36 @@ def get_python_type_from_ast(expr: ast.expr) -> str:
                 return "Dict"
         return "Any"
     elif isinstance(expr, ast.Attribute):
-        return expr.attr
+        # python does a series of attributes from the bottom to the top
+        # e.g. schemas.petStore.Pet becomes:
+        # Pet is an Attribute of petStore which is then an Attribute of schemas which is a Name
+        # this recursively unwraps the structure to like it appears in code: schemas.petStore.Pet
+        val = expr.value
+        output = get_python_type_from_ast(val)
+        return output + '.' + expr.attr
     else:
         return "Any"
 
 
-def _get_type_schema(json_type: str, python_type: str, schemas: List[Dict]):
+def _get_type_schema(json_type: str, python_type: str, schemas: Dict[str, Dict]):
     if python_type.startswith("List["):
         subtype = python_type[5:-1]
-        for schema in schemas:
-            if schema["title"] == subtype:
-                return {"type": "array", "items": schema}
-
-        # subtype somehow not in schema, just call it any
-        return None
+        schema = schemas.get(subtype, "Any")
+        if schema:
+            return {"type": "array", "items": schema}
+        else:
+            return {"type": "array"}
     elif python_type.startswith("Dict"):
         return {"type": "object"}
     else:
-        for schema in schemas:
-            if schema["title"] == json_type:
-                return schema
+        return schemas.get(json_type)
 
 
-def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[Any, Any, Any]:
+def _get_type(expr: ast.expr | None, schemas: Dict[str, Dict]) -> Tuple[Any, Any, Any]:
     if not expr:
         return "any", "Any", None
     python_type = get_python_type_from_ast(expr)
     json_type = get_jsonschema_type(python_type)
-    schemas = [
-        {
-            "title": "Pet",
-            "required": ["id", "name"],
-            "properties": {
-                "id": {"type": "number", "format": "int64"},
-                "name": {"type": "string"},
-                "tag": {"type": "string"},
-            },
-            "$schema": "http://json-schema.org/draft-06/schema#",
-        }
-    ]
     schema = _get_type_schema(json_type, python_type, schemas)
     return json_type, python_type, schema
 
@@ -284,8 +277,11 @@ def _parse_value(value):
 
 def parse_function_code(  # noqa: C901
     code: str, name: Optional[str] = "", context: Optional[str] = ""
-):
+) -> DeployableRecord:
+    poly_schemas = get_poly_schemas()
+    schema_index = build_poly_schema_index(poly_schemas)
     schemas = _get_schemas(code)
+    schema_index.update(schemas)
 
     # the pip name and the import name might be different
     # e.g. kube_hunter is the import name, but the pip name is kube-hunter
@@ -445,7 +441,7 @@ def parse_function_code(  # noqa: C901
                 parsed_params = []
                 # parse params from actual function and merge in any data from the docstring
                 for arg in function_args:
-                    _, python_type, type_schema = _get_type(arg.annotation, schemas)
+                    _, python_type, type_schema = _get_type(arg.annotation, schema_index)
                     json_arg = {
                         "name": arg.arg,
                         "type": python_type,
@@ -477,7 +473,7 @@ def parse_function_code(  # noqa: C901
                 deployable["types"]["params"] = parsed_params
                 if node.returns:
                     _, python_type, return_type_schema = _get_type(
-                        node.returns, schemas
+                        node.returns, schema_index
                     )
                     if deployable["types"]["returns"]["type"] != python_type:
                         deployable["dirty"] = True

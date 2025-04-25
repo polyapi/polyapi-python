@@ -1,6 +1,7 @@
+import ast
 import unittest
 
-from polyapi.parser import parse_function_code
+from polyapi.parser import get_python_type_from_ast, parse_function_code
 
 
 CODE_NO_TYPES = """
@@ -231,7 +232,7 @@ class T(unittest.TestCase):
         self.assertEqual(deployable["types"]["params"][1], {
             "name": "bar",
             "type": "Dict[str, str]",
-            "typeSchema": None,
+            "typeSchema": '{"type": "object"}',
             "description": "Configuration of bars"
         })
         self.assertEqual(deployable["types"]["returns"], {
@@ -264,3 +265,8 @@ class T(unittest.TestCase):
             'name': 'foobar',
             'type': 'server-function'
         })
+
+    def test_get_python_type_from_ast(self):
+        tree = ast.parse("schemas.petStore.Pet")
+        python_type = get_python_type_from_ast(tree.body[0].value)
+        self.assertEqual(python_type, "schemas.petStore.Pet")

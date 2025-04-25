@@ -4,7 +4,7 @@ import requests
 from polyapi.generate import generate as generate_library
 from polyapi.config import get_api_key_and_url
 from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
-from polyapi.parser import parse_function_code, get_jsonschema_type
+from polyapi.parser import parse_function_code
 import importlib
 
 
