@@ -74,40 +74,40 @@ def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
                     "description": [description],
                 }
             elif current_key:
-                params[current_key]["description"].append(line.strip())
+                params[current_key]["description"].append(line.strip())  # type: ignore
 
         elif mode == "returns":
-            if not parsed["returns"]["description"]:
+            if not parsed["returns"]["description"]:  # type: ignore
                 ret_type, _, desc = line.partition(":")
-                parsed["returns"]["type"] = ret_type.strip()
-                parsed["returns"]["description"].append(desc.strip())
+                parsed["returns"]["type"] = ret_type.strip()  # type: ignore
+                parsed["returns"]["description"].append(desc.strip())  # type: ignore
             else:
-                parsed["returns"]["description"].append(line.strip())
+                parsed["returns"]["description"].append(line.strip())  # type: ignore
 
         elif mode == "raises":
             if ":" in line:
                 exc_type, desc = line.split(":", 1)
-                parsed["raises"][exc_type.strip()] = desc.strip()
+                parsed["raises"][exc_type.strip()] = desc.strip()  # type: ignore
             elif current_key:
-                parsed["raises"][current_key] += " " + line.strip()
+                parsed["raises"][current_key] += " " + line.strip()  # type: ignore
 
         elif mode is None:
-            parsed["description"].append(line.strip())
+            parsed["description"].append(line.strip())  # type: ignore
 
     # Consolidate descriptions
     parsed["description"] = " ".join(parsed["description"]).strip()
-    parsed["returns"]["description"] = " ".join(
-        parsed["returns"]["description"]
+    parsed["returns"]["description"] = " ".join(  # type: ignore
+        parsed["returns"]["description"]  # type: ignore
     ).strip()
     parsed["params"] = [
-        {**v, "description": " ".join(v["description"]).strip()}
+        {**v, "description": " ".join(v["description"]).strip()}  # type: ignore
         for v in params.values()
     ]
 
     return parsed
 
 
-def _get_schemas(code: str) -> Dict[str, Dict]:
+def _get_typed_dict_schemas(code: str) -> Dict[str, Dict]:
     schemas = {}
     user_code = types.SimpleNamespace()
     exec(code, user_code.__dict__)
@@ -125,7 +125,7 @@ def _get_schemas(code: str) -> Dict[str, Dict]:
             and name != "TypedDict"
         ):
             schemas[name] = TypeAdapter(obj).json_schema()
-        
+
     return schemas
 
 
@@ -238,12 +238,12 @@ def _parse_deploy_comment(comment: str) -> Optional[Deployment]:
 
     # Local development puts canopy on a different port than the poly-server
     if instance.endswith("localhost:3000"):
-        instance = instance.replace(":3000', ':8000")
+        instance = instance.replace(':3000', ':8000')
 
     return {
         "name": name,
         "context": context,
-        "type": deploy_type,
+        "type": deploy_type,  # type: ignore
         "id": id,
         "deployed": deployed,
         "fileRevision": file_revision,
@@ -280,7 +280,7 @@ def parse_function_code(  # noqa: C901
 ) -> DeployableRecord:
     poly_schemas = get_poly_schemas()
     schema_index = build_poly_schema_index(poly_schemas)
-    schemas = _get_schemas(code)
+    schemas = _get_typed_dict_schemas(code)
     schema_index.update(schemas)
 
     # the pip name and the import name might be different
@@ -470,7 +470,7 @@ def parse_function_code(  # noqa: C901
                         deployable["dirty"] = True
 
                     parsed_params.append(json_arg)
-                deployable["types"]["params"] = parsed_params
+                deployable["types"]["params"] = parsed_params  # type: ignore
                 if node.returns:
                     _, python_type, return_type_schema = _get_type(
                         node.returns, schema_index

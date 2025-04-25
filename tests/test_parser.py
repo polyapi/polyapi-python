@@ -1,5 +1,6 @@
 import ast
 import unittest
+from mock import patch
 
 from polyapi.parser import get_python_type_from_ast, parse_function_code
 
@@ -38,6 +39,16 @@ class Barbar(TypedDict):
 def foobar(n: int) -> List[Barbar]:
     return [Barbar(count=n)]
 """
+
+SCHEMA_RETURN_TYPE = """
+from typing_extensions import TypedDict
+from polyapi import schemas
+
+
+def foobar(n: int) -> schemas.foo.Barbar:
+    return schemas.foo.Barbar()
+"""
+
 
 COMPLEX_ARG_TYPE = """
 from typing_extensions import TypedDict
@@ -112,7 +123,7 @@ def foobar(foo: str, bar: Dict[str, str]) -> int:
     return 7
 '''
 
-GLIDE_DEPLOYMENTS_SERVER_FN = '''
+GLIDE_DEPLOYMENTS_SERVER_FN = """
 # Poly deployed @ 2024-11-12T14:43:22.631113 - testing.foobar - https://na1.polyapi.io/canopy/polyui/collections/server-functions/jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h - 086aedd
 # Poly deployed @ 2024-11-11T14:43:22.631113 - testing.foobar - https://dev.polyapi.io/canopy/polyui/collections/server-functions/jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h - 086aedd
 from typing import Dict
@@ -127,7 +138,7 @@ polyConfig: PolyServerFunction = {
 def foobar(foo: str, bar: Dict[str, str]) -> int:
     print("Okay then!")
     return 7
-'''
+"""
 
 
 class T(unittest.TestCase):
@@ -137,8 +148,14 @@ class T(unittest.TestCase):
         deployable = parse_function_code(CODE_NO_TYPES, "foobar")
         types = deployable["types"]
         self.assertEqual(len(types["params"]), 2)
-        self.assertEqual(types["params"][0], {"name": "a", "type": "Any", "typeSchema": None, "description": ""})
-        self.assertEqual(types["params"][1], {"name": "b", "type": "Any", "typeSchema": None, "description": ""})
+        self.assertEqual(
+            types["params"][0],
+            {"name": "a", "type": "Any", "typeSchema": None, "description": ""},
+        )
+        self.assertEqual(
+            types["params"][1],
+            {"name": "b", "type": "Any", "typeSchema": None, "description": ""},
+        )
         self.assertEqual(types["returns"]["type"], "Any")
         self.assertIsNone(types["returns"]["typeSchema"])
         self.assertEqual(deployable["dependencies"], [])
@@ -147,7 +164,10 @@ class T(unittest.TestCase):
         deployable = parse_function_code(SIMPLE_CODE, "foobar")
         types = deployable["types"]
         self.assertEqual(len(types["params"]), 1)
-        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "typeSchema": None, "description": ""})
+        self.assertEqual(
+            types["params"][0],
+            {"name": "n", "type": "int", "typeSchema": None, "description": ""},
+        )
         self.assertEqual(types["returns"]["type"], "int")
         self.assertIsNone(types["returns"]["typeSchema"])
         self.assertEqual(deployable["dependencies"], [])
@@ -156,9 +176,29 @@ class T(unittest.TestCase):
         deployable = parse_function_code(COMPLEX_RETURN_TYPE, "foobar")
         types = deployable["types"]
         self.assertEqual(len(types["params"]), 1)
-        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "typeSchema": None, "description": ""})
+        self.assertEqual(
+            types["params"][0],
+            {"name": "n", "type": "int", "typeSchema": None, "description": ""},
+        )
         self.assertEqual(types["returns"]["type"], "Barbar")
-        self.assertEqual(types["returns"]["typeSchema"]['title'], "Barbar")
+        self.assertEqual(types["returns"]["typeSchema"]["title"], "Barbar")
+
+    @patch("polyapi.parser._get_typed_dict_schemas")
+    def test_schema_return_type(self, _get_typed_dict_schemas):
+        _get_typed_dict_schemas.return_value = {}
+        deployable = parse_function_code(SCHEMA_RETURN_TYPE, "foobar")
+        types = deployable["types"]
+        self.assertEqual(len(types["params"]), 1)
+        self.assertEqual(
+            types["params"][0],
+            {"name": "n", "type": "int", "typeSchema": None, "description": ""},
+        )
+        self.assertEqual(types["returns"]["type"], "Barbar")
+        self.assertEqual(types["returns"]["typeSchema"]["title"], "Barbar")
+        self.assertEqual(
+            types["returns"]["typeSchema"].get("allOf"),
+            [{"x-poly-ref": {"path": "petStore.Pet"}}],
+        )
 
     def test_complex_arg_type(self):
         deployable = parse_function_code(COMPLEX_ARG_TYPE, "foobar")
@@ -172,9 +212,12 @@ class T(unittest.TestCase):
         deployable = parse_function_code(LIST_COMPLEX_RETURN_TYPE, "foobar")
         types = deployable["types"]
         self.assertEqual(len(types["params"]), 1)
-        self.assertEqual(types["params"][0], {"name": "n", "type": "int", "typeSchema": None, "description": ""})
+        self.assertEqual(
+            types["params"][0],
+            {"name": "n", "type": "int", "typeSchema": None, "description": ""},
+        )
         self.assertEqual(types["returns"]["type"], "List[Barbar]")
-        self.assertEqual(types["returns"]["typeSchema"]["items"]['title'], "Barbar")
+        self.assertEqual(types["returns"]["typeSchema"]["items"]["title"], "Barbar")
 
     def test_parse_import_basic(self):
         code = "import flask\n\n\ndef foobar(n: int) -> int:\n    return 9\n"
@@ -201,45 +244,66 @@ class T(unittest.TestCase):
     def test_parse_glide_server_function_bad_docstring(self):
         code = GLIDE_DOCSTRING_BAD_SERVER_FN
         deployable = parse_function_code(code, "foobar")
-        self.assertEqual(deployable["types"]["description"], "A function that does something really import.")
-        self.assertEqual(deployable["types"]["params"][0], {
-            "name": "foo",
-            "type": "Any",
-            "typeSchema": None,
-            "description": "The foo in question"
-        })
-        self.assertEqual(deployable["types"]["params"][1], {
-            "name": "bar",
-            "type": "Any",
-            "typeSchema": None,
-            "description": "Configuration of bars"
-        })
-        self.assertEqual(deployable["types"]["returns"], {
-            "type": "Any",
-            "description": "import number please keep handy"
-        })
+        self.assertEqual(
+            deployable["types"]["description"],
+            "A function that does something really import.",
+        )
+        self.assertEqual(
+            deployable["types"]["params"][0],
+            {
+                "name": "foo",
+                "type": "Any",
+                "typeSchema": None,
+                "description": "The foo in question",
+            },
+        )
+        self.assertEqual(
+            deployable["types"]["params"][1],
+            {
+                "name": "bar",
+                "type": "Any",
+                "typeSchema": None,
+                "description": "Configuration of bars",
+            },
+        )
+        self.assertEqual(
+            deployable["types"]["returns"],
+            {"type": "Any", "description": "import number please keep handy"},
+        )
 
     def test_parse_glide_server_function_ok_docstring(self):
         code = GLIDE_DOCSTRING_OK_SERVER_FN
         deployable = parse_function_code(code, "foobar")
-        self.assertEqual(deployable["types"]["description"], "A function that does something really import.")
-        self.assertEqual(deployable["types"]["params"][0], {
-            "name": "foo",
-            "type": "str",
-            "typeSchema": None,
-            "description": "The foo in question"
-        })
-        self.assertEqual(deployable["types"]["params"][1], {
-            "name": "bar",
-            "type": "Dict[str, str]",
-            "typeSchema": '{"type": "object"}',
-            "description": "Configuration of bars"
-        })
-        self.assertEqual(deployable["types"]["returns"], {
-            "type": "int",
-            "typeSchema": None,
-            "description": "import number please keep handy"
-        })
+        self.assertEqual(
+            deployable["types"]["description"],
+            "A function that does something really import.",
+        )
+        self.assertEqual(
+            deployable["types"]["params"][0],
+            {
+                "name": "foo",
+                "type": "str",
+                "typeSchema": None,
+                "description": "The foo in question",
+            },
+        )
+        self.assertEqual(
+            deployable["types"]["params"][1],
+            {
+                "name": "bar",
+                "type": "Dict[str, str]",
+                "typeSchema": '{"type": "object"}',
+                "description": "Configuration of bars",
+            },
+        )
+        self.assertEqual(
+            deployable["types"]["returns"],
+            {
+                "type": "int",
+                "typeSchema": None,
+                "description": "import number please keep handy",
+            },
+        )
 
     @unittest.skip("TODO fix test")
     def test_parse_glide_server_function_deploy_receipt(self):
@@ -247,24 +311,30 @@ class T(unittest.TestCase):
         deployable = parse_function_code(code, "foobar")
 
         self.assertEqual(len(deployable["deployments"]), 2)
-        self.assertEqual(deployable["deployments"][0], {
-            'context': 'testing',
-            'deployed': '2024-11-12T14:43:22.631113',
-            'fileRevision': '086aedd',
-            'id': 'jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h',
-            'instance': 'https://na1.polyapi.io',
-            'name': 'foobar',
-            'type': 'server-function'
-        })
-        self.assertEqual(deployable["deployments"][1], {
-            'context': 'testing',
-            'deployed': '2024-11-11T14:43:22.631113',
-            'fileRevision': '086aedd',
-            'id': 'jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h',
-            'instance': 'https://dev.polyapi.io',
-            'name': 'foobar',
-            'type': 'server-function'
-        })
+        self.assertEqual(
+            deployable["deployments"][0],
+            {
+                "context": "testing",
+                "deployed": "2024-11-12T14:43:22.631113",
+                "fileRevision": "086aedd",
+                "id": "jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h",
+                "instance": "https://na1.polyapi.io",
+                "name": "foobar",
+                "type": "server-function",
+            },
+        )
+        self.assertEqual(
+            deployable["deployments"][1],
+            {
+                "context": "testing",
+                "deployed": "2024-11-11T14:43:22.631113",
+                "fileRevision": "086aedd",
+                "id": "jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h",
+                "instance": "https://dev.polyapi.io",
+                "name": "foobar",
+                "type": "server-function",
+            },
+        )
 
     def test_get_python_type_from_ast(self):
         tree = ast.parse("schemas.petStore.Pet")
