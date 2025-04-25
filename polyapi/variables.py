@@ -11,7 +11,7 @@ GET_TEMPLATE = """
     @staticmethod
     def get() -> {variable_type}:
         resp = variable_get("{variable_id}")
-        return resp.text
+        return {variable_return}
 """
 
 
@@ -80,7 +80,9 @@ def render_variable(variable: VariableSpecDto):
         ""
         if variable["variable"]["secret"]
         else GET_TEMPLATE.format(
-            variable_id=variable["id"], variable_type=variable_type
+            variable_id=variable["id"],
+            variable_type=variable_type,
+            variable_return="resp.text" if variable_type == "str" else "resp.json()",
         )
     )
     return TEMPLATE.format(

@@ -21,7 +21,7 @@ SUPPORTED_FUNCTION_TYPES = {
     "authFunction",
     "customFunction",  # client function - this is badly named in /specs atm
     "serverFunction",
-    "webhookHandle",
+    # "webhookHandle",
 }
 
 SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema", "snippet"}
@@ -200,7 +200,6 @@ def generate() -> None:
     cache_specs(specs)
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
-    limit_ids: List[str] = ["1e47487a-6027-486f-9c70-a4b14934b605"]  # useful for narrowing down generation to a single function to debug
     functions = parse_function_specs(specs, limit_ids=limit_ids)
 
     schemas = get_poly_schemas()
