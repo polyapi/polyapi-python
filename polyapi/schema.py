@@ -11,6 +11,7 @@ import tempfile
 import json
 
 import referencing.exceptions
+import referencing.jsonschema
 
 from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 
@@ -63,7 +64,12 @@ def wrapped_generate_schema_types(type_spec: dict, root, fallback_type):
         # we couldn't match the right $ref earlier in resolve_poly_refs
         # {'$ref': '#/definitions/FinanceAccountListModel'}
         return fallback_type, ""
-    except:
+    except referencing.jsonschema.UnknownDialect:
+        # someone probably fat fingered the jsonschema dialect
+        # just go with the fallback type here
+        return fallback_type, ""
+    except Exception as e:
+        assert isinstance(e, Exception)  # dummy assert to satisfy linter and enable easy debugging
         logging.error(f"Error when generating schema type: {type_spec}\nusing fallback type '{fallback_type}'")
         return fallback_type, ""
 
