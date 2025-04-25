@@ -4,7 +4,7 @@ import requests
 from polyapi.generate import generate as generate_library
 from polyapi.config import get_api_key_and_url
 from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
-from polyapi.parser import parse_function_code
+from polyapi.parser import get_jsonschema_type, parse_function_code
 import importlib
 
 
@@ -54,8 +54,8 @@ def function_add_or_update(
         "description": description or parsed["types"]["description"],
         "code": code,
         "language": "python",
-        "returnType": parsed["types"]["returns"]["type"],
-        "arguments": parsed["types"]["params"],
+        "returnType": get_jsonschema_type(return_type),
+        "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])} for p in parsed["types"]["params"]],
         "logsEnabled": logs_enabled,
     }
     if parsed["types"]["returns"]["typeSchema"]:
