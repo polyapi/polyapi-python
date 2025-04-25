@@ -59,7 +59,7 @@ LIST_RECOMMENDATIONS = {
         },
         "synchronous": False,
     },
-    "sourceCode": '',
+    "sourceCode": "",
     "language": "javascript",
     "state": "ALPHA",
     "visibilityMetadata": {"visibility": "ENVIRONMENT"},
@@ -109,6 +109,28 @@ class T(unittest.TestCase):
         )
         self.assertIn(LIST_RECOMMENDATIONS["id"], func_str)
         self.assertIn("-> List", func_str)
+
+    def test_simple_render_server_function(self):
+        func_str, func_type_defs = render_server_function(
+            "serverFunction",
+            "stest1",
+            "1234-5678-90ab-cdef",
+            "",
+            [{
+                "name": "petId",
+                "description": "",
+                "required": True,
+                "type": {"kind": "plain", "value": "integer"},
+            }],
+            {
+                "kind": "plain",
+                "value": "string"
+            },
+        )
+        self.assertIn("stest1", func_str)
+        self.assertIn("-> str", func_str)
+        self.assertIn("petId: int", func_str)
+
 
 #         expected_return_type = '''class ReturnType(TypedDict, total=False):
 # id: Required[str]

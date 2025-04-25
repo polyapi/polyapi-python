@@ -5,13 +5,20 @@ import sys
 import re
 from typing import Dict, List, Mapping, Optional, Tuple, Any
 from typing import _TypedDictMeta as BaseTypedDict  # type: ignore
-from typing_extensions import _TypedDictMeta, cast # type: ignore
+from typing_extensions import _TypedDictMeta, cast  # type: ignore
 from stdlib_list import stdlib_list
 from pydantic import TypeAdapter
 from importlib.metadata import packages_distributions
+from polyapi import schema
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
+from polyapi.generate import build_poly_schema_index, get_poly_schemas
 from polyapi.utils import print_red
-from polyapi.deployables import Deployment, DeployableRecord, get_deployable_file_revision
+from polyapi.deployables import (
+    DeployableFunctionTypes,
+    Deployment,
+    DeployableRecord,
+    get_deployable_file_revision,
+)
 
 
 # these libraries are already installed in the base docker image
@@ -30,90 +37,23 @@ BASE_REQUIREMENTS.update(
 )  # dont need to pip install stuff in the python standard library
 
 
-def _parse_sphinx_docstring(docstring: str) -> Dict[str, Any]:
-    """
-    Parses a Sphinx-style docstring to extract parameters, return values, and descriptions.
-
-    :param docstring: Docstring content in reST format.
-    :type docstring: str
-    :return: A dictionary with descriptions, parameters, and return values.
-    :rtype: Dict[str, Any]
-    """
-    lines = docstring.split('\n')
-    description = []
-    params = {}
-    returns = {
-        "description": "",
-        "type": "Any"
-    }
-    current_section = None
-
-    for line in lines:
-        stripped_line = line.strip()
-        if stripped_line.startswith(":param "):
-            # Example line: :param x: This is x
-            param_name, _, param_desc = stripped_line[7:].partition(":")
-            param_name = param_name.strip()
-            if param_name in params:
-                params[param_name]["description"] = param_desc.strip()
-            else:
-                params[param_name] = { "name": param_name, "type": "", "description": param_desc.strip() }
-            current_section = param_name
-
-        elif stripped_line.startswith(":type "):
-            # Example line: :type x: int
-            param_name, _, param_type = stripped_line[6:].partition(":")
-            param_name = param_name.strip()
-            if param_name in params:
-                params[param_name]["type"] = param_type.strip()
-            else:
-                params[param_name] = { "name": param_name, "type": param_type.strip(), "description": "" }
-
-        elif stripped_line.startswith(":returns: "):
-            # Example line: :returns: This returns x
-            return_desc = stripped_line[10:].strip()
-            returns["description"] = return_desc
-            current_section = "returns"
-
-        elif stripped_line.startswith(":rtype: "):
-            # Example line: :rtype: int
-            return_type = stripped_line[8:].strip()
-            returns["type"] = return_type
-
-        elif current_section and not stripped_line.startswith(":"):
-            # Append continued description lines to the last param or return section
-            if current_section == "returns":
-                returns["description"] += ' ' + stripped_line
-            else:
-                params[current_section]["description"] += " " + stripped_line
-
-        elif not stripped_line.startswith(":"):
-            # Normal description line
-            description.append(stripped_line)
-
-    return {
-        "description": '\n'.join(description).strip(),
-        "params": list(params.values()),
-        "returns": returns
-    }
-
-
 def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
     import re
-    lines = docstring.split('\n')
+
+    lines = docstring.split("\n")
     mode = None
     params = {}
     parsed = {
-        'description': [],
-        'params': [],
-        'returns': {'description': []},
-        'raises': {}
+        "description": [],
+        "params": [],
+        "returns": {"description": []},
+        "raises": {},
     }
     current_key = None
 
     # Regex to capture the parts of the parameter and the start of type/exception sections
-    arg_pattern = re.compile(r'^\s*(\w+)\s*(\(.*?\))?:(.*)')
-    section_pattern = re.compile(r'^\s*(Args|Returns|Raises):')
+    arg_pattern = re.compile(r"^\s*(\w+)\s*(\(.*?\))?:(.*)")
+    section_pattern = re.compile(r"^\s*(Args|Returns|Raises):")
 
     for line in lines:
         line = line.rstrip()
@@ -123,44 +63,53 @@ def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
             mode = section_match.group(1).lower()
             continue
 
-        if mode == 'args':
+        if mode == "args":
             arg_match = arg_pattern.match(line)
             if arg_match:
                 current_key = arg_match.group(1)
-                type_desc = arg_match.group(2) if arg_match.group(2) else ''
+                type_desc = arg_match.group(2) if arg_match.group(2) else ""
                 description = arg_match.group(3).strip()
-                params[current_key] = {'name': current_key, 'type': type_desc.strip('() '), 'description': [description]}
+                params[current_key] = {
+                    "name": current_key,
+                    "type": type_desc.strip("() "),
+                    "description": [description],
+                }
             elif current_key:
-                params[current_key]['description'].append(line.strip())
+                params[current_key]["description"].append(line.strip())  # type: ignore
 
-        elif mode == 'returns':
-            if not parsed['returns']['description']:
-                ret_type, _, desc = line.partition(':')
-                parsed['returns']['type'] = ret_type.strip()
-                parsed['returns']['description'].append(desc.strip())
+        elif mode == "returns":
+            if not parsed["returns"]["description"]:  # type: ignore
+                ret_type, _, desc = line.partition(":")
+                parsed["returns"]["type"] = ret_type.strip()  # type: ignore
+                parsed["returns"]["description"].append(desc.strip())  # type: ignore
             else:
-                parsed['returns']['description'].append(line.strip())
+                parsed["returns"]["description"].append(line.strip())  # type: ignore
 
-        elif mode == 'raises':
-            if ':' in line:
-                exc_type, desc = line.split(':', 1)
-                parsed['raises'][exc_type.strip()] = desc.strip()
+        elif mode == "raises":
+            if ":" in line:
+                exc_type, desc = line.split(":", 1)
+                parsed["raises"][exc_type.strip()] = desc.strip()  # type: ignore
             elif current_key:
-                parsed['raises'][current_key] += ' ' + line.strip()
+                parsed["raises"][current_key] += " " + line.strip()  # type: ignore
 
         elif mode is None:
-            parsed['description'].append(line.strip())
+            parsed["description"].append(line.strip())  # type: ignore
 
     # Consolidate descriptions
-    parsed['description'] = ' '.join(parsed['description']).strip()
-    parsed['returns']['description'] = ' '.join(parsed['returns']['description']).strip()
-    parsed['params'] = [{ **v, 'description': ' '.join(v['description']).strip() } for v in params.values()]
+    parsed["description"] = " ".join(parsed["description"]).strip()
+    parsed["returns"]["description"] = " ".join(  # type: ignore
+        parsed["returns"]["description"]  # type: ignore
+    ).strip()
+    parsed["params"] = [
+        {**v, "description": " ".join(v["description"]).strip()}  # type: ignore
+        for v in params.values()
+    ]
 
     return parsed
 
 
-def _get_schemas(code: str) -> List[Dict]:
-    schemas = []
+def _get_typed_dict_schemas(code: str) -> Dict[str, Dict]:
+    schemas = {}
     user_code = types.SimpleNamespace()
     exec(code, user_code.__dict__)
     for name, obj in user_code.__dict__.items():
@@ -176,7 +125,8 @@ def _get_schemas(code: str) -> List[Dict]:
             and isinstance(obj, _TypedDictMeta)
             and name != "TypedDict"
         ):
-            schemas.append(TypeAdapter(obj).json_schema())
+            schemas[name] = TypeAdapter(obj).json_schema()
+
     return schemas
 
 
@@ -200,6 +150,11 @@ def get_jsonschema_type(python_type: str):
             return "object"
 
     if python_type.startswith("Dict"):
+        # schemas logic will handle deeper object type
+        return "object"
+
+    if python_type.startswith("schemas."):
+        # this is a polyapi schema
         return "object"
 
     rv = PYTHON_TO_JSONSCHEMA_TYPE_MAP.get(python_type)
@@ -227,32 +182,54 @@ def get_python_type_from_ast(expr: ast.expr) -> str:
             else:
                 return "Dict"
         return "Any"
+    elif isinstance(expr, ast.Attribute):
+        # python does a series of attributes from the bottom to the top
+        # e.g. schemas.petStore.Pet becomes:
+        # Pet is an Attribute of petStore which is then an Attribute of schemas which is a Name
+        # this recursively unwraps the structure to like it appears in code: schemas.petStore.Pet
+        val = expr.value
+        output = get_python_type_from_ast(val)
+        return output + "." + expr.attr
     else:
         return "Any"
 
 
-def _get_type_schema(json_type: str, python_type: str, schemas: List[Dict]):
+def _get_type_schema(json_type: str, python_type: str, schemas: Dict[str, Dict]):
+    if python_type.startswith("schemas."):
+        schema_context_name = python_type[8:]
+        title = schema_context_name.rsplit(".", 1)[-1]
+        return {
+            "title": title,
+            "$schema": "http://json-schema.org/draft-06/schema#",
+            "allOf": [
+                {
+                    "x-poly-ref": {
+                        "path": schema_context_name,
+                    }
+                }
+            ],
+        }
+
     if python_type.startswith("List["):
         subtype = python_type[5:-1]
-        for schema in schemas:
-            if schema["title"] == subtype:
-                return {"type": "array", "items": schema}
-
-        # subtype somehow not in schema, just call it any
-        return None
+        schema = schemas.get(subtype, "Any")
+        if schema:
+            return {"type": "array", "items": schema}
+        else:
+            return {"type": "array"}
+    elif python_type.startswith("Dict"):
+        return {"type": "object"}
     else:
-        for schema in schemas:
-            if schema["title"] == json_type:
-                return schema
+        return schemas.get(json_type)
 
 
-def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[Any, Any, Any]:
+def _get_type(expr: ast.expr | None, schemas: Dict[str, Dict]) -> Tuple[Any, Any, Any]:
     if not expr:
         return "any", "Any", None
     python_type = get_python_type_from_ast(expr)
     json_type = get_jsonschema_type(python_type)
-    return json_type, python_type, _get_type_schema(json_type, python_type, schemas)
-
+    schema = _get_type_schema(json_type, python_type, schemas)
+    return json_type, python_type, schema
 
 
 def _get_req_name_if_not_in_base(
@@ -281,16 +258,16 @@ def _parse_deploy_comment(comment: str) -> Optional[Deployment]:
 
     # Local development puts canopy on a different port than the poly-server
     if instance.endswith("localhost:3000"):
-        instance = instance.replace(":3000', ':8000")
+        instance = instance.replace(":3000", ":8000")
 
     return {
         "name": name,
         "context": context,
-        "type": deploy_type,
+        "type": deploy_type,  # type: ignore
         "id": id,
         "deployed": deployed,
         "fileRevision": file_revision,
-        "instance": instance
+        "instance": instance,
     }
 
 
@@ -318,8 +295,13 @@ def _parse_value(value):
         return None
 
 
-def parse_function_code(code: str, name: Optional[str] = "", context: Optional[str] = ""):  # noqa: C901
-    schemas = _get_schemas(code)
+def parse_function_code(  # noqa: C901
+    code: str, name: Optional[str] = "", context: Optional[str] = ""
+) -> DeployableRecord:
+    poly_schemas = get_poly_schemas()
+    schema_index = build_poly_schema_index(poly_schemas)
+    schemas = _get_typed_dict_schemas(code)
+    schema_index.update(schemas)
 
     # the pip name and the import name might be different
     # e.g. kube_hunter is the import name, but the pip name is kube-hunter
@@ -341,11 +323,11 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 "type": "",
                 "typeSchema": None,
                 "description": "",
-            }
+            },
         },
         "typeSchemas": {},
         "dependencies": [],
-        "deployments" : [],
+        "deployments": [],
         "deploymentCommentRanges": [],
         "docStartIndex": -1,
         "docEndIndex": -1,
@@ -359,12 +341,14 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
 
         def __init__(self):
             self._name = name
-            self._lines = code.splitlines(keepends=True)  # Keep line endings to maintain accurate indexing
+            self._lines = code.splitlines(
+                keepends=True
+            )  # Keep line endings to maintain accurate indexing
             self._current_offset = 0
             self._line_offsets = [0]
             for i in range(1, len(self._lines)):
                 self._line_offsets.append(
-                    self._line_offsets[i-1] + len(self._lines[i-1])
+                    self._line_offsets[i - 1] + len(self._lines[i - 1])
                 )
 
             self._extract_deploy_comments()
@@ -374,9 +358,9 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             self.generic_visit(node)  # Continue to visit children first
 
             if (
-                isinstance(node.target, ast.Name) and
-                node.target.id == "polyConfig" and
-                isinstance(node.annotation, ast.Name)
+                isinstance(node.target, ast.Name)
+                and node.target.id == "polyConfig"
+                and isinstance(node.annotation, ast.Name)
             ):
                 # We've found a polyConfig dictionary assignment
                 if node.annotation.id == "PolyServerFunction":
@@ -402,7 +386,11 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             finally:
                 # Handle case where there is no doc string
                 # Also handle case where docstring exists but is empty
-                if type(docstring) is None or (not docstring and '"""' not in self._lines[start_lineno] and "'''" not in self._lines[start_lineno]):
+                if type(docstring) is None or (
+                    not docstring
+                    and '"""' not in self._lines[start_lineno]
+                    and "'''" not in self._lines[start_lineno]
+                ):
                     return None
 
             docstring = cast(str, docstring)
@@ -431,8 +419,10 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             deployable["docEndIndex"] = end_offset
 
             # Check if the docstring is likely to be Google Docstring format https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
-            if 'Args:' in docstring or 'Returns:' in docstring:
-                deployable["types"] = _parse_google_docstring(docstring)
+            if "Args:" in docstring or "Returns:" in docstring:
+                deployable["types"] = cast(
+                    DeployableFunctionTypes, _parse_google_docstring(docstring)
+                )
             else:
                 deployable["types"]["description"] = docstring.strip()
 
@@ -445,7 +435,9 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 if deployment:
                     start = self._line_offsets[i]
                     deployable["deployments"].append(deployment)
-                    deployable["deploymentCommentRanges"].append([start, start + len(line)])
+                    deployable["deploymentCommentRanges"].append(
+                        [start, start + len(line)]
+                    )
 
         def visit_Import(self, node: ast.Import):
             # TODO maybe handle `import foo.bar` case?
@@ -469,19 +461,29 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 parsed_params = []
                 # parse params from actual function and merge in any data from the docstring
                 for arg in function_args:
-                    _, python_type, type_schema = _get_type(arg.annotation, schemas)
+                    _, python_type, type_schema = _get_type(
+                        arg.annotation, schema_index
+                    )
                     json_arg = {
                         "name": arg.arg,
                         "type": python_type,
                         "description": "",
                     }
-                    json_arg["typeSchema"] = json.dumps(type_schema) if type_schema else None
+                    json_arg["typeSchema"] = (
+                        json.dumps(type_schema) if type_schema else None
+                    )
 
                     if docstring_params:
                         try:
-                            type_index = next(i for i, d in enumerate(docstring_params) if d["name"] == arg.arg)
+                            type_index = next(
+                                i
+                                for i, d in enumerate(docstring_params)
+                                if d["name"] == arg.arg
+                            )
                             if type_index >= 0:
-                                json_arg["description"] = docstring_params[type_index]["description"]
+                                json_arg["description"] = docstring_params[type_index][
+                                    "description"
+                                ]
                                 if docstring_params[type_index]["type"] != python_type:
                                     deployable["dirty"] = True
                         except:
@@ -490,9 +492,11 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                         deployable["dirty"] = True
 
                     parsed_params.append(json_arg)
-                deployable["types"]["params"] = parsed_params
+                deployable["types"]["params"] = parsed_params  # type: ignore
                 if node.returns:
-                    _, python_type, return_type_schema = _get_type(node.returns, schemas)
+                    _, python_type, return_type_schema = _get_type(
+                        node.returns, schema_index
+                    )
                     if deployable["types"]["returns"]["type"] != python_type:
                         deployable["dirty"] = True
                     deployable["types"]["returns"]["type"] = python_type
@@ -501,8 +505,10 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                     deployable["types"]["returns"]["type"] = "Any"
 
         def generic_visit(self, node):
-            if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
-                self._current_offset = self._line_offsets[node.lineno - 1] + node.col_offset
+            if hasattr(node, "lineno") and hasattr(node, "col_offset"):
+                self._current_offset = (
+                    self._line_offsets[node.lineno - 1] + node.col_offset
+                )
             super().generic_visit(node)
 
     tree = ast.parse(code)
@@ -522,4 +528,3 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
     deployable["fileRevision"] = get_deployable_file_revision(code)
 
     return deployable
-

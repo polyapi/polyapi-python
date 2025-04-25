@@ -4,7 +4,7 @@ import requests
 from polyapi.generate import generate as generate_library
 from polyapi.config import get_api_key_and_url
 from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
-from polyapi.parser import parse_function_code, get_jsonschema_type
+from polyapi.parser import get_jsonschema_type, parse_function_code
 import importlib
 
 
@@ -58,6 +58,8 @@ def function_add_or_update(
         "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])} for p in parsed["types"]["params"]],
         "logsEnabled": logs_enabled,
     }
+    if parsed["types"]["returns"]["typeSchema"]:
+        data["returnTypeSchema"] = parsed["types"]["returns"]["typeSchema"]
 
     if server and parsed["dependencies"]:
         print_yellow(

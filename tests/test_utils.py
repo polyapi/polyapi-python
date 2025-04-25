@@ -73,6 +73,69 @@ OPENAPI_FUNCTION = {
 }
 
 
+SCHEMA_OOB_TYPE_SPEC = {
+    "kind": "object",
+    "schema": {
+        "$schema": "http://json-schema.org/draft-06/schema#",
+        "allOf": [
+            {
+                "x-poly-ref": {
+                    "path": "mews.CustomerSearchResult",
+                    "publicNamespace": "OOB",
+                }
+            }
+        ],
+    },
+}
+
+
+ALLOF_TYPE_SPEC = {
+    "kind": "object",
+    "schema": {
+        "title": "Pet",
+        "$schema": "http://json-schema.org/draft-06/schema#",
+        "allOf": [
+            {
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "number", "format": "int64"},
+                    "name": {"type": "string"},
+                    "tag": {"type": "string"},
+                },
+                "$schema": "http://json-schema.org/draft-06/schema#",
+                "name": "Pet",
+            }
+        ],
+    },
+}
+
+OBJECT_TYPE_SPEC = {
+    "kind": "object",
+    "schema": {
+        "title": "Pet",
+        "$schema": "http://json-schema.org/draft-06/schema#",
+        "required": ["id", "name"],
+        "properties": {
+            "id": {"type": "number", "format": "int64"},
+            "name": {"type": "string"},
+            "tag": {"type": "string"},
+        }
+    },
+}
+
+ARRAY_TYPE_SPEC = {
+    "kind": "object",
+    "schema": {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {"id": {"type": "string"}, "stay_date": {"type": "string"}},
+            "required": ["id", "stay_date"],
+        },
+    },
+}
+
+
 class T(unittest.TestCase):
     def test_get_type_and_def(self):
         arg_type, arg_def = get_type_and_def(OPENAPI_FUNCTION)
@@ -80,6 +143,22 @@ class T(unittest.TestCase):
             arg_type,
             "Callable[[List[WebhookEventTypeElement], Dict, Dict, Dict], None]",
         )
+
+    def test_get_type_and_def_array(self):
+        arg_type, arg_def = get_type_and_def(ARRAY_TYPE_SPEC, "ResponseType")
+        self.assertEqual(arg_type, "ResponseType")
+        self.assertIn('ResponseType = List["_ResponseTypeitem"]', arg_def)
+
+    def test_get_type_and_def_object(self):
+        arg_type, arg_def = get_type_and_def(OBJECT_TYPE_SPEC)
+        self.assertEqual(arg_type, "Pet")
+        self.assertIn('class Pet(', arg_def)
+
+    def test_get_type_and_def_allof(self):
+        arg_type, arg_def = get_type_and_def(ALLOF_TYPE_SPEC)
+        self.assertEqual(arg_type, "Pet")
+        self.assertNotEqual(arg_def, "")
+        self.assertIn('class Pet(', arg_def)
 
     def test_rewrite_reserved(self):
         rv = rewrite_reserved("from")

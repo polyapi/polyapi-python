@@ -6,9 +6,9 @@ from polyapi.utils import add_import_to_init, init_the_init, to_func_namespace
 
 from .typedefs import SchemaSpecDto
 
-SCHEMA_CODE_IMPORTS = """from typing_extensions import TypedDict, NotRequired
+SCHEMA_CODE_IMPORTS = """from typing_extensions import TypedDict, NotRequired, List, Any
 
-__all__ = []
+__all__: List[Any] = []
 
 
 """
