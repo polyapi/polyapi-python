@@ -36,12 +36,13 @@ Unresolved schema, please add the following schema to complete it:
   path:'''
 
 
-def get_specs() -> List:
+def get_specs(no_types: bool = False) -> List:
     api_key, api_url = get_api_key_and_url()
     assert api_key
     headers = get_auth_headers(api_key)
     url = f"{api_url}/specs"
-    resp = requests.get(url, headers=headers)
+    params = {"noTypes": str(no_types).lower()}
+    resp = requests.get(url, headers=headers, params=params)
     if resp.status_code == 200:
         return resp.json()
     else:
@@ -192,11 +193,11 @@ def remove_old_library():
         shutil.rmtree(path)
 
 
-def generate() -> None:
+def generate(no_types: bool = False) -> None:
     print("Generating Poly Python SDK...", end="", flush=True)
     remove_old_library()
 
-    specs = get_specs()
+    specs = get_specs(no_types=no_types)
     cache_specs(specs)
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug

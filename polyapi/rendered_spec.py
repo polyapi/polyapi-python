@@ -35,11 +35,12 @@ def update_rendered_spec(spec: SpecificationDto):
     assert resp.status_code == 201, (resp.text, resp.status_code)
 
 
-def _get_spec(spec_id: str) -> Optional[SpecificationDto]:
+def _get_spec(spec_id: str, no_types: bool = False) -> Optional[SpecificationDto]:
     api_key, base_url = get_api_key_and_url()
     url = f"{base_url}/specs"
     headers = {"Authorization": f"Bearer {api_key}"}
-    resp = requests.get(url, headers=headers)
+    params = {"noTypes": str(no_types).lower()}
+    resp = requests.get(url, headers=headers, params=params)
     if resp.status_code == 200:
         specs = resp.json()
         for spec in specs:
