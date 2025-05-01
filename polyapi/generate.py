@@ -136,6 +136,10 @@ def parse_function_specs(
             # poly libraries only support client functions of same language
             continue
 
+        # Functions with serverSideAsync True will always return a Dict with execution ID
+        if spec.get('serverSideAsync'):
+            spec['function']['returnType'] = {'kind': 'plain', 'value': 'object'}
+
         functions.append(spec)
 
     return functions
