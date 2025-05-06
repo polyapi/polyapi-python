@@ -31,6 +31,40 @@ GET_PRODUCTS_COUNT = {
     "visibilityMetadata": {"visibility": "ENVIRONMENT"},
 }
 
+LIST_RECOMMENDATIONS = {
+    "id": "1234-5678-90ab-cdef",
+    "type": "serverFunction",
+    "context": "foo",
+    "name": "listRecommendations",
+    "contextName": "foo.listRecommendations",
+    "description": "",
+    "requirements": [],
+    "serverSideAsync": False,
+    "function": {
+        "arguments": [],
+        "returnType": {
+            "kind": "object",
+            "schema": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "stay_date": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                    "required": ["id", "stay_date"],
+                },
+            },
+        },
+        "synchronous": False,
+    },
+    "sourceCode": '',
+    "language": "javascript",
+    "state": "ALPHA",
+    "visibilityMetadata": {"visibility": "ENVIRONMENT"},
+}
+
 
 class T(unittest.TestCase):
     def test_render_function_twilio_server(self):
@@ -62,3 +96,24 @@ class T(unittest.TestCase):
         self.assertIn(GET_PRODUCTS_COUNT["id"], func_str)
         self.assertIn("products: List[str]", func_str)
         self.assertIn("-> float", func_str)
+
+    def test_render_function_list_recommendations(self):
+        return_type = LIST_RECOMMENDATIONS["function"]["returnType"]
+        func_str, func_type_defs = render_server_function(
+            LIST_RECOMMENDATIONS["type"],
+            LIST_RECOMMENDATIONS["name"],
+            LIST_RECOMMENDATIONS["id"],
+            LIST_RECOMMENDATIONS["description"],
+            LIST_RECOMMENDATIONS["function"]["arguments"],
+            return_type,
+        )
+        self.assertIn(LIST_RECOMMENDATIONS["id"], func_str)
+        self.assertIn("-> List", func_str)
+
+#         expected_return_type = '''class ReturnType(TypedDict, total=False):
+# id: Required[str]
+# """ Required property """
+
+# stay_date: Required[str]
+# """ Required property """'''
+#         self.assertIn(expected_return_type, func_str)

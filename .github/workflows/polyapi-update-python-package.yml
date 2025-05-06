@@ -1,4 +1,4 @@
-name: Update python pip package 
+name: Update python pip package
 on:
   push:
     paths:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/develop' }}
     environment: dev
-    
+
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -31,7 +31,7 @@ jobs:
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
     - name: Store the distribution packages
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
@@ -44,27 +44,27 @@ jobs:
     needs: develop-build
     environment:
       name: dev
-      url: https://pypi.org/p/polyapi-python 
+      url: https://pypi.org/p/polyapi-python
 
     permissions:
-      id-token: write 
+      id-token: write
     steps:
 
     - name: Download all the dists
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
     - name: Publish distribution 📦 to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
 
-          
+
   main-build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' }}
     environment: main
-    
+
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -81,7 +81,7 @@ jobs:
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
     - name: Store the distribution packages
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
@@ -90,20 +90,20 @@ jobs:
   main-publish-to-pypi:
     name: >-
       Publish Python 🐍 distribution 📦 to PyPI
-    if: ${{ github.ref == 'refs/heads/main' }} 
+    if: ${{ github.ref == 'refs/heads/main' }}
     needs:
     - main-build
     runs-on: ubuntu-latest
     environment:
       name: main
-      url: https://pypi.org/p/polyapi-python 
+      url: https://pypi.org/p/polyapi-python
     permissions:
-      id-token: write 
+      id-token: write
 
 
     steps:
     - name: Download all the dists
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/

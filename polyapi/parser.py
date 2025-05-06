@@ -5,7 +5,7 @@ import sys
 import re
 from typing import Dict, List, Mapping, Optional, Tuple, Any
 from typing import _TypedDictMeta as BaseTypedDict  # type: ignore
-from typing_extensions import _TypedDictMeta  # type: ignore
+from typing_extensions import _TypedDictMeta, cast # type: ignore
 from stdlib_list import stdlib_list
 from pydantic import TypeAdapter
 from importlib.metadata import packages_distributions
@@ -158,6 +158,7 @@ def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
 
     return parsed
 
+
 def _get_schemas(code: str) -> List[Dict]:
     schemas = []
     user_code = types.SimpleNamespace()
@@ -245,7 +246,7 @@ def _get_type_schema(json_type: str, python_type: str, schemas: List[Dict]):
                 return schema
 
 
-def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[str, Dict | None]:
+def _get_type(expr: ast.expr | None, schemas: List[Dict]) -> Tuple[Any, Any, Any]:
     if not expr:
         return "any", "Any", None
     python_type = get_python_type_from_ast(expr)
@@ -317,7 +318,7 @@ def _parse_value(value):
         return None
 
 
-def parse_function_code(code: str, name: Optional[str] = "", context: Optional[str] = ""):
+def parse_function_code(code: str, name: Optional[str] = "", context: Optional[str] = ""):  # noqa: C901
     schemas = _get_schemas(code)
 
     # the pip name and the import name might be different
@@ -325,9 +326,9 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
     # see https://stackoverflow.com/a/75144378
     pip_name_lookup = packages_distributions()
 
-    deployable: DeployableRecord = {
-        "context": context,
-        "name": name,
+    deployable: DeployableRecord = {  # type: ignore
+        "context": context,  # type: ignore
+        "name": name,  # type: ignore
         "description": "",
         "config": {},
         "gitRevision": "",
@@ -381,7 +382,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 if node.annotation.id == "PolyServerFunction":
                     deployable["type"] = "server-function"
                 elif node.annotation.id == "PolyClientFunction":
-                    deployable["type"] = "server-function"
+                    deployable["type"] = "client-function"
                 else:
                     print_red("ERROR")
                     print(f"Unsupported polyConfig type '${node.annotation.id}'")
@@ -404,6 +405,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 if type(docstring) is None or (not docstring and '"""' not in self._lines[start_lineno] and "'''" not in self._lines[start_lineno]):
                     return None
 
+            docstring = cast(str, docstring)
 
             # Support both types of triple quotation marks
             pattern = '"""'

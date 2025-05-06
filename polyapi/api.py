@@ -8,6 +8,7 @@ API_DEFS_TEMPLATE = """
 from typing import List, Dict, Any, TypedDict
 {args_def}
 {return_type_def}
+
 class {api_response_type}(TypedDict):
     status: int
     headers: Dict
@@ -41,6 +42,7 @@ def render_api_function(
     arg_names = [a["name"] for a in arguments]
     args, args_def = parse_arguments(function_name, arguments)
     return_type_name, return_type_def = get_type_and_def(return_type)  # type: ignore
+
     data = "{" + ", ".join([f"'{arg}': {rewrite_arg_name(arg)}" for arg in arg_names]) + "}"
 
     api_response_type = f"{function_name}Response"

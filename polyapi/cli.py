@@ -13,6 +13,7 @@ from .sync import sync_deployables
 
 CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "update_rendered_spec"]
 
+
 def execute_from_cli():
     # First we setup all our argument parsing logic
     # Then we parse the arguments (waaay at the bottom)
@@ -46,9 +47,7 @@ def execute_from_cli():
 
     def generate_command(args):
         initialize_config()
-        print("Generating Poly functions...", end="")
         generate()
-        print_green("DONE")
 
     generate_parser.set_defaults(command=generate_command)
 

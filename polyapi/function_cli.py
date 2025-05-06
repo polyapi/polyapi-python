@@ -1,7 +1,7 @@
 import sys
 from typing import Any, List, Optional
 import requests
-from polyapi.generate import get_functions_and_parse, generate_functions
+from polyapi.generate import generate as generate_library
 from polyapi.config import get_api_key_and_url
 from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
 from polyapi.parser import parse_function_code, get_jsonschema_type
@@ -87,10 +87,7 @@ def function_add_or_update(
         function_id = resp.json()["id"]
         print(f"Function ID: {function_id}")
         if generate:
-            print("Generating new custom function...", end="")
-            functions = get_functions_and_parse(limit_ids=[function_id])
-            generate_functions(functions)
-            print_green("DONE")
+            generate_library()
     else:
         print("Error adding function.")
         print(resp.status_code)

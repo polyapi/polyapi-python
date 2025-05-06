@@ -55,6 +55,19 @@ class VariableSpecDto(TypedDict):
     variable: VariableSpecification
     type: Literal['serverVariable']
 
+
+class SchemaSpecDto(TypedDict):
+    id: str
+    context: str
+    name: str
+    contextName: str
+    type: Literal['schema']
+    definition: Dict[Any, Any]
+    visibilityMetadata: object
+    unresolvedPolySchemaRefs: List
+    # TODO add more
+
+
 Visibility = Union[Literal['PUBLIC'], Literal['TENANT'], Literal['ENVIRONMENT']]
 
 
@@ -68,6 +81,7 @@ class PolyServerFunction(PolyDeployable):
     logs_enabled: NotRequired[bool]
     always_on: NotRequired[bool]
     visibility: NotRequired[Visibility]
+
 
 class PolyClientFunction(PolyDeployable):
     logs_enabled: NotRequired[bool]

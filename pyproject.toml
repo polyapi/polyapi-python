@@ -3,12 +3,12 @@ requires = ["setuptools>=61.2", "wheel"]
 
 [project]
 name = "polyapi-python"
-version = "0.3.2"
+version = "0.3.3"
 description = "The Python Client for PolyAPI, the IPaaS by Developers for Developers"
 authors = [{ name = "Dan Fellin", email = "dan@polyapi.io" }]
 dependencies = [
-    "requests==2.31.0",
-    "typing_extensions>=4.10.0",
+    "requests>=2.32.3",
+    "typing_extensions>=4.12.2",
     "jsonschema-gentypes==2.6.0",
     "pydantic==2.6.4",
     "stdlib_list==0.10.0",
@@ -29,3 +29,8 @@ packages = ["polyapi"]
 [tools.setuptools.packages.find]
 include = ["polyapi"]
 exclude = ["polyapi/poly*", "polyapi/vari*", "polyapi/.config.env", "polyapi/cached_deployables*", "polyapi/deployments_revision"]  # exclude the generated libraries from builds
+
+[tool.mypy]
+# for now redef errors happen sometimes, we will clean this up in the future!
+disable_error_code = "no-redef,name-defined"
+implicit_optional = true

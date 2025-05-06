@@ -143,6 +143,26 @@ To run this library's unit tests, please clone the repo then run:
 python -m unittest discover
 ```
 
+## Linting
+
+The flake8 config is at the root of this repo at `.flake8`.
+
+When hacking on this library, please enable flake8 and add this line to your flake8 args (e.g., in your VSCode Workspace Settings):
+
+```
+--config=.flake8
+```
+
+## Mypy Type Improvements
+
+This script is handy for checking for any mypy types:
+
+```bash
+./check_mypy.sh
+```
+
+Please ignore \[name-defined\] errors for now. This is a known bug we are working to fix!
+
 ## Support
 
 If you run into any issues or want help getting started with this project, please contact support@polyapi.io
