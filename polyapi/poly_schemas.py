@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict, List, Tuple
 
 from polyapi.schema import wrapped_generate_schema_types
-from polyapi.utils import add_import_to_init, init_the_init, to_func_namespace
+from polyapi.utils import add_import_to_init, init_the_init, make_folder, to_func_namespace
 
 from .typedefs import SchemaSpecDto
 
@@ -71,9 +71,7 @@ def create_schema(
                 spec,
             )
         else:
-            full_path = os.path.join(full_path, folder)
-            if not os.path.exists(full_path):
-                os.makedirs(full_path)
+            make_folder(folder)
 
             # append to __init__.py file if nested folders
             next = folders[idx + 1] if idx + 2 < len(folders) else ""

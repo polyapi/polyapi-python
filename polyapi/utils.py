@@ -26,6 +26,15 @@ def init_the_init(full_path: str, code_imports="") -> None:
             f.write(code_imports)
 
 
+def make_folder(folder: str) -> str:
+    """create a folder if it doesn't exist"""
+    abspath = os.path.dirname(os.path.abspath(__file__))
+    full_path = os.path.join(abspath, folder)
+    if not os.path.exists(full_path):
+        os.makedirs(full_path)
+    return full_path
+
+
 def add_import_to_init(full_path: str, next: str, code_imports="") -> None:
     init_the_init(full_path, code_imports=code_imports)
 
@@ -281,6 +290,9 @@ valid_subdomains = ["na[1-2]", "eu[1-2]", "dev"]
 
 
 def is_valid_polyapi_url(_url: str):
+    if _url.startswith("http://localhost"):
+        return True
+
     # Join the subdomains into a pattern
     subdomain_pattern = "|".join(valid_subdomains)
     pattern = rf"^https://({subdomain_pattern})\.polyapi\.io$"
