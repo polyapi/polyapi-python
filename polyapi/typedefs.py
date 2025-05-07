@@ -40,7 +40,7 @@ class SpecificationDto(TypedDict):
     language: str
 
 
-# New enum for variable secrecy levels
+# Enum for variable secrecy levels
 Secrecy = Literal['SECRET', 'OBSCURED', 'NONE']
 
 
