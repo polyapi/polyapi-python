@@ -2,11 +2,11 @@ import os
 from typing import List
 
 from polyapi.schema import map_primitive_types
-from polyapi.typedefs import PropertyType, VariableSpecDto
+from polyapi.typedefs import PropertyType, VariableSpecDto, Secrecy
 from polyapi.utils import add_import_to_init, init_the_init
 
 
-# GET is only included if the variable is not a secret
+# GET is only included if the variable is not SECRET
 GET_TEMPLATE = """
     @staticmethod
     def get() -> {variable_type}:
@@ -76,9 +76,10 @@ def generate_variables(variables: List[VariableSpecDto]):
 
 def render_variable(variable: VariableSpecDto):
     variable_type = _get_variable_type(variable["variable"]["valueType"])
+    # Only include get() method if secrecy is not SECRET
     get_method = (
         ""
-        if variable["variable"]["secret"]
+        if variable["variable"]["secrecy"] == "SECRET"
         else GET_TEMPLATE.format(
             variable_id=variable["id"], variable_type=variable_type
         )

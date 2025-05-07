@@ -12,7 +12,7 @@ EXAMPLE = {
         },
         "variable": {
             "environmentId": "123818231",
-            "secret": False,
+            "secrecy": "NONE",
             "valueType": {
                 "kind": "primitive",
                 "type": "string"
