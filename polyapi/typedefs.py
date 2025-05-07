@@ -40,11 +40,15 @@ class SpecificationDto(TypedDict):
     language: str
 
 
+# New enum for variable secrecy levels
+Secrecy = Literal['SECRET', 'OBSCURED', 'NONE']
+
+
 class VariableSpecification(TypedDict):
     environmentId: str
     value: Any
     valueType: PropertyType
-    secret: bool
+    secrecy: Secrecy
 
 
 class VariableSpecDto(TypedDict):
