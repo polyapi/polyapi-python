@@ -1,7 +1,5 @@
-.env
-.env*
-.venv/
-.venv/*
+*env
+*venv
 .DS_Store
 
 # Pip

@@ -3,7 +3,7 @@ import os
 import configparser
 from typing import Tuple
 
-from polyapi.utils import is_valid_polyapi_url, is_valid_uuid, print_green, print_yellow
+from polyapi.utils import is_valid_polyapi_url, print_green, print_yellow
 
 # cached values
 API_KEY = None
@@ -78,8 +78,6 @@ def initialize_config(force=False):
             errors = []
             if not is_valid_polyapi_url(url):
                 errors.append(f"{url} is not a valid Poly API Base URL")
-            if not is_valid_uuid(key):
-                errors.append(f"{key} is not a valid Poly App Key or User Key")
             if errors:
                 print_yellow("\n".join(errors))
                 sys.exit(1)
