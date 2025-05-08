@@ -91,7 +91,8 @@ def function_add_or_update(
         function_id = resp.json()["id"]
         print(f"Function ID: {function_id}")
         if generate:
-            generate_library()
+            contexts=generate_contexts.split(",") if generate_contexts else None
+            generate_library(contexts=contexts)
     else:
         print("Error adding function.")
         print(resp.status_code)

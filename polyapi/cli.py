@@ -45,10 +45,12 @@ def execute_from_cli():
     # Generate command
     generate_parser = subparsers.add_parser("generate", help="Generates Poly library")
     generate_parser.add_argument("--no-types", action="store_true", help="Generate SDK without type definitions")
+    generate_parser.add_argument("--contexts", type=str, required=False, help="Contexts to generate")
 
     def generate_command(args):
         initialize_config()
-        generate(no_types=args.no_types)
+        contexts = args.contexts.split(",") if args.contexts else None
+        generate(contexts=contexts, no_types=args.no_types)
 
     generate_parser.set_defaults(command=generate_command)
 
