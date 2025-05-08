@@ -24,6 +24,7 @@ def function_add_or_update(
     client: bool,
     server: bool,
     logs_enabled: Optional[bool],
+    generate_contexts: Optional[str],
     generate: bool = True,
     execution_api_key: str = ""
 ):
@@ -58,6 +59,9 @@ def function_add_or_update(
         "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])} for p in parsed["types"]["params"]],
         "logsEnabled": logs_enabled,
     }
+
+    if generate_contexts:
+        data["generateContexts"] = generate_contexts.split(",")
 
     if server and parsed["dependencies"]:
         print_yellow(

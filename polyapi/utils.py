@@ -2,6 +2,7 @@ import keyword
 import re
 import os
 import uuid
+from urllib.parse import urlparse
 from typing import Tuple, List
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
@@ -261,6 +262,12 @@ valid_subdomains = ["na[1-2]", "eu[1-2]", "dev"]
 
 
 def is_valid_polyapi_url(_url: str):
+    # in dev allow localhost (and 127.0.0.1) over http *or* https
+    if os.getenv("PYTHON_ENV") == "development":
+        parsed = urlparse(_url)
+        if parsed.scheme in ("http", "https") and parsed.hostname in ("localhost", "127.0.0.1"):
+            return True
+    
     # Join the subdomains into a pattern
     subdomain_pattern = "|".join(valid_subdomains)
     pattern = rf"^https://({subdomain_pattern})\.polyapi\.io$"
@@ -268,6 +275,9 @@ def is_valid_polyapi_url(_url: str):
 
 
 def is_valid_uuid(uuid_string, version=4):
+    if os.getenv("PYTHON_ENV") == "development":
+        return True
+    
     try:
         uuid_obj = uuid.UUID(uuid_string, version=version)
     except ValueError:
