@@ -14,7 +14,7 @@ from .api import render_api_function
 from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
 from .variables import generate_variables
-from .config import get_api_key_and_url
+from .config import get_api_key_and_url, get_direct_execute_config
 
 SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
@@ -45,6 +45,10 @@ def get_specs(contexts=Optional[List[str]], no_types: bool = False) -> List:
 
     if contexts:
         params["contexts"] = contexts
+
+    # Add apiFunctionDirectExecute parameter if direct execute is enabled
+    if get_direct_execute_config():
+        params["apiFunctionDirectExecute"] = "true"
 
     resp = requests.get(url, headers=headers, params=params)
     if resp.status_code == 200:
