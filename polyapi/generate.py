@@ -201,7 +201,7 @@ def remove_old_library():
         shutil.rmtree(path)
 
 
-def generate(contexts: Optional[List[str]], no_types: bool = False) -> None:
+def generate(contexts: Optional[List[str]] = None, no_types: bool = False) -> None:
     generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
     print(generate_msg, end="", flush=True)
     remove_old_library()
