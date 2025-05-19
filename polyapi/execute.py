@@ -1,23 +1,8 @@
 from typing import Dict, Optional
 import requests
 from requests import Response
-import ssl
-import certifi
-from polyapi.config import get_api_key_and_url, get_mtls_config, get_direct_execute_config
+from polyapi.config import get_api_key_and_url, get_mtls_config
 from polyapi.exceptions import PolyApiException
-
-
-def _create_https_agent() -> Optional[ssl.SSLContext]:
-    """Create an SSL context with MTLS if configured"""
-    has_mtls, cert_path, key_path, ca_path = get_mtls_config()
-    if not has_mtls:
-        return None
-
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)
-    if ca_path:
-        ssl_context.load_verify_locations(cafile=ca_path)
-    return ssl_context
 
 def direct_execute(function_type, function_id, data) -> Response:
     """ execute a specific function id/type
@@ -25,32 +10,38 @@ def direct_execute(function_type, function_id, data) -> Response:
     api_key, api_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}
     url = f"{api_url}/functions/{function_type}/{function_id}/direct-execute"
-    ssl_context = _create_https_agent()
-    endpoint_info = requests.post(url, json=data, headers=headers, verify=ssl_context)
+    
+    endpoint_info = requests.post(url, json=data, headers=headers)
     if endpoint_info.status_code < 200 or endpoint_info.status_code >= 300:
         raise PolyApiException(f"{endpoint_info.status_code}: {endpoint_info.content.decode('utf-8', errors='ignore')}")
     
     endpoint_info_data = endpoint_info.json()
-
-    # Get all request parameters from the response
     request_params = endpoint_info_data.copy()
-    request_params.pop("url", None)  # Remove url as it's passed separately
+    request_params.pop("url", None)
     
-    # Map maxRedirects to allow_redirects
     if "maxRedirects" in request_params:
         request_params["allow_redirects"] = request_params.pop("maxRedirects") > 0
     
-    # Make the request with all parameters
-    resp = requests.request(
-        url=endpoint_info_data["url"],
-        verify=ssl_context,
-        **request_params
-    )
+    has_mtls, cert_path, key_path, ca_path = get_mtls_config()
+    
+    if has_mtls:
+        resp = requests.request(
+            url=endpoint_info_data["url"],
+            cert=(cert_path, key_path),
+            verify=ca_path,
+            **request_params
+        )
+    else:
+        resp = requests.request(
+            url=endpoint_info_data["url"],
+            verify=False,
+            **request_params
+        )
 
     if resp.status_code < 200 or resp.status_code >= 300:
         error_content = resp.content.decode("utf-8", errors="ignore")
         raise PolyApiException(f"{resp.status_code}: {error_content}")
-        
+    
     return resp
 
 def execute(function_type, function_id, data) -> Response:
