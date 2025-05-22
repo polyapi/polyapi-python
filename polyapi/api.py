@@ -23,8 +23,16 @@ def {function_name}(
 
     Function ID: {function_id}
     \"""
-    resp = execute("{function_type}", "{function_id}", {data})
-    return {api_response_type}(resp.json())  # type: ignore
+    if get_direct_execute_config():
+        resp = direct_execute("{function_type}", "{function_id}", {data})
+        return {api_response_type}({{
+            "status": resp.status_code,
+            "headers": dict(resp.headers),
+            "data": resp.json()
+        }})  # type: ignore
+    else:
+        resp = execute("{function_type}", "{function_id}", {data})
+        return {api_response_type}(resp.json())  # type: ignore
 
 
 """

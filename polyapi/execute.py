@@ -1,22 +1,68 @@
-from typing import Dict
+from typing import Dict, Optional
 import requests
 from requests import Response
-from polyapi.config import get_api_key_and_url
+from polyapi.config import get_api_key_and_url, get_mtls_config
 from polyapi.exceptions import PolyApiException
 
+def direct_execute(function_type, function_id, data) -> Response:
+    """ execute a specific function id/type
+    """
+    api_key, api_url = get_api_key_and_url()
+    headers = {"Authorization": f"Bearer {api_key}"}
+    url = f"{api_url}/functions/{function_type}/{function_id}/direct-execute"
+    
+    endpoint_info = requests.post(url, json=data, headers=headers)
+    if endpoint_info.status_code < 200 or endpoint_info.status_code >= 300:
+        raise PolyApiException(f"{endpoint_info.status_code}: {endpoint_info.content.decode('utf-8', errors='ignore')}")
+    
+    endpoint_info_data = endpoint_info.json()
+    request_params = endpoint_info_data.copy()
+    request_params.pop("url", None)
+    
+    if "maxRedirects" in request_params:
+        request_params["allow_redirects"] = request_params.pop("maxRedirects") > 0
+    
+    has_mtls, cert_path, key_path, ca_path = get_mtls_config()
+    
+    if has_mtls:
+        resp = requests.request(
+            url=endpoint_info_data["url"],
+            cert=(cert_path, key_path),
+            verify=ca_path,
+            **request_params
+        )
+    else:
+        resp = requests.request(
+            url=endpoint_info_data["url"],
+            verify=False,
+            **request_params
+        )
+
+    if resp.status_code < 200 or resp.status_code >= 300:
+        error_content = resp.content.decode("utf-8", errors="ignore")
+        raise PolyApiException(f"{resp.status_code}: {error_content}")
+    
+    return resp
 
 def execute(function_type, function_id, data) -> Response:
     """ execute a specific function id/type
     """
     api_key, api_url = get_api_key_and_url()
     headers = {"Authorization": f"Bearer {api_key}"}
+
     url = f"{api_url}/functions/{function_type}/{function_id}/execute"
-    resp = requests.post(url, json=data, headers=headers)
-    # print(resp.status_code)
-    # print(resp.headers["content-type"])
+    
+    # Make the request
+    resp = requests.post(
+        url, 
+        json=data, 
+        headers=headers,
+    )
+
     if resp.status_code < 200 or resp.status_code >= 300:
         error_content = resp.content.decode("utf-8", errors="ignore")
         raise PolyApiException(f"{resp.status_code}: {error_content}")
+
     return resp
 
 
