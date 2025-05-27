@@ -129,24 +129,26 @@ def parse_function_specs(
 ) -> List[SpecificationDto]:
     functions = []
     for spec in specs:
-        if not spec or "function" not in spec:
+        if not spec:
             continue
 
-        if not spec["function"]:
-            continue
-
-        if limit_ids and spec["id"] not in limit_ids:
-            continue
-
+        # For no_types mode, we might not have function data, but we still want to include the spec
+        # if it's a supported function type
         if spec["type"] not in SUPPORTED_FUNCTION_TYPES:
             continue
 
-        if spec["type"] == "customFunction" and spec["language"] != "python":
-            # poly libraries only support client functions of same language
+        # Skip if we have a limit and this spec is not in it
+        if limit_ids and spec.get("id") not in limit_ids:
             continue
 
+        # For customFunction, check language if we have function data
+        if spec["type"] == "customFunction":
+            if spec.get("language") and spec["language"] != "python":
+                # poly libraries only support client functions of same language
+                continue
+
         # Functions with serverSideAsync True will always return a Dict with execution ID
-        if spec.get('serverSideAsync'):
+        if spec.get('serverSideAsync') and spec.get("function"):
             spec['function']['returnType'] = {'kind': 'plain', 'value': 'object'}
 
         functions.append(spec)
@@ -205,6 +207,63 @@ def remove_old_library():
         shutil.rmtree(path)
 
 
+def create_empty_schemas_module():
+    """Create an empty schemas module for no-types mode so user code can still import from polyapi.schemas"""
+    currdir = os.path.dirname(os.path.abspath(__file__))
+    schemas_path = os.path.join(currdir, "schemas")
+    
+    # Create the schemas directory
+    if not os.path.exists(schemas_path):
+        os.makedirs(schemas_path)
+    
+    # Create an __init__.py file with dynamic schema resolution
+    init_path = os.path.join(schemas_path, "__init__.py")
+    with open(init_path, "w") as f:
+        f.write('''"""Empty schemas module for no-types mode"""
+from typing import Any, Dict
+
+class _GenericSchema(Dict[str, Any]):
+    """Generic schema type that acts like a Dict for no-types mode"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class _SchemaModule:
+    """Dynamic module that returns itself for attribute access, allowing infinite nesting"""
+    
+    def __getattr__(self, name: str):
+        # For callable access (like schemas.Response()), return the generic schema class
+        # For further attribute access (like schemas.random.random2), return self to allow nesting
+        return _NestedSchemaAccess()
+    
+    def __call__(self, *args, **kwargs):
+        # If someone tries to call the module itself, return a generic schema
+        return _GenericSchema(*args, **kwargs)
+    
+    def __dir__(self):
+        # Return common schema names for introspection
+        return ['Response', 'Request', 'Error', 'Data', 'Result']
+
+class _NestedSchemaAccess:
+    """Handles nested attribute access and final callable resolution"""
+    
+    def __getattr__(self, name: str):
+        # Continue allowing nested access
+        return _NestedSchemaAccess()
+    
+    def __call__(self, *args, **kwargs):
+        # When finally called, return a generic schema instance
+        return _GenericSchema(*args, **kwargs)
+    
+    def __class_getitem__(cls, item):
+        # Support type annotations like schemas.Response[str]
+        return _GenericSchema
+
+# Replace this module with our dynamic module
+import sys
+sys.modules[__name__] = _SchemaModule()
+''')
+
+
 def generate(contexts: Optional[List[str]] = None, no_types: bool = False) -> None:
     generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
     print(generate_msg, end="", flush=True)
@@ -216,14 +275,23 @@ def generate(contexts: Optional[List[str]] = None, no_types: bool = False) -> No
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
     functions = parse_function_specs(specs, limit_ids=limit_ids)
 
-    schemas = get_schemas()
-    schema_index = build_schema_index(schemas)
-    if schemas:
-        schema_limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
-        schemas = replace_poly_refs_in_schemas(schemas, schema_index)
-        generate_schemas(schemas, limit_ids=schema_limit_ids)
-
-    functions = replace_poly_refs_in_functions(functions, schema_index)
+    # Only process schemas if no_types is False
+    if not no_types:
+        schemas = get_schemas()
+        schema_index = build_schema_index(schemas)
+        if schemas:
+            schema_limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
+            schemas = replace_poly_refs_in_schemas(schemas, schema_index)
+            generate_schemas(schemas, limit_ids=schema_limit_ids)
+        
+        functions = replace_poly_refs_in_functions(functions, schema_index)
+    else:
+        # When no_types is True, we still need to process functions but without schema resolution
+        # Use an empty schema index to avoid poly-ref resolution
+        schema_index = {}
+        
+        # Create an empty schemas module so user code can still import from polyapi.schemas
+        create_empty_schemas_module()
 
     if functions:
         generate_functions(functions)
@@ -233,10 +301,11 @@ def generate(contexts: Optional[List[str]] = None, no_types: bool = False) -> No
         )
         exit()
 
-    variables = get_variables()
-    if variables:
-        generate_variables(variables)
-
+    # Only process variables if no_types is False
+    if not no_types:
+        variables = get_variables()
+        if variables:
+            generate_variables(variables)
 
     # indicator to vscode extension that this is a polyapi-python project
     file_path = os.path.join(os.getcwd(), ".polyapi-python")
@@ -266,11 +335,19 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
 
     arguments: List[PropertySpecification] = []
     return_type = {}
-    if spec["function"]:
-        arguments = [
-            arg for arg in spec["function"]["arguments"]
-        ]
-        return_type = spec["function"]["returnType"]
+    if spec.get("function"):
+        # Handle cases where arguments might be missing or None
+        if spec["function"].get("arguments"):
+            arguments = [
+                arg for arg in spec["function"]["arguments"]
+            ]
+        
+        # Handle cases where returnType might be missing or None
+        if spec["function"].get("returnType"):
+            return_type = spec["function"]["returnType"]
+        else:
+            # Provide a fallback return type when missing
+            return_type = {"kind": "any"}
 
     if function_type == "apiFunction":
         func_str, func_type_defs = render_api_function(
@@ -284,7 +361,7 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
     elif function_type == "customFunction":
         func_str, func_type_defs = render_client_function(
             function_name,
-            spec["code"],
+            spec.get("code", ""),
             arguments,
             return_type,
         )
