@@ -151,8 +151,11 @@ def get_type_and_def(
 
                 title = f"List[{title}]"
                 return wrapped_generate_schema_types(schema, title, "List")
+            elif schema.get("properties"):
+                result = wrapped_generate_schema_types(schema, "ResponseType", "Dict")  # type: ignore
+                return result
             else:
-                return "Any", ""
+                return "Dict", ""
         else:
             return "Dict", ""
     elif type_spec["kind"] == "function":
