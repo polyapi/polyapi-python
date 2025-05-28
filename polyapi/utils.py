@@ -11,6 +11,7 @@ from polyapi.schema import (
     wrapped_generate_schema_types,
     clean_title,
     map_primitive_types,
+    is_primitive
 )
 
 
@@ -128,9 +129,15 @@ def get_type_and_def(
                 # TODO fix me
                 # we don't use ReturnType as name for the list type here, we use _ReturnTypeItem
                 return "List", ""
+            elif title and title == "ReturnType" and schema.get("type"):
+                assert isinstance(title, str)
+                schema_type = schema.get("type", "Any")
+                root_type, generated_code = wrapped_generate_schema_types(schema, schema_type, "Dict")  # type: ignore
+                return (map_primitive_types(root_type), "") if is_primitive(root_type) else (root_type, generated_code)  # type: ignore
             elif title:
                 assert isinstance(title, str)
-                return wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
+                root_type, generated_code = wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
+                return ("Any", "") if root_type == "ReturnType" else wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
             elif schema.get("allOf") and len(schema["allOf"]):
                 # we are in a case of a single allOf, lets strip off the allOf and move on!
                 # our library doesn't handle allOf well yet
