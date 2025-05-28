@@ -86,7 +86,7 @@ def function_add_or_update(
 
     headers = get_auth_headers(api_key)
     resp = requests.post(url, headers=headers, json=data)
-    if resp.status_code == 201:
+    if resp.status_code in [200, 201]:
         print_green("DEPLOYED")
         function_id = resp.json()["id"]
         print(f"Function ID: {function_id}")
