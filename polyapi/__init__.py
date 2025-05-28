@@ -1,5 +1,6 @@
 import os
 import sys
+import copy
 import truststore
 from typing import Any, Optional, overload, Literal
 from typing_extensions import TypedDict
@@ -22,6 +23,7 @@ class PolyCustomDict(TypedDict, total=False):
     executionApiKey: Optional[str]
     responseStatusCode: int
     responseContentType: Optional[str]
+    responseHeaders: Dict[str, str]
 
 
 class _PolyCustom:
@@ -31,6 +33,7 @@ class _PolyCustom:
             "executionApiKey": None,
             "responseStatusCode": 200,
             "responseContentType": None,
+            "responseHeaders": {},
         }
         self._execution_id_locked = False
 
@@ -63,6 +66,9 @@ class _PolyCustom:
     
     @overload
     def __getitem__(self, key: Literal["responseContentType"]) -> Optional[str]: ...
+
+    @overload
+    def __getitem__(self, key: Literal["responseHeaders"]) -> Dict[str, str]: ...
     
     def __getitem__(self, key: str) -> Any:
         return self.get(key)
@@ -75,6 +81,9 @@ class _PolyCustom:
     
     @overload
     def __setitem__(self, key: Literal["responseContentType"], value: Optional[str]) -> None: ...
+
+    @overload
+    def __setitem__(self, key: Literal["responseHeaders"], value: Dict[str, str]) -> None: ...
     
     def __setitem__(self, key: str, value: Any) -> None:
         self.set_once(key, value)
@@ -84,7 +93,7 @@ class _PolyCustom:
 
     def copy(self) -> '_PolyCustom':
         new = _PolyCustom()
-        new._internal_store = self._internal_store.copy()
+        new._internal_store = copy.deepcopy(self._internal_store)
         new._execution_id_locked = self._execution_id_locked
         return new
 
