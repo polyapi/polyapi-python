@@ -222,6 +222,12 @@ def _maybe_add_fallback_schema_name(a: PropertySpecification):
             schema["title"] = a["name"].title()
 
 
+def _clean_description(text: str) -> str:
+    """Flatten new-lines and collapse excess whitespace."""
+    text = text.replace("\\n", " ").replace("\n", " ")
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def parse_arguments(
     function_name: str, arguments: List[PropertySpecification]
 ) -> Tuple[str, str]:
@@ -248,8 +254,8 @@ def parse_arguments(
         if not a.get("required", True):
             arg_string += " = None"
 
-        description = a.get("description", "")
-        description = description.replace("\n", " ")
+        description = _clean_description(a.get("description", ""))
+
         if description:
             if idx == len(arguments) - 1:
                 arg_string += f"  # {description}\n"
