@@ -2,7 +2,7 @@ import os
 import sys
 import copy
 import truststore
-from typing import Any, Optional, overload, Literal
+from typing import Any, Dict, Optional, overload, Literal
 from typing_extensions import TypedDict
 truststore.inject_into_ssl()
 from .cli import CLI_COMMANDS
