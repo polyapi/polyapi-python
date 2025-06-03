@@ -44,10 +44,13 @@ def execute_from_cli():
     ###########################################################################
     # Generate command
     generate_parser = subparsers.add_parser("generate", help="Generates Poly library")
+    generate_parser.add_argument("--no-types", action="store_true", help="Generate SDK without type definitions")
+    generate_parser.add_argument("--contexts", type=str, required=False, help="Contexts to generate")
 
     def generate_command(args):
         initialize_config()
-        generate()
+        contexts = args.contexts.split(",") if args.contexts else None
+        generate(contexts=contexts, no_types=args.no_types)
 
     generate_parser.set_defaults(command=generate_command)
 
@@ -68,6 +71,7 @@ def execute_from_cli():
     fn_add_parser.add_argument("--logs", choices=["enabled", "disabled"], default=None, help="Enable or disable logs for the function.")
     fn_add_parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
     fn_add_parser.add_argument("--disable-ai", "--skip-generate", action="store_true", help="Pass --disable-ai skip AI generation of missing descriptions")
+    fn_add_parser.add_argument("--generate-contexts", type=str, help="Server function only – only include certain contexts to speed up function execution")
 
     def add_function(args):
         initialize_config()
@@ -79,6 +83,8 @@ def execute_from_cli():
             err = "You must specify `--server` or `--client`."
         elif logs_enabled and not args.server:
             err = "Option `logs` is only for server functions (--server)."
+        elif args.generate_contexts and not args.server:
+            err = "Option `generate-contexts` is only for server functions (--server)."
 
         if err:
             print_red("ERROR")
@@ -94,7 +100,8 @@ def execute_from_cli():
             server=args.server,
             logs_enabled=logs_enabled,
             generate=not args.disable_ai,
-            execution_api_key=args.execution_api_key
+            execution_api_key=args.execution_api_key,
+            generate_contexts=args.generate_contexts
         )
 
     fn_add_parser.set_defaults(command=add_function)

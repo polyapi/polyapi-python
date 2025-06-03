@@ -65,6 +65,7 @@ async def {function_name}(
                     "data": resp,
                     "statusCode": polyCustom.get("responseStatusCode", 200),
                     "contentType": polyCustom.get("responseContentType", None),
+                    "headers": polyCustom.get("responseHeaders", {{}}),
                 }},
             }}, namespace="/events")
 

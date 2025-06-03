@@ -127,3 +127,7 @@ def clean_title(title: str) -> str:
 def map_primitive_types(type_: str) -> str:
     # Define your mapping logic here
     return JSONSCHEMA_TO_PYTHON_TYPE_MAP.get(type_, "Any")
+
+
+def is_primitive(type_: str) -> bool:
+    return type_ in JSONSCHEMA_TO_PYTHON_TYPE_MAP

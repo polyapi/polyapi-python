@@ -3,11 +3,15 @@ import os
 import configparser
 from typing import Tuple
 
-from polyapi.utils import is_valid_polyapi_url, is_valid_uuid, print_green, print_yellow
+from polyapi.utils import is_valid_polyapi_url, print_green, print_yellow
 
 # cached values
 API_KEY = None
 API_URL = None
+API_FUNCTION_DIRECT_EXECUTE = None
+MTLS_CERT_PATH = None
+MTLS_KEY_PATH = None
+MTLS_CA_PATH = None
 
 
 def get_config_file_path() -> str:
@@ -45,6 +49,13 @@ def get_api_key_and_url() -> Tuple[str | None, str | None]:
         API_KEY = key
         API_URL = url
 
+        # Read and cache MTLS and direct execute settings
+        global API_FUNCTION_DIRECT_EXECUTE, MTLS_CERT_PATH, MTLS_KEY_PATH, MTLS_CA_PATH
+        API_FUNCTION_DIRECT_EXECUTE = config.get("polyapi", "api_function_direct_execute", fallback="false").lower() == "true"
+        MTLS_CERT_PATH = config.get("polyapi", "mtls_cert_path", fallback=None)
+        MTLS_KEY_PATH = config.get("polyapi", "mtls_key_path", fallback=None)
+        MTLS_CA_PATH = config.get("polyapi", "mtls_ca_path", fallback=None)
+
     return key, url
 
 
@@ -78,8 +89,6 @@ def initialize_config(force=False):
             errors = []
             if not is_valid_polyapi_url(url):
                 errors.append(f"{url} is not a valid Poly API Base URL")
-            if not is_valid_uuid(key):
-                errors.append(f"{key} is not a valid Poly App Key or User Key")
             if errors:
                 print_yellow("\n".join(errors))
                 sys.exit(1)
@@ -107,3 +116,21 @@ def clear_config():
     path = get_config_file_path()
     if os.path.exists(path):
         os.remove(path)
+
+
+def get_mtls_config() -> Tuple[bool, str | None, str | None, str | None]:
+    """Return MTLS configuration settings"""
+    global MTLS_CERT_PATH, MTLS_KEY_PATH, MTLS_CA_PATH
+    if MTLS_CERT_PATH is None or MTLS_KEY_PATH is None or MTLS_CA_PATH is None:
+        # Force a config read if values aren't cached
+        get_api_key_and_url()
+    return bool(MTLS_CERT_PATH and MTLS_KEY_PATH and MTLS_CA_PATH), MTLS_CERT_PATH, MTLS_KEY_PATH, MTLS_CA_PATH
+
+
+def get_direct_execute_config() -> bool:
+    """Return whether direct execute is enabled"""
+    global API_FUNCTION_DIRECT_EXECUTE
+    if API_FUNCTION_DIRECT_EXECUTE is None:
+        # Force a config read if value isn't cached
+        get_api_key_and_url()
+    return bool(API_FUNCTION_DIRECT_EXECUTE)

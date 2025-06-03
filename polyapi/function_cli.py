@@ -24,6 +24,7 @@ def function_add_or_update(
     client: bool,
     server: bool,
     logs_enabled: Optional[bool],
+    generate_contexts: Optional[str],
     generate: bool = True,
     execution_api_key: str = ""
 ):
@@ -59,6 +60,9 @@ def function_add_or_update(
         "logsEnabled": logs_enabled,
     }
 
+    if generate_contexts:
+        data["generateContexts"] = generate_contexts.split(",")
+
     if server and parsed["dependencies"]:
         print_yellow(
             "\nPlease note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi."
@@ -82,7 +86,7 @@ def function_add_or_update(
 
     headers = get_auth_headers(api_key)
     resp = requests.post(url, headers=headers, json=data)
-    if resp.status_code == 201:
+    if resp.status_code in [200, 201]:
         print_green("DEPLOYED")
         function_id = resp.json()["id"]
         print(f"Function ID: {function_id}")
