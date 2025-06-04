@@ -64,7 +64,7 @@ def wrapped_generate_schema_types(type_spec: dict, root, fallback_type):
         # {'$ref': '#/definitions/FinanceAccountListModel'}
         return fallback_type, ""
     except:
-        logging.error(f"Error when generating schema type: {type_spec}\nusing fallback type '{fallback_type}'")
+        logging.warning(f"WARNING parsing jsonschema failed: {type_spec}\nusing fallback type '{fallback_type}'")
         return fallback_type, ""
 
 
