@@ -91,7 +91,10 @@ def function_add_or_update(
         function_id = resp.json()["id"]
         print(f"Function ID: {function_id}")
         if generate:
-            generate_library()
+            # Use cached generate arguments when regenerating after function deployment
+            from polyapi.config import get_cached_generate_args
+            cached_contexts, cached_names, cached_function_ids, cached_no_types = get_cached_generate_args()
+            generate_library(contexts=cached_contexts, names=cached_names, function_ids=cached_function_ids, no_types=cached_no_types)
     else:
         print("Error adding function.")
         print(resp.status_code)

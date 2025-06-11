@@ -46,11 +46,34 @@ def execute_from_cli():
     generate_parser = subparsers.add_parser("generate", help="Generates Poly library")
     generate_parser.add_argument("--no-types", action="store_true", help="Generate SDK without type definitions")
     generate_parser.add_argument("--contexts", type=str, required=False, help="Contexts to generate")
+    generate_parser.add_argument("--names", type=str, required=False, help="Resource names to generate (comma-separated)")
+    generate_parser.add_argument("--function-ids", type=str, required=False, help="Function IDs to generate (comma-separated)")
 
     def generate_command(args):
+        from .config import cache_generate_args, get_cached_generate_args
+        
         initialize_config()
+        
         contexts = args.contexts.split(",") if args.contexts else None
-        generate(contexts=contexts, no_types=args.no_types)
+        names = args.names.split(",") if args.names else None
+        function_ids = args.function_ids.split(",") if args.function_ids else None
+        no_types = args.no_types
+        
+        cached_contexts, cached_names, cached_function_ids, cached_no_types = get_cached_generate_args()
+        
+        final_contexts = contexts if contexts is not None else cached_contexts
+        final_names = names if names is not None else cached_names  
+        final_function_ids = function_ids if function_ids is not None else cached_function_ids
+        final_no_types = no_types if no_types else cached_no_types
+        
+        cache_generate_args(
+            contexts=final_contexts,
+            names=final_names, 
+            function_ids=final_function_ids,
+            no_types=final_no_types
+        )
+        
+        generate(contexts=final_contexts, names=final_names, function_ids=final_function_ids, no_types=final_no_types)
 
     generate_parser.set_defaults(command=generate_command)
 

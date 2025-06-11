@@ -36,7 +36,7 @@ Unresolved schema, please add the following schema to complete it:
   path:'''
 
 
-def get_specs(contexts=Optional[List[str]], no_types: bool = False) -> List:
+def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> List:
     api_key, api_url = get_api_key_and_url()
     assert api_key
     headers = get_auth_headers(api_key)
@@ -45,6 +45,12 @@ def get_specs(contexts=Optional[List[str]], no_types: bool = False) -> List:
 
     if contexts:
         params["contexts"] = contexts
+    
+    if names:
+        params["names"] = names
+        
+    if function_ids:
+        params["functionIds"] = function_ids
 
     # Add apiFunctionDirectExecute parameter if direct execute is enabled
     if get_direct_execute_config():
@@ -264,12 +270,11 @@ sys.modules[__name__] = _SchemaModule()
 ''')
 
 
-def generate(contexts: Optional[List[str]] = None, no_types: bool = False) -> None:
-    generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
-    print(generate_msg, end="", flush=True)
+def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> None:
+    
     remove_old_library()
 
-    specs = get_specs(no_types=no_types, contexts=contexts)
+    specs = get_specs(contexts=contexts, names=names, function_ids=function_ids, no_types=no_types)
     cache_specs(specs)
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
