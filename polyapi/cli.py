@@ -50,7 +50,7 @@ def execute_from_cli():
     generate_parser.add_argument("--function-ids", type=str, required=False, help="Function IDs to generate (comma-separated)")
 
     def generate_command(args):
-        from .config import cache_generate_args, get_cached_generate_args
+        from .config import cache_generate_args
         
         initialize_config()
         
@@ -59,78 +59,13 @@ def execute_from_cli():
         function_ids = args.function_ids.split(",") if args.function_ids else None
         no_types = args.no_types
         
-        # Get cached values to compare restrictiveness
-        cached_contexts, cached_names, cached_function_ids, cached_no_types = get_cached_generate_args()
+        # overwrite all cached values with the values passed in from the command line
+        final_contexts = contexts
+        final_names = names
+        final_function_ids = function_ids
+        final_no_types = no_types
         
-        def is_less_restrictive(new_val, cached_val):
-            """Check if new_val is less restrictive than cached_val for list arguments"""
-            if new_val is None:  #no argument = least restrictive
-                return True
-            if cached_val is None:  #cached has no restriction, new has restriction
-                return False
-            return len(new_val) < len(cached_val)  # fewer values = less restrictive 
-        
-        def is_no_types_less_restrictive(new_no_types, cached_no_types):
-            """Check if new no_types is less restrictive than cached (false < true)"""
-            if not new_no_types and cached_no_types:
-                return True
-            else:
-                return False  
-        
-        if args.contexts is not None:
-            if cached_contexts is None:
-                final_contexts = contexts  # No cached value, use new
-            else:
-                final_contexts = contexts if is_less_restrictive(contexts, cached_contexts) else cached_contexts
-        else:
-            final_contexts = cached_contexts
-            
-        if args.names is not None:
-            if cached_names is None:
-                final_names = names  # No cached value, use new
-            else:
-                final_names = names if is_less_restrictive(names, cached_names) else cached_names
-        else:
-            final_names = cached_names
-            
-        if args.function_ids is not None:
-            if cached_function_ids is None:
-                final_function_ids = function_ids  # No cached value, use new
-            else:
-                final_function_ids = function_ids if is_less_restrictive(function_ids, cached_function_ids) else cached_function_ids
-        else:
-            final_function_ids = cached_function_ids
-            
-        # For no_types, handle based on whether any args are provided
-        any_args_provided_for_no_types = any([
-            args.contexts is not None,
-            args.names is not None, 
-            args.function_ids is not None,
-            args.no_types
-        ])
-        
-        if args.no_types:  # When --no-types flag is explicitly provided
-            final_no_types = True  # Always use True when explicitly provided
-        elif any_args_provided_for_no_types and not args.no_types:  # When other args provided but no_types is False
-            # False is less restrictive than True, so should replace cached True
-            final_no_types = False if cached_no_types else False
-        else:
-            final_no_types = cached_no_types if cached_no_types is not None else False
-        
-        any_args_provided = any([
-            args.contexts is not None,
-            args.names is not None, 
-            args.function_ids is not None,
-            args.no_types
-        ])
-        
-        if not any_args_provided:
-            final_contexts = None
-            final_names = None
-            final_function_ids = None
-            final_no_types = False
-        
-        # cache the final values used
+        # cache the values used for this explicit generate command
         cache_generate_args(
             contexts=final_contexts,
             names=final_names, 

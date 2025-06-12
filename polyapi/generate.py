@@ -14,7 +14,7 @@ from .api import render_api_function
 from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
 from .variables import generate_variables
-from .config import get_api_key_and_url, get_direct_execute_config
+from .config import get_api_key_and_url, get_direct_execute_config, get_cached_generate_args
 
 SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
@@ -268,6 +268,21 @@ class _NestedSchemaAccess:
 import sys
 sys.modules[__name__] = _SchemaModule()
 ''')
+
+
+def generate_from_cache() -> None:
+    """
+    Generate using cached values. This is used when generate is called programmatically
+    (e.g., after deploying a function) rather than explicitly by the user.
+    """
+    cached_contexts, cached_names, cached_function_ids, cached_no_types = get_cached_generate_args()
+    
+    generate(
+        contexts=cached_contexts, 
+        names=cached_names, 
+        function_ids=cached_function_ids, 
+        no_types=cached_no_types
+    )
 
 
 def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> None:
