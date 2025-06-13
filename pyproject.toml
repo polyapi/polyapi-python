@@ -10,7 +10,7 @@ dependencies = [
     "requests>=2.32.3",
     "typing_extensions>=4.12.2",
     "jsonschema-gentypes==2.6.0",
-    "pydantic==2.6.4",
+    "pydantic>=2.8.0",
     "stdlib_list==0.10.0",
     "colorama==0.4.4",
     "python-socketio[asyncio_client]==5.11.1",
