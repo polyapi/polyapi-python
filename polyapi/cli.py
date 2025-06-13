@@ -36,7 +36,7 @@ def execute_from_cli():
             set_api_key_and_url(args.url, args.api_key)
         else:
             initialize_config(force=True)
-            # Setup command should cache "generate everything" behavior (all None/False)
+            # setup command should have default cache values
             from .config import cache_generate_args
             cache_generate_args(contexts=None, names=None, function_ids=None, no_types=False)
             generate()
