@@ -272,8 +272,7 @@ sys.modules[__name__] = _SchemaModule()
 
 def generate_from_cache() -> None:
     """
-    Generate using cached values. This is used when generate is called programmatically
-    (e.g., after deploying a function) rather than explicitly by the user.
+    Generate using cached values after non-explicit call.
     """
     cached_contexts, cached_names, cached_function_ids, cached_no_types = get_cached_generate_args()
     
