@@ -285,7 +285,8 @@ def generate_from_cache() -> None:
 
 
 def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> None:
-    
+    generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
+    print(generate_msg, end="", flush=True)
     remove_old_library()
 
     specs = get_specs(contexts=contexts, names=names, function_ids=function_ids, no_types=no_types)
