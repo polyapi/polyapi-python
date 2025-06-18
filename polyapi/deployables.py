@@ -116,6 +116,8 @@ def get_all_deployable_files_windows(config: PolyDeployConfig) -> List[str]:
     exclude_pattern = ' '.join(f"\\{f}" for f in config["exclude_dirs"])
     pattern = ' '.join(f"\\<polyConfig: {name}\\>" for name in config["type_names"]) or 'polyConfig'
 
+    # Using two regular quotes or two smart quotes throws "The syntax of the command is incorrect".
+    # For some reason, starting with a regular quote and leaving the end without a quote works.
     exclude_command = f" | findstr /V /I \"{exclude_pattern}" if exclude_pattern else ''
     search_command = f" | findstr /M /I /F:/ {pattern}"
 
