@@ -126,7 +126,6 @@ def get_all_deployable_files_windows(config: PolyDeployConfig) -> List[str]:
         dir_command = f"dir {include_pattern} /S /P /B"
         full_command = f"{dir_command}{exclude_command}{search_command}"
         try:
-            print(full_command)
             output = subprocess.check_output(full_command, shell=True, text=True)
             result.extend(output.strip().split('\n'))
         except subprocess.CalledProcessError:
