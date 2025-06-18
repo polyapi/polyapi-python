@@ -158,7 +158,7 @@ def get_all_deployable_files(config: PolyDeployConfig) -> List[str]:
     if not config.get("include_files_or_extensions"):
         config["include_files_or_extensions"] = ["py"]
     if not config.get("exclude_dirs"):
-        config["exclude_dirs"] = ["Lib", "node_modules", "dist", "build", "output", ".vscode", ".poly", ".github", ".husky", ".yarn"]
+        config["exclude_dirs"] = ["Lib", "node_modules", "dist", "build", "output", ".vscode", ".poly", ".github", ".husky", ".yarn", ".venv"]
 
     is_windows = os.name == "nt"
     if is_windows:
