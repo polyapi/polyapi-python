@@ -185,18 +185,18 @@ def cache_generate_args(contexts: list | None = None, names: list | None = None,
     # Write values to config
     if contexts is not None:
         config.set("polyapi", "last_generate_contexts_used", ",".join(contexts))
-    else:
-        config.remove_option("polyapi", "last_generate_contexts_used") if config.has_option("polyapi", "last_generate_contexts_used") else None
+    elif config.has_option("polyapi", "last_generate_contexts_used"):
+        config.remove_option("polyapi", "last_generate_contexts_used")
         
     if names is not None:
         config.set("polyapi", "last_generate_names_used", ",".join(names))
-    else:
-        config.remove_option("polyapi", "last_generate_names_used") if config.has_option("polyapi", "last_generate_names_used") else None
+    elif config.has_option("polyapi", "last_generate_names_used"):
+        config.remove_option("polyapi", "last_generate_names_used")
         
     if function_ids is not None:
         config.set("polyapi", "last_generate_function_ids_used", ",".join(function_ids))
-    else:
-        config.remove_option("polyapi", "last_generate_function_ids_used") if config.has_option("polyapi", "last_generate_function_ids_used") else None
+    elif config.has_option("polyapi", "last_generate_function_ids_used"):
+        config.remove_option("polyapi", "last_generate_function_ids_used")
         
     config.set("polyapi", "last_generate_no_types_used", str(no_types).lower())
     
