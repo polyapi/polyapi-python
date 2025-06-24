@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 from typing import List, Tuple, Literal
 import requests
 
@@ -135,6 +136,18 @@ def prepare_deployables(lazy: bool = False, disable_docs: bool = False, disable_
         # NOTE: write_updated_deployable has side effects that update deployable.fileRevision which is in both this list and parsed_deployables
         for deployable in dirty_deployables:
             write_updated_deployable(deployable, disable_docs)
+        # Re-stage any updated staged files.
+        staged = subprocess.check_output('git diff --name-only --cached', shell=True, text=True, ).split('\n')
+        rootPath = subprocess.check_output('git rev-parse --show-toplevel', shell=True, text=True).replace('\n', '')
+        for deployable in dirty_deployables:
+            try:
+                deployableName = deployable["file"].replace('\\', '/').replace(f"{rootPath}/", '')
+                if deployableName in staged:
+                    print(f'Staging {deployableName}')
+                    subprocess.run(['git', 'add', deployableName])
+            except:
+                print('Warning: File staging failed, check that all files are staged properly.')
+
 
     print("Poly deployments are prepared.")
     save_deployable_records(parsed_deployables)
