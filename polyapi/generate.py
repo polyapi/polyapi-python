@@ -2,7 +2,7 @@ import json
 import requests
 import os
 import shutil
-from typing import List, Optional, Tuple, cast
+from typing import Any, List, Optional, Tuple, cast
 
 from .auth import render_auth_function
 from .client import render_client_function
@@ -41,7 +41,7 @@ def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] =
     assert api_key
     headers = get_auth_headers(api_key)
     url = f"{api_url}/specs"
-    params = {"noTypes": str(no_types).lower()}
+    params: Any = {"noTypes": str(no_types).lower()}
 
     if contexts:
         params["contexts"] = contexts
@@ -155,7 +155,7 @@ def parse_function_specs(
 
         # Functions with serverSideAsync True will always return a Dict with execution ID
         if spec.get('serverSideAsync') and spec.get("function"):
-            spec['function']['returnType'] = {'kind': 'plain', 'value': 'object'}
+            spec['function']['returnType'] = {'kind': 'plain', 'value': 'object'}  # type: ignore
 
         functions.append(spec)
 
@@ -321,11 +321,9 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
         )
         exit()
 
-    # Only process variables if no_types is False
-    if not no_types:
-        variables = get_variables()
-        if variables:
-            generate_variables(variables)
+    variables = get_variables()
+    if variables:
+        generate_variables(variables)
 
     # indicator to vscode extension that this is a polyapi-python project
     file_path = os.path.join(os.getcwd(), ".polyapi-python")
@@ -354,8 +352,9 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
     function_id = spec["id"]
 
     arguments: List[PropertySpecification] = []
-    return_type = {}
+    return_type: Any = {}
     if spec.get("function"):
+        assert spec["function"]
         # Handle cases where arguments might be missing or None
         if spec["function"].get("arguments"):
             arguments = [
