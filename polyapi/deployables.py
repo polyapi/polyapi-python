@@ -225,25 +225,17 @@ def print_docstring_function_comment(description: str, args: list, returns: dict
             arg_type = arg.get('type', '')
             desc = arg.get('description', '')
             if arg_type:
-                docstring += f'        {name} ({arg_type}):'
-                if desc:
-                    docstring += f' {desc}'
-                docstring += '\n'
+                docstring += f'        {name} ({arg_type}): {desc}\n'
             else:
-                docstring += f'        {name}:'
-                if desc:
-                    docstring += f' {desc}'
-                docstring += '\n'
+                docstring += f'        {name}: {desc}\n'
 
     return_type = returns.get('type', '')
     return_description = returns.get('description', '')
     if return_type:
-        docstring += f'\n    Returns:\n        {return_type}:'
+        docstring += f'\n    Returns:\n        {return_type}: {return_description}\n'
+    else:
         if return_description:
-            docstring += f' {return_description}'
-        docstring += '\n'
-    elif return_description:
-        docstring += f'\n    Returns:\n        {return_description}\n'
+            docstring += f'\n    Returns:\n        {return_description}\n'
 
     docstring += '    """'
     return docstring
