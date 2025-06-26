@@ -233,7 +233,7 @@ def print_docstring_function_comment(description: str, args: list, returns: dict
     return_description = returns.get('description', '')
     if return_type:
         docstring += f'\n    Returns:\n        {return_type}: {return_description}\n'
-    elif return_description:
+    else:
         docstring += f'\n    Returns:\n        {return_description}\n'
 
     docstring += '    """'
