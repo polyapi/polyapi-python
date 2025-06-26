@@ -78,6 +78,7 @@ Visibility = Union[Literal['PUBLIC'], Literal['TENANT'], Literal['ENVIRONMENT']]
 class PolyDeployable(TypedDict, total=False):
     context: str
     name: str
+    description: NotRequired[str]
     disable_ai: NotRequired[bool]  # Optional field to disable AI
 
 
