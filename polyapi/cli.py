@@ -14,6 +14,16 @@ from .sync import sync_deployables
 CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "update_rendered_spec"]
 
 
+def _get_version_string():
+    """Get the version string for the package."""
+    try:
+        import importlib.metadata
+        version = importlib.metadata.version('polyapi-python')
+        return version
+    except Exception:
+        return "Unknown"
+
+
 def execute_from_cli():
     # First we setup all our argument parsing logic
     # Then we parse the arguments (waaay at the bottom)
@@ -22,6 +32,11 @@ def execute_from_cli():
         description="Manage your Poly API configurations and functions",
         formatter_class=argparse.RawTextHelpFormatter
     )
+    
+    # Add global --version/-v flag
+    parser.add_argument('-v', '--version', action='version', 
+                       version=_get_version_string(),
+                       help="Show version information")
 
     subparsers = parser.add_subparsers(help="Available commands")
 
