@@ -31,6 +31,7 @@ class ParsedDeployableConfig(TypedDict):
     context: str
     name: str
     type: DeployableTypes
+    description: Optional[str]
     disableAi: Optional[bool]
     config: Dict[str, Any]
 
