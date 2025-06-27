@@ -48,12 +48,12 @@ def add_schema_file(
     if schema_defs:
         # add function to init
         init_path = os.path.join(full_path, "__init__.py")
-        with open(init_path, "a") as f:
+        with open(init_path, "a", encoding="utf-8") as f:
             f.write(f"\n\nfrom ._{to_func_namespace(schema_name)} import {schema_name}\n__all__.append('{schema_name}')\n")
 
         # add type_defs to underscore file
         file_path = os.path.join(full_path, f"_{to_func_namespace(schema_name)}.py")
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(schema_defs)
 
 
@@ -85,7 +85,7 @@ def create_schema(
 def add_schema_to_init(full_path: str, spec: SchemaSpecDto):
     init_the_init(full_path, code_imports="")
     init_path = os.path.join(full_path, "__init__.py")
-    with open(init_path, "a") as f:
+    with open(init_path, "a", encoding='utf-8') as f:
         f.write(render_poly_schema(spec) + "\n\n")
 
 
