@@ -2,6 +2,7 @@ import asyncio
 import socketio  # type: ignore
 from socketio.exceptions import ConnectionError  # type: ignore
 import uuid
+import logging
 from typing import Any, Dict, List, Tuple
 
 from polyapi.config import get_api_key_and_url
@@ -121,22 +122,27 @@ def render_webhook_handle(
     arguments: List[PropertySpecification],
     return_type: Dict[str, Any],
 ) -> Tuple[str, str]:
-    function_args, function_args_def = parse_arguments(function_name, arguments)
+    try:
+        function_args, function_args_def = parse_arguments(function_name, arguments)
 
-    if "WebhookEventType" in function_args:
-        # let's add the function name import!
-        function_args = function_args.replace("WebhookEventType", f"{to_func_namespace(function_name)}.WebhookEventType")
+        if "WebhookEventType" in function_args:
+            # let's add the function name import!
+            function_args = function_args.replace("WebhookEventType", f"{to_func_namespace(function_name)}.WebhookEventType")
 
-    func_str = WEBHOOK_TEMPLATE.format(
-        description=function_description,
-        client_id=uuid.uuid4().hex,
-        function_id=function_id,
-        function_name=function_name,
-        function_args=function_args,
-        function_path=poly_full_path(function_context, function_name),
-    )
-    func_defs = WEBHOOK_DEFS_TEMPLATE.format(function_args_def=function_args_def)
-    return func_str, func_defs
+        func_str = WEBHOOK_TEMPLATE.format(
+            description=function_description,
+            client_id=uuid.uuid4().hex,
+            function_id=function_id,
+            function_name=function_name,
+            function_args=function_args,
+            function_path=poly_full_path(function_context, function_name),
+        )
+        func_defs = WEBHOOK_DEFS_TEMPLATE.format(function_args_def=function_args_def)
+        return func_str, func_defs
+    except Exception as e:
+        logging.warning(f"Failed to render webhook handle {function_context}.{function_name} (id: {function_id}): {str(e)}")
+        # Return empty strings to indicate generation failure - this will be caught by generate_functions error handling
+        return "", ""
 
 
 def start(*args):

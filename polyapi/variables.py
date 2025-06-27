@@ -1,4 +1,7 @@
 import os
+import logging
+import tempfile
+import shutil
 from typing import List
 
 from polyapi.schema import map_primitive_types
@@ -70,8 +73,21 @@ class {variable_name}:{get_method}
 
 
 def generate_variables(variables: List[VariableSpecDto]):
+    failed_variables = []
     for variable in variables:
-        create_variable(variable)
+        try:
+            create_variable(variable)
+        except Exception as e:
+            variable_path = f"{variable.get('context', 'unknown')}.{variable.get('name', 'unknown')}"
+            variable_id = variable.get('id', 'unknown')
+            failed_variables.append(f"{variable_path} (id: {variable_id})")
+            logging.warning(f"WARNING: Failed to generate variable {variable_path} (id: {variable_id}): {str(e)}")
+            continue
+    
+    if failed_variables:
+        logging.warning(f"WARNING: {len(failed_variables)} variable(s) failed to generate:")
+        for failed_var in failed_variables:
+            logging.warning(f"  - {failed_var}")
 
 
 def render_variable(variable: VariableSpecDto):
@@ -116,26 +132,84 @@ def _get_variable_type(type_spec: PropertyType) -> str:
 
 
 def create_variable(variable: VariableSpecDto) -> None:
+    """
+    Create a variable with atomic directory and file operations.
+    
+    Tracks directory creation to enable cleanup on failure.
+    """
     folders = ["vari"]
     if variable["context"]:
         folders += variable["context"].split(".")
 
     # build up the full_path by adding all the folders
     full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    created_dirs = []  # Track directories we create for cleanup on failure
 
-    for idx, folder in enumerate(folders):
-        full_path = os.path.join(full_path, folder)
-        if not os.path.exists(full_path):
-            os.makedirs(full_path)
-        next = folders[idx + 1] if idx + 1 < len(folders) else None
-        if next:
-            add_import_to_init(full_path, next)
+    try:
+        for idx, folder in enumerate(folders):
+            full_path = os.path.join(full_path, folder)
+            if not os.path.exists(full_path):
+                os.makedirs(full_path)
+                created_dirs.append(full_path)  # Track for cleanup
+            next = folders[idx + 1] if idx + 1 < len(folders) else None
+            if next:
+                add_import_to_init(full_path, next)
 
-    add_variable_to_init(full_path, variable)
+        add_variable_to_init(full_path, variable)
+        
+    except Exception as e:
+        # Clean up directories we created (in reverse order)
+        for dir_path in reversed(created_dirs):
+            try:
+                if os.path.exists(dir_path) and not os.listdir(dir_path):  # Only remove if empty
+                    os.rmdir(dir_path)
+            except:
+                pass  # Best effort cleanup
+        
+        # Re-raise the original exception
+        raise e
 
 
 def add_variable_to_init(full_path: str, variable: VariableSpecDto):
-    init_the_init(full_path)
-    init_path = os.path.join(full_path, "__init__.py")
-    with open(init_path, "a") as f:
-        f.write(render_variable(variable) + "\n\n")
+    """
+    Atomically add a variable to __init__.py to prevent partial corruption during generation failures.
+    
+    This function generates all content first, then writes the file atomically using temporary files
+    to ensure that either the entire operation succeeds or no changes are made to the filesystem.
+    """
+    try:
+        init_the_init(full_path)
+        init_path = os.path.join(full_path, "__init__.py")
+        
+        # Generate variable content first
+        variable_content = render_variable(variable)
+        if not variable_content:
+            raise Exception("Variable rendering failed - empty content returned")
+        
+        # Read current __init__.py content if it exists
+        init_content = ""
+        if os.path.exists(init_path):
+            with open(init_path, "r") as f:
+                init_content = f.read()
+        
+        # Prepare new content to append
+        new_init_content = init_content + variable_content + "\n\n"
+        
+        # Write to temporary file first, then atomic move
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp") as temp_file:
+            temp_file.write(new_init_content)
+            temp_file_path = temp_file.name
+        
+        # Atomic operation: move temp file to final location
+        shutil.move(temp_file_path, init_path)
+        
+    except Exception as e:
+        # Clean up temporary file if it exists
+        try:
+            if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        except:
+            pass  # Best effort cleanup
+        
+        # Re-raise the original exception
+        raise e
