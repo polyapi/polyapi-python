@@ -2,8 +2,11 @@ import unittest
 import os
 import shutil
 import importlib.util
+from unittest.mock import patch, MagicMock
 from polyapi.utils import get_type_and_def, rewrite_reserved
-from polyapi.generate import render_spec, create_empty_schemas_module
+from polyapi.generate import render_spec, create_empty_schemas_module, generate_functions, create_function
+from polyapi.poly_schemas import generate_schemas, create_schema
+from polyapi.variables import generate_variables, create_variable
 
 OPENAPI_FUNCTION = {
     "kind": "function",
@@ -287,3 +290,373 @@ def test_nested_function() -> schemas.api.v1.user.profile:
         
         # Clean up schemas directory
         shutil.rmtree(schemas_path)
+
+    def test_error_handling_generate_functions(self):
+        """Test that generate_functions handles errors gracefully and continues with other functions"""
+        # Mock create_function to raise an exception for one function
+        failing_spec = {
+            "id": "failing-function-123",
+            "type": "serverFunction",
+            "context": "test",
+            "name": "failingFunction",
+            "description": "A function that will fail to generate",
+        }
+        
+        working_spec = {
+            "id": "working-function-456",
+            "type": "serverFunction", 
+            "context": "test",
+            "name": "workingFunction",
+            "description": "A function that will generate successfully",
+        }
+        
+        specs = [failing_spec, working_spec]
+        
+        # Mock create_function to fail on the first call and succeed on the second
+        with patch('polyapi.generate.create_function') as mock_create:
+            mock_create.side_effect = [Exception("Schema generation failed"), None]
+            
+            # Capture logging output
+            with patch('polyapi.generate.logging.warning') as mock_warning:
+                generate_functions(specs)
+                
+                # Verify that create_function was called twice (once for each spec)
+                self.assertEqual(mock_create.call_count, 2)
+                
+                # Verify that warning messages were logged  
+                mock_warning.assert_any_call("WARNING: Failed to generate function test.failingFunction (id: failing-function-123): Schema generation failed")
+                mock_warning.assert_any_call("WARNING: 1 function(s) failed to generate:")
+                mock_warning.assert_any_call("  - test.failingFunction (id: failing-function-123)")
+
+    def test_error_handling_generate_schemas(self):
+        """Test that generate_schemas handles errors gracefully and continues with other schemas"""
+        from polyapi.typedefs import SchemaSpecDto
+        
+        failing_spec = {
+            "id": "failing-schema-123",
+            "type": "schema",
+            "context": "test",
+            "name": "failingSchema",
+            "description": "A schema that will fail to generate",
+            "definition": {}
+        }
+        
+        working_spec = {
+            "id": "working-schema-456", 
+            "type": "schema",
+            "context": "test",
+            "name": "workingSchema",
+            "description": "A schema that will generate successfully",
+            "definition": {}
+        }
+        
+        specs = [failing_spec, working_spec]
+        
+        # Mock create_schema to fail on the first call and succeed on the second
+        with patch('polyapi.poly_schemas.create_schema') as mock_create:
+            mock_create.side_effect = [Exception("Schema generation failed"), None]
+            
+            # Capture logging output
+            with patch('polyapi.poly_schemas.logging.warning') as mock_warning:
+                generate_schemas(specs)
+                
+                # Verify that create_schema was called twice (once for each spec)
+                self.assertEqual(mock_create.call_count, 2)
+                
+                # Verify that warning messages were logged
+                mock_warning.assert_any_call("WARNING: Failed to generate schema test.failingSchema (id: failing-schema-123): Schema generation failed")
+                mock_warning.assert_any_call("WARNING: 1 schema(s) failed to generate:")
+                mock_warning.assert_any_call("  - test.failingSchema (id: failing-schema-123)")
+
+    def test_error_handling_generate_variables(self):
+        """Test that generate_variables handles errors gracefully and continues with other variables"""
+        from polyapi.typedefs import VariableSpecDto
+        
+        failing_spec = {
+            "id": "failing-variable-123",
+            "type": "serverVariable",
+            "context": "test",
+            "name": "failingVariable",
+            "description": "A variable that will fail to generate",
+            "variable": {
+                "valueType": {"kind": "primitive", "type": "string"},
+                "secrecy": "PUBLIC"
+            }
+        }
+        
+        working_spec = {
+            "id": "working-variable-456",
+            "type": "serverVariable", 
+            "context": "test",
+            "name": "workingVariable",
+            "description": "A variable that will generate successfully",
+            "variable": {
+                "valueType": {"kind": "primitive", "type": "string"},
+                "secrecy": "PUBLIC"
+            }
+        }
+        
+        specs = [failing_spec, working_spec]
+        
+        # Mock create_variable to fail on the first call and succeed on the second
+        with patch('polyapi.variables.create_variable') as mock_create:
+            mock_create.side_effect = [Exception("Variable generation failed"), None]
+            
+            # Capture logging output
+            with patch('polyapi.variables.logging.warning') as mock_warning:
+                generate_variables(specs)
+                
+                # Verify that create_variable was called twice (once for each spec)
+                self.assertEqual(mock_create.call_count, 2)
+                
+                # Verify that warning messages were logged
+                mock_warning.assert_any_call("WARNING: Failed to generate variable test.failingVariable (id: failing-variable-123): Variable generation failed")
+                mock_warning.assert_any_call("WARNING: 1 variable(s) failed to generate:")
+                mock_warning.assert_any_call("  - test.failingVariable (id: failing-variable-123)")
+
+    def test_error_handling_webhook_generation(self):
+        """Test that render_webhook_handle handles errors gracefully during generation"""
+        from polyapi.webhook import render_webhook_handle
+        
+        # Test with problematic arguments that might cause rendering to fail
+        with patch('polyapi.webhook.parse_arguments') as mock_parse:
+            mock_parse.side_effect = Exception("Invalid webhook arguments")
+            
+            with patch('polyapi.webhook.logging.warning') as mock_warning:
+                func_str, func_defs = render_webhook_handle(
+                    function_type="webhookHandle",
+                    function_context="test", 
+                    function_name="failingWebhook",
+                    function_id="webhook-123",
+                    function_description="A webhook that fails to generate",
+                    arguments=[],
+                    return_type={}
+                )
+                
+                # Should return empty strings on failure
+                self.assertEqual(func_str, "")
+                self.assertEqual(func_defs, "")
+                
+                # Should log a warning
+                mock_warning.assert_called_once_with("Failed to render webhook handle test.failingWebhook (id: webhook-123): Invalid webhook arguments")
+
+    def test_atomic_function_generation_failure(self):
+        """Test that function generation failures don't leave partial corrupted files"""
+        import tempfile
+        from polyapi.generate import add_function_file
+        
+        failing_spec = {
+            "id": "failing-function-123",
+            "type": "serverFunction",
+            "context": "test",
+            "name": "failingFunction", 
+            "description": "A function that will fail to generate",
+        }
+        
+        # Create a temporary directory for testing
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Mock render_spec to fail after being called
+            with patch('polyapi.generate.render_spec') as mock_render:
+                mock_render.side_effect = Exception("Rendering failed")
+                
+                # Verify that the function generation fails
+                with self.assertRaises(Exception):
+                    add_function_file(temp_dir, "failingFunction", failing_spec)
+                
+                # Verify no partial files were left behind
+                files_in_dir = os.listdir(temp_dir)
+                # Should only have __init__.py from init_the_init, no corrupted function files
+                self.assertNotIn("failing_function.py", files_in_dir)
+                self.assertNotIn("failingFunction.py", files_in_dir)
+                
+                # If __init__.py exists, it should not contain partial imports
+                init_path = os.path.join(temp_dir, "__init__.py")
+                if os.path.exists(init_path):
+                    with open(init_path, "r") as f:
+                        init_content = f.read()
+                    self.assertNotIn("from . import failing_function", init_content)
+                    self.assertNotIn("from . import failingFunction", init_content)
+
+    def test_atomic_variable_generation_failure(self):
+        """Test that variable generation failures don't leave partial corrupted files"""
+        import tempfile
+        from polyapi.variables import add_variable_to_init
+        
+        failing_spec = {
+            "id": "failing-variable-123",
+            "type": "serverVariable",
+            "context": "test",
+            "name": "failingVariable",
+            "description": "A variable that will fail to generate",
+            "variable": {
+                "valueType": {"kind": "primitive", "type": "string"},
+                "secrecy": "PUBLIC"
+            }
+        }
+        
+        # Create a temporary directory for testing
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Mock render_variable to fail
+            with patch('polyapi.variables.render_variable') as mock_render:
+                mock_render.side_effect = Exception("Variable rendering failed")
+                
+                # Verify that the variable generation fails
+                with self.assertRaises(Exception):
+                    add_variable_to_init(temp_dir, failing_spec)
+                
+                # Verify no partial files were left behind and __init__.py wasn't corrupted
+                init_path = os.path.join(temp_dir, "__init__.py")
+                if os.path.exists(init_path):
+                    with open(init_path, "r") as f:
+                        init_content = f.read()
+                    # Should not contain partial variable content or broken imports
+                    self.assertNotIn("failingVariable", init_content)
+                    self.assertNotIn("class failingVariable", init_content)
+
+    def test_atomic_schema_generation_failure(self):
+        """Test that schema generation failures don't leave partial files or directories"""
+        with patch('tempfile.TemporaryDirectory') as mock_temp_dir:
+            mock_temp_dir.return_value.__enter__.return_value = "/tmp/test_dir"
+            
+            # Mock the render function to fail
+            with patch('polyapi.poly_schemas.render_poly_schema', side_effect=Exception("Schema generation failed")):
+                with patch('logging.warning') as mock_warning:
+                    # This should not crash and should log a warning
+                    schemas = [
+                        {
+                            "id": "schema1",
+                            "name": "TestSchema",
+                            "context": "",
+                            "type": "schema",
+                            "definition": {"type": "object", "properties": {"test": {"type": "string"}}}
+                        }
+                    ]
+                    generate_schemas(schemas)
+                    
+                    # Should have logged a warning about the failed schema
+                    mock_warning.assert_called()
+                    warning_calls = [call[0][0] for call in mock_warning.call_args_list]
+                    # Check that both the main warning and summary warning are present
+                    self.assertTrue(any("Failed to generate schema" in call for call in warning_calls))
+                    self.assertTrue(any("TestSchema" in call for call in warning_calls))
+                    self.assertTrue(any("schema1" in call for call in warning_calls))
+
+    def test_broken_imports_not_left_on_function_failure(self):
+        """Test that if a function fails after directories are created, we don't leave broken imports"""
+        import tempfile
+        import shutil
+        import os
+        from polyapi import generate
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a mock polyapi directory structure
+            polyapi_dir = os.path.join(temp_dir, "polyapi")
+            os.makedirs(polyapi_dir)
+            
+            # Mock spec that would create a nested structure: poly/context/function_name
+            spec = {
+                "id": "test-func-id",
+                "name": "test_function",
+                "context": "test_context", 
+                "type": "apiFunction",
+                "description": "Test function",
+                "function": {
+                    "arguments": [],
+                    "returnType": {"kind": "any"}
+                }
+            }
+            
+            # Mock the add_function_file to fail AFTER directories are created
+            
+            def failing_add_function_file(*args, **kwargs):
+                raise Exception("Function file creation failed")
+            
+            with patch('polyapi.generate.add_function_file', side_effect=failing_add_function_file):
+                with patch('os.path.dirname') as mock_dirname:
+                    mock_dirname.return_value = polyapi_dir
+                    with patch('logging.warning') as mock_warning:
+                        
+                        # This should fail gracefully 
+                        try:
+                            generate.create_function(spec)
+                        except:
+                            pass  # Expected to fail
+                        
+                        # Check that no intermediate directories were left behind
+                        poly_dir = os.path.join(polyapi_dir, "poly")
+                        if os.path.exists(poly_dir):
+                            context_dir = os.path.join(poly_dir, "test_context")
+                            
+                            # If intermediate directories exist, they should not have broken imports
+                            if os.path.exists(context_dir):
+                                init_file = os.path.join(context_dir, "__init__.py")
+                                if os.path.exists(init_file):
+                                    with open(init_file, 'r') as f:
+                                        content = f.read()
+                                    # Should not contain import for the failed function
+                                    self.assertNotIn("test_function", content)
+                                    
+                                # The function directory should not exist
+                                func_dir = os.path.join(context_dir, "test_function") 
+                                self.assertFalse(os.path.exists(func_dir))
+
+    def test_intermediate_init_files_handle_failure_correctly(self):
+        """Test that intermediate __init__.py files are handled correctly when function generation fails"""
+        import tempfile
+        import os
+        from polyapi import generate
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            polyapi_dir = os.path.join(temp_dir, "polyapi") 
+            os.makedirs(polyapi_dir)
+            
+            # Create a poly directory and context directory beforehand
+            poly_dir = os.path.join(polyapi_dir, "poly")
+            context_dir = os.path.join(poly_dir, "test_context")
+            os.makedirs(context_dir)
+            
+            # Put some existing content in the context __init__.py
+            init_file = os.path.join(context_dir, "__init__.py")
+            with open(init_file, 'w') as f:
+                f.write("# Existing context init file\nfrom . import existing_function\n")
+            
+            spec = {
+                "id": "test-func-id", 
+                "name": "failing_function",
+                "context": "test_context",
+                "type": "apiFunction", 
+                "description": "Test function",
+                "function": {
+                    "arguments": [],
+                    "returnType": {"kind": "any"}
+                }
+            }
+            
+            # Mock add_function_file to fail
+            def failing_add_function_file(full_path, function_name, spec):
+                # This simulates failure AFTER intermediate directories are processed
+                # but BEFORE the final function file is written
+                raise Exception("Function file creation failed")
+            
+            with patch('polyapi.generate.add_function_file', side_effect=failing_add_function_file):
+                with patch('os.path.dirname') as mock_dirname:
+                    mock_dirname.return_value = polyapi_dir
+                    
+                    # This should fail but handle cleanup gracefully
+                    try:
+                        generate.create_function(spec)
+                    except:
+                        pass  # Expected to fail
+                    
+                    # The context __init__.py should not contain import for failed function
+                    with open(init_file, 'r') as f:
+                        content = f.read()
+                    
+                    # Should still have existing content
+                    self.assertIn("existing_function", content)
+                    # Should NOT have the failed function
+                    self.assertNotIn("failing_function", content)
+                    
+                    # The failed function directory should not exist
+                    func_dir = os.path.join(context_dir, "failing_function")
+                    self.assertFalse(os.path.exists(func_dir))

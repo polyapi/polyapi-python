@@ -31,6 +31,7 @@ class ParsedDeployableConfig(TypedDict):
     context: str
     name: str
     type: DeployableTypes
+    description: Optional[str]
     disableAi: Optional[bool]
     config: Dict[str, Any]
 
@@ -114,18 +115,16 @@ def get_all_deployable_files_windows(config: PolyDeployConfig) -> List[str]:
     # Constructing the Windows command using dir and findstr
     include_pattern = " ".join(f"*.{f}" for f in config["include_files_or_extensions"]) or "*"
     exclude_pattern = ' '.join(f"\\{f}" for f in config["exclude_dirs"])
-    pattern = ' '.join(f"\\<polyConfig: {name}\\>" for name in config["type_names"]) or 'polyConfig'
+    pattern = ' '.join(f"/C:\"polyConfig: {name}\"" for name in config["type_names"]) or '/C:"polyConfig"'
 
-    # Using two regular quotes or two smart quotes throws "The syntax of the command is incorrect".
-    # For some reason, starting with a regular quote and leaving the end without a quote works.
-    exclude_command = f" | findstr /V /I \"{exclude_pattern}" if exclude_pattern else ''
-    search_command = f" | findstr /M /I /F:/ {pattern}"
+    exclude_command = f" | findstr /V /I \"{exclude_pattern}\"" if exclude_pattern else ''
+    search_command = f" | findstr /S /M /I /F:/ {pattern} *.*"
 
     result = []
     for dir_path in config["include_dirs"]:
-        if dir_path is not '.':
+        if dir_path != '.':
             include_pattern = " ".join(f"{dir_path}*.{f}" for f in config["include_files_or_extensions"]) or "*"
-        dir_command = f"dir {include_pattern} /S /P /B"
+        dir_command = f"dir {include_pattern} /S /P /B > NUL"
         full_command = f"{dir_command}{exclude_command}{search_command}"
         try:
             output = subprocess.check_output(full_command, shell=True, text=True)

@@ -10,7 +10,7 @@ from typing import List, Dict, Any, TypedDict
 """
 
 
-def _wrap_code_in_try_except(code: str) -> str:
+def _wrap_code_in_try_except(function_name: str, code: str) -> str:
     """ this is necessary because client functions with imports will blow up ALL server functions,
     even if they don't use them.
     because the server function will try to load all client functions when loading the library
@@ -18,8 +18,8 @@ def _wrap_code_in_try_except(code: str) -> str:
     prefix = """logger = logging.getLogger("poly")
 try:
     """
-    suffix = """except ImportError as e:
-    logger.debug(e)"""
+    suffix = f"""except ImportError as e:
+    logger.warning("Failed to import client function '{function_name}', function unavailable: " + str(e))"""
 
     lines = code.split("\n")
     code = "\n    ".join(lines)
@@ -39,6 +39,6 @@ def render_client_function(
         return_type_def=return_type_def,
     )
 
-    code = _wrap_code_in_try_except(code)
+    code = _wrap_code_in_try_except(function_name, code)
 
     return code + "\n\n", func_type_defs
