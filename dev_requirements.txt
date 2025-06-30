@@ -1,3 +1,4 @@
 -r requirements.txt
 mock==5.2.0
-pytest 
+pytest
+flask==3.0.3 
