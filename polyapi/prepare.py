@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 from typing import List, Tuple, Literal
 import requests
 
@@ -31,7 +32,7 @@ def get_server_function_description(description: str, arguments, code: str) -> s
     api_key, api_url = get_api_key_and_url()
     headers = get_auth_headers(api_key)
     data = {"description": description, "arguments": arguments, "code": code}
-    response = requests.post(f"{api_url}/server-function-description", headers=headers, json=data)
+    response = requests.post(f"{api_url}/functions/server/description-generation", headers=headers, json=data)
     return response.json()
 
 def get_client_function_description(description: str, arguments, code: str) -> str:
@@ -39,7 +40,7 @@ def get_client_function_description(description: str, arguments, code: str) -> s
     headers = get_auth_headers(api_key)
     # Simulated API call to generate client function descriptions
     data = {"description": description, "arguments": arguments, "code": code}
-    response = requests.post(f"{api_url}/client-function-description", headers=headers, json=data)
+    response = requests.post(f"{api_url}/functions/client/description-generation", headers=headers, json=data)
     return response.json()
 
 def fill_in_missing_function_details(deployable: DeployableRecord, code: str) -> DeployableRecord:
@@ -135,6 +136,16 @@ def prepare_deployables(lazy: bool = False, disable_docs: bool = False, disable_
         # NOTE: write_updated_deployable has side effects that update deployable.fileRevision which is in both this list and parsed_deployables
         for deployable in dirty_deployables:
             write_updated_deployable(deployable, disable_docs)
+        # Re-stage any updated staged files.
+        staged = subprocess.check_output('git diff --name-only --cached', shell=True, text=True, ).split('\n')
+        for deployable in dirty_deployables:
+            try:
+                if deployable["file"] in staged:
+                    print(f'Staging {deployable["file"]}')
+                    subprocess.run(['git', 'add', deployable["file"]])
+            except:
+                print('Warning: File staging failed, check that all files are staged properly.')
+
 
     print("Poly deployments are prepared.")
     save_deployable_records(parsed_deployables)

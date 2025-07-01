@@ -166,3 +166,4 @@ Please ignore \[name-defined\] errors for now. This is a known bug we are workin
 ## Support
 
 If you run into any issues or want help getting started with this project, please contact support@polyapi.io
+.

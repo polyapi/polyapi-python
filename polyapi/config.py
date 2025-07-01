@@ -12,6 +12,10 @@ API_FUNCTION_DIRECT_EXECUTE = None
 MTLS_CERT_PATH = None
 MTLS_KEY_PATH = None
 MTLS_CA_PATH = None
+LAST_GENERATE_CONTEXTS = None
+LAST_GENERATE_NAMES = None
+LAST_GENERATE_FUNCTION_IDS = None
+LAST_GENERATE_NO_TYPES = None
 
 
 def get_config_file_path() -> str:
@@ -55,6 +59,16 @@ def get_api_key_and_url() -> Tuple[str | None, str | None]:
         MTLS_CERT_PATH = config.get("polyapi", "mtls_cert_path", fallback=None)
         MTLS_KEY_PATH = config.get("polyapi", "mtls_key_path", fallback=None)
         MTLS_CA_PATH = config.get("polyapi", "mtls_ca_path", fallback=None)
+        
+        # Read and cache generate command arguments
+        global LAST_GENERATE_CONTEXTS, LAST_GENERATE_NAMES, LAST_GENERATE_FUNCTION_IDS, LAST_GENERATE_NO_TYPES
+        contexts_str = config.get("polyapi", "last_generate_contexts_used", fallback=None)
+        LAST_GENERATE_CONTEXTS = contexts_str.split(",") if contexts_str else None
+        names_str = config.get("polyapi", "last_generate_names_used", fallback=None)
+        LAST_GENERATE_NAMES = names_str.split(",") if names_str else None
+        function_ids_str = config.get("polyapi", "last_generate_function_ids_used", fallback=None)
+        LAST_GENERATE_FUNCTION_IDS = function_ids_str.split(",") if function_ids_str else None
+        LAST_GENERATE_NO_TYPES = config.get("polyapi", "last_generate_no_types_used", fallback="false").lower() == "true"
 
     return key, url
 
@@ -134,3 +148,57 @@ def get_direct_execute_config() -> bool:
         # Force a config read if value isn't cached
         get_api_key_and_url()
     return bool(API_FUNCTION_DIRECT_EXECUTE)
+
+
+def get_cached_generate_args() -> Tuple[list | None, list | None, list | None, bool]:
+    """Return cached generate command arguments"""
+    global LAST_GENERATE_CONTEXTS, LAST_GENERATE_NAMES, LAST_GENERATE_FUNCTION_IDS, LAST_GENERATE_NO_TYPES
+    if LAST_GENERATE_CONTEXTS is None and LAST_GENERATE_NAMES is None and LAST_GENERATE_FUNCTION_IDS is None and LAST_GENERATE_NO_TYPES is None:
+        # Force a config read if values aren't cached
+        get_api_key_and_url()
+    return LAST_GENERATE_CONTEXTS, LAST_GENERATE_NAMES, LAST_GENERATE_FUNCTION_IDS, bool(LAST_GENERATE_NO_TYPES)
+
+
+def cache_generate_args(contexts: list | None = None, names: list | None = None, function_ids: list | None = None, no_types: bool = False):
+    """Cache generate command arguments to config file"""
+    from typing import List
+    
+    # Read existing config
+    path = get_config_file_path()
+    config = configparser.ConfigParser()
+    
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            config.read_file(f)
+    
+    # Ensure polyapi section exists
+    if "polyapi" not in config:
+        config["polyapi"] = {}
+    
+    # Update cached values
+    global LAST_GENERATE_CONTEXTS, LAST_GENERATE_NAMES, LAST_GENERATE_FUNCTION_IDS, LAST_GENERATE_NO_TYPES
+    LAST_GENERATE_CONTEXTS = contexts
+    LAST_GENERATE_NAMES = names
+    LAST_GENERATE_FUNCTION_IDS = function_ids
+    LAST_GENERATE_NO_TYPES = no_types
+    
+    # Write values to config
+    if contexts is not None:
+        config.set("polyapi", "last_generate_contexts_used", ",".join(contexts))
+    elif config.has_option("polyapi", "last_generate_contexts_used"):
+        config.remove_option("polyapi", "last_generate_contexts_used")
+        
+    if names is not None:
+        config.set("polyapi", "last_generate_names_used", ",".join(names))
+    elif config.has_option("polyapi", "last_generate_names_used"):
+        config.remove_option("polyapi", "last_generate_names_used")
+        
+    if function_ids is not None:
+        config.set("polyapi", "last_generate_function_ids_used", ",".join(function_ids))
+    elif config.has_option("polyapi", "last_generate_function_ids_used"):
+        config.remove_option("polyapi", "last_generate_function_ids_used")
+        
+    config.set("polyapi", "last_generate_no_types_used", str(no_types).lower())
+    
+    with open(path, "w") as f:
+        config.write(f)

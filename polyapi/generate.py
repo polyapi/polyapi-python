@@ -2,7 +2,9 @@ import json
 import requests
 import os
 import shutil
-from typing import List, Optional, Tuple, cast
+import logging
+import tempfile
+from typing import Any, List, Optional, Tuple, cast
 
 from .auth import render_auth_function
 from .client import render_client_function
@@ -14,7 +16,7 @@ from .api import render_api_function
 from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
 from .variables import generate_variables
-from .config import get_api_key_and_url, get_direct_execute_config
+from .config import get_api_key_and_url, get_direct_execute_config, get_cached_generate_args
 
 SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
@@ -36,15 +38,21 @@ Unresolved schema, please add the following schema to complete it:
   path:'''
 
 
-def get_specs(contexts=Optional[List[str]], no_types: bool = False) -> List:
+def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> List:
     api_key, api_url = get_api_key_and_url()
     assert api_key
     headers = get_auth_headers(api_key)
     url = f"{api_url}/specs"
-    params = {"noTypes": str(no_types).lower()}
+    params: Any = {"noTypes": str(no_types).lower()}
 
     if contexts:
         params["contexts"] = contexts
+    
+    if names:
+        params["names"] = names
+        
+    if function_ids:
+        params["functionIds"] = function_ids
 
     # Add apiFunctionDirectExecute parameter if direct execute is enabled
     if get_direct_execute_config():
@@ -149,7 +157,7 @@ def parse_function_specs(
 
         # Functions with serverSideAsync True will always return a Dict with execution ID
         if spec.get('serverSideAsync') and spec.get("function"):
-            spec['function']['returnType'] = {'kind': 'plain', 'value': 'object'}
+            spec['function']['returnType'] = {'kind': 'plain', 'value': 'object'}  # type: ignore
 
         functions.append(spec)
 
@@ -264,12 +272,26 @@ sys.modules[__name__] = _SchemaModule()
 ''')
 
 
-def generate(contexts: Optional[List[str]] = None, no_types: bool = False) -> None:
+def generate_from_cache() -> None:
+    """
+    Generate using cached values after non-explicit call.
+    """
+    cached_contexts, cached_names, cached_function_ids, cached_no_types = get_cached_generate_args()
+    
+    generate(
+        contexts=cached_contexts, 
+        names=cached_names, 
+        function_ids=cached_function_ids, 
+        no_types=cached_no_types
+    )
+
+
+def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> None:
     generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
     print(generate_msg, end="", flush=True)
     remove_old_library()
 
-    specs = get_specs(no_types=no_types, contexts=contexts)
+    specs = get_specs(contexts=contexts, names=names, function_ids=function_ids, no_types=no_types)
     cache_specs(specs)
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
@@ -301,11 +323,9 @@ def generate(contexts: Optional[List[str]] = None, no_types: bool = False) -> No
         )
         exit()
 
-    # Only process variables if no_types is False
-    if not no_types:
-        variables = get_variables()
-        if variables:
-            generate_variables(variables)
+    variables = get_variables()
+    if variables:
+        generate_variables(variables)
 
     # indicator to vscode extension that this is a polyapi-python project
     file_path = os.path.join(os.getcwd(), ".polyapi-python")
@@ -334,8 +354,9 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
     function_id = spec["id"]
 
     arguments: List[PropertySpecification] = []
-    return_type = {}
+    return_type: Any = {}
     if spec.get("function"):
+        assert spec["function"]
         # Handle cases where arguments might be missing or None
         if spec["function"].get("arguments"):
             arguments = [
@@ -407,48 +428,124 @@ def add_function_file(
     function_name: str,
     spec: SpecificationDto,
 ):
-    # first lets add the import to the __init__
-    init_the_init(full_path)
+    """
+    Atomically add a function file to prevent partial corruption during generation failures.
+    
+    This function generates all content first, then writes files atomically using temporary files
+    to ensure that either the entire operation succeeds or no changes are made to the filesystem.
+    """
+    try:
+        # first lets add the import to the __init__
+        init_the_init(full_path)
 
-    func_str, func_type_defs = render_spec(spec)
+        func_str, func_type_defs = render_spec(spec)
 
-    if func_str:
-        # add function to init
+        if not func_str:
+            # If render_spec failed and returned empty string, don't create any files
+            raise Exception("Function rendering failed - empty function string returned")
+
+        # Prepare all content first before writing any files
+        func_namespace = to_func_namespace(function_name)
         init_path = os.path.join(full_path, "__init__.py")
-        with open(init_path, "a") as f:
-            f.write(f"\n\nfrom . import {to_func_namespace(function_name)}\n\n{func_str}")
-
-        # add type_defs to underscore file
-        file_path = os.path.join(full_path, f"{to_func_namespace(function_name)}.py")
-        with open(file_path, "w") as f:
-            f.write(func_type_defs)
+        func_file_path = os.path.join(full_path, f"{func_namespace}.py")
+        
+        # Read current __init__.py content if it exists
+        init_content = ""
+        if os.path.exists(init_path):
+            with open(init_path, "r") as f:
+                init_content = f.read()
+        
+        # Prepare new content to append to __init__.py
+        new_init_content = init_content + f"\n\nfrom . import {func_namespace}\n\n{func_str}"
+        
+        # Use temporary files for atomic writes
+        # Write to __init__.py atomically
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp") as temp_init:
+            temp_init.write(new_init_content)
+            temp_init_path = temp_init.name
+        
+        # Write to function file atomically  
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp") as temp_func:
+            temp_func.write(func_type_defs)
+            temp_func_path = temp_func.name
+        
+        # Atomic operations: move temp files to final locations
+        shutil.move(temp_init_path, init_path)
+        shutil.move(temp_func_path, func_file_path)
+        
+    except Exception as e:
+        # Clean up any temporary files that might have been created
+        try:
+            if 'temp_init_path' in locals() and os.path.exists(temp_init_path):
+                os.unlink(temp_init_path)
+            if 'temp_func_path' in locals() and os.path.exists(temp_func_path):
+                os.unlink(temp_func_path)
+        except:
+            pass  # Best effort cleanup
+        
+        # Re-raise the original exception
+        raise e
 
 
 def create_function(
     spec: SpecificationDto
 ) -> None:
+    """
+    Create a function with atomic directory and file operations.
+    
+    Tracks directory creation to enable cleanup on failure.
+    """
     full_path = os.path.dirname(os.path.abspath(__file__))
     folders = f"poly.{spec['context']}.{spec['name']}".split(".")
-    for idx, folder in enumerate(folders):
-        if idx + 1 == len(folders):
-            # special handling for final level
-            add_function_file(
-                full_path,
-                folder,
-                spec,
-            )
-        else:
-            full_path = os.path.join(full_path, folder)
-            if not os.path.exists(full_path):
-                os.makedirs(full_path)
+    created_dirs = []  # Track directories we create for cleanup on failure
+    
+    try:
+        for idx, folder in enumerate(folders):
+            if idx + 1 == len(folders):
+                # special handling for final level
+                add_function_file(
+                    full_path,
+                    folder,
+                    spec,
+                )
+            else:
+                full_path = os.path.join(full_path, folder)
+                if not os.path.exists(full_path):
+                    os.makedirs(full_path)
+                    created_dirs.append(full_path)  # Track for cleanup
 
-            # append to __init__.py file if nested folders
-            next = folders[idx + 1] if idx + 2 < len(folders) else ""
-            if next:
-                init_the_init(full_path)
-                add_import_to_init(full_path, next)
+                # append to __init__.py file if nested folders
+                next = folders[idx + 1] if idx + 2 < len(folders) else ""
+                if next:
+                    init_the_init(full_path)
+                    add_import_to_init(full_path, next)
+                    
+    except Exception as e:
+        # Clean up directories we created (in reverse order)
+        for dir_path in reversed(created_dirs):
+            try:
+                if os.path.exists(dir_path) and not os.listdir(dir_path):  # Only remove if empty
+                    os.rmdir(dir_path)
+            except:
+                pass  # Best effort cleanup
+        
+        # Re-raise the original exception
+        raise e
 
 
 def generate_functions(functions: List[SpecificationDto]) -> None:
+    failed_functions = []
     for func in functions:
-        create_function(func)
+        try:
+            create_function(func)
+        except Exception as e:
+            function_path = f"{func.get('context', 'unknown')}.{func.get('name', 'unknown')}"
+            function_id = func.get('id', 'unknown')
+            failed_functions.append(f"{function_path} (id: {function_id})")
+            logging.warning(f"WARNING: Failed to generate function {function_path} (id: {function_id}): {str(e)}")
+            continue
+    
+    if failed_functions:
+        logging.warning(f"WARNING: {len(failed_functions)} function(s) failed to generate:")
+        for failed_func in failed_functions:
+            logging.warning(f"  - {failed_func}")

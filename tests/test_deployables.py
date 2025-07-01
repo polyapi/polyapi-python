@@ -66,11 +66,11 @@ def foobar(foo: str, bar: Dict[str, str]) -> int:
     """A function that does something really import.
 
     Args:
-        foo (str):
-        bar (Dict[str, str]):
+        foo (str): 
+        bar (Dict[str, str]): 
 
     Returns:
-        int:
+        int: 
     """
     print("Okay then!")
     return 7

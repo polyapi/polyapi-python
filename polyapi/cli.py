@@ -14,6 +14,16 @@ from .sync import sync_deployables
 CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "update_rendered_spec"]
 
 
+def _get_version_string():
+    """Get the version string for the package."""
+    try:
+        import importlib.metadata
+        version = importlib.metadata.version('polyapi-python')
+        return version
+    except Exception:
+        return "Unknown"
+
+
 def execute_from_cli():
     # First we setup all our argument parsing logic
     # Then we parse the arguments (waaay at the bottom)
@@ -22,6 +32,11 @@ def execute_from_cli():
         description="Manage your Poly API configurations and functions",
         formatter_class=argparse.RawTextHelpFormatter
     )
+    
+    # Add global --version/-v flag
+    parser.add_argument('-v', '--version', action='version', 
+                       version=_get_version_string(),
+                       help="Show version information")
 
     subparsers = parser.add_subparsers(help="Available commands")
 
@@ -36,6 +51,9 @@ def execute_from_cli():
             set_api_key_and_url(args.url, args.api_key)
         else:
             initialize_config(force=True)
+            # setup command should have default cache values
+            from .config import cache_generate_args
+            cache_generate_args(contexts=None, names=None, function_ids=None, no_types=False)
             generate()
 
     setup_parser.set_defaults(command=setup)
@@ -46,11 +64,34 @@ def execute_from_cli():
     generate_parser = subparsers.add_parser("generate", help="Generates Poly library")
     generate_parser.add_argument("--no-types", action="store_true", help="Generate SDK without type definitions")
     generate_parser.add_argument("--contexts", type=str, required=False, help="Contexts to generate")
+    generate_parser.add_argument("--names", type=str, required=False, help="Resource names to generate (comma-separated)")
+    generate_parser.add_argument("--function-ids", type=str, required=False, help="Function IDs to generate (comma-separated)")
 
     def generate_command(args):
+        from .config import cache_generate_args
+        
         initialize_config()
+        
         contexts = args.contexts.split(",") if args.contexts else None
-        generate(contexts=contexts, no_types=args.no_types)
+        names = args.names.split(",") if args.names else None
+        function_ids = args.function_ids.split(",") if args.function_ids else None
+        no_types = args.no_types
+        
+        # overwrite all cached values with the values passed in from the command line
+        final_contexts = contexts
+        final_names = names
+        final_function_ids = function_ids
+        final_no_types = no_types
+        
+        # cache the values used for this explicit generate command
+        cache_generate_args(
+            contexts=final_contexts,
+            names=final_names, 
+            function_ids=final_function_ids,
+            no_types=final_no_types
+        )
+        
+        generate(contexts=final_contexts, names=final_names, function_ids=final_function_ids, no_types=final_no_types)
 
     generate_parser.set_defaults(command=generate_command)
 

@@ -31,6 +31,7 @@ class ParsedDeployableConfig(TypedDict):
     context: str
     name: str
     type: DeployableTypes
+    description: Optional[str]
     disableAi: Optional[bool]
     config: Dict[str, Any]
 
@@ -112,20 +113,22 @@ class PolyDeployConfig(TypedDict):
 
 def get_all_deployable_files_windows(config: PolyDeployConfig) -> List[str]:
     # Constructing the Windows command using dir and findstr
-    include_pattern = " ".join(f"*.{f}" if "." in f else f"*.{f}" for f in config["include_files_or_extensions"]) or "*"
-    exclude_pattern = '|'.join(config["exclude_dirs"])
-    pattern = '|'.join(f"polyConfig: {name}" for name in config["type_names"]) or 'polyConfig'
+    include_pattern = " ".join(f"*.{f}" for f in config["include_files_or_extensions"]) or "*"
+    exclude_pattern = ' '.join(f"\\{f}" for f in config["exclude_dirs"])
+    pattern = ' '.join(f"/C:\"polyConfig: {name}\"" for name in config["type_names"]) or '/C:"polyConfig"'
 
     exclude_command = f" | findstr /V /I \"{exclude_pattern}\"" if exclude_pattern else ''
-    search_command = f" | findstr /M /I /F:/ /C:\"{pattern}\""
+    search_command = f" | findstr /S /M /I /F:/ {pattern} *.*"
 
     result = []
     for dir_path in config["include_dirs"]:
-        dir_command = f"dir /S /P /B {include_pattern} {dir_path}"
+        if dir_path != '.':
+            include_pattern = " ".join(f"{dir_path}*.{f}" for f in config["include_files_or_extensions"]) or "*"
+        dir_command = f"dir {include_pattern} /S /P /B > NUL"
         full_command = f"{dir_command}{exclude_command}{search_command}"
         try:
             output = subprocess.check_output(full_command, shell=True, text=True)
-            result.extend(output.strip().split('\r\n'))
+            result.extend(output.strip().split('\n'))
         except subprocess.CalledProcessError:
             pass
     return result
@@ -154,7 +157,7 @@ def get_all_deployable_files(config: PolyDeployConfig) -> List[str]:
     if not config.get("include_files_or_extensions"):
         config["include_files_or_extensions"] = ["py"]
     if not config.get("exclude_dirs"):
-        config["exclude_dirs"] = ["poly", "node_modules", "dist", "build", "output", ".vscode", ".poly", ".github", ".husky", ".yarn"]
+        config["exclude_dirs"] = ["Lib", "node_modules", "dist", "build", "output", ".vscode", ".poly", ".github", ".husky", ".yarn", ".venv"]
 
     is_windows = os.name == "nt"
     if is_windows:
