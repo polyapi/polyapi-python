@@ -513,7 +513,13 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
     deployable["context"] = context or deployable["config"].get("context", "")
     deployable["name"] = name or deployable["config"].get("name", "")
     deployable["disableAi"] = deployable["config"].get("disableAi", False)
-    deployable["description"] = deployable["types"].get("description", "")
+    deployable["description"] = deployable["config"].get("description", "")
+    if deployable["description"]:
+        if deployable["description"] != deployable["types"].get("description", ""):
+            deployable["types"]["description"] = deployable["description"]
+            deployable["dirty"] = True
+    else:
+        deployable["description"] = deployable["types"].get("description", "")
     if not deployable["name"]:
         print_red("ERROR")
         print("Function config is missing a name.")

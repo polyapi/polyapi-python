@@ -25,11 +25,13 @@ FALLBACK_SPEC_TEMPLATE = """class {name}(TypedDict, total=False):
 
 def generate_schemas(specs: List[SchemaSpecDto], limit_ids: List[str] = None):
     failed_schemas = []
+    successful_schemas = []
     if limit_ids:
         for spec in specs:
             if spec["id"] in limit_ids:
                 try:
                     create_schema(spec)
+                    successful_schemas.append(f"{spec.get('context', 'unknown')}.{spec.get('name', 'unknown')}")
                 except Exception as e:
                     schema_path = f"{spec.get('context', 'unknown')}.{spec.get('name', 'unknown')}"
                     schema_id = spec.get('id', 'unknown')
@@ -40,6 +42,7 @@ def generate_schemas(specs: List[SchemaSpecDto], limit_ids: List[str] = None):
         for spec in specs:
             try:
                 create_schema(spec)
+                successful_schemas.append(f"{spec.get('context', 'unknown')}.{spec.get('name', 'unknown')}")
             except Exception as e:
                 schema_path = f"{spec.get('context', 'unknown')}.{spec.get('name', 'unknown')}"
                 schema_id = spec.get('id', 'unknown')
@@ -51,6 +54,37 @@ def generate_schemas(specs: List[SchemaSpecDto], limit_ids: List[str] = None):
         logging.warning(f"WARNING: {len(failed_schemas)} schema(s) failed to generate:")
         for failed_schema in failed_schemas:
             logging.warning(f"  - {failed_schema}")
+        logging.warning(f"Successfully generated {len(successful_schemas)} schema(s)")
+
+
+def validate_schema_content(schema_content: str, schema_name: str) -> bool:
+    """
+    Validate that the schema content is meaningful and not just imports.
+    Returns True if the schema is valid, False otherwise.
+    """
+    if not schema_content or not schema_content.strip():
+        logging.debug(f"Schema {schema_name} failed validation: Empty content")
+        return False
+    
+    lines = schema_content.strip().split('\n')
+    
+    # Check if the content has any actual class definitions or type aliases
+    has_class_definition = any(line.strip().startswith('class ') for line in lines)
+    has_type_alias = any(schema_name in line and '=' in line and not line.strip().startswith('#') for line in lines)
+    
+    # Check if it's essentially just imports (less than 5 lines and no meaningful definitions)
+    meaningful_lines = [line for line in lines if line.strip() and not line.strip().startswith('from ') and not line.strip().startswith('import ') and not line.strip().startswith('#')]
+    
+    # Enhanced logging for debugging
+    if not (has_class_definition or has_type_alias) or len(meaningful_lines) < 1:
+        # Determine the specific reason for failure
+        if len(meaningful_lines) == 0:
+            logging.debug(f"Schema {schema_name} failed validation: No meaningful content (only imports) - likely empty object or unresolved reference")
+        elif not has_class_definition and not has_type_alias:
+            logging.debug(f"Schema {schema_name} failed validation: No class definition or type alias found")
+        return False
+    
+    return True
 
 
 def add_schema_file(
@@ -75,9 +109,9 @@ def add_schema_file(
 
         schema_defs = render_poly_schema(spec)
 
-        if not schema_defs:
-            # If render_poly_schema failed and returned empty string, don't create any files
-            raise Exception("Schema rendering failed - empty schema content returned")
+        # Validate schema content before proceeding
+        if not validate_schema_content(schema_defs, schema_name):
+            raise Exception(f"Schema rendering failed or produced invalid content for {schema_name}")
 
         # Prepare all content first before writing any files
         schema_namespace = to_func_namespace(schema_name)
