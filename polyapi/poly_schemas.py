@@ -121,7 +121,7 @@ def add_schema_file(
         # Read current __init__.py content if it exists
         init_content = ""
         if os.path.exists(init_path):
-            with open(init_path, "r") as f:
+            with open(init_path, "r", encoding='utf-8') as f:
                 init_content = f.read()
         
         # Prepare new content to append to __init__.py
@@ -129,12 +129,12 @@ def add_schema_file(
         
         # Use temporary files for atomic writes
         # Write to __init__.py atomically
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp") as temp_init:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp", encoding='utf-8') as temp_init:
             temp_init.write(new_init_content)
             temp_init_path = temp_init.name
         
         # Write to schema file atomically  
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp") as temp_schema:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp", encoding='utf-8') as temp_schema:
             temp_schema.write(schema_defs)
             temp_schema_path = temp_schema.name
         
@@ -205,7 +205,7 @@ def create_schema(
 def add_schema_to_init(full_path: str, spec: SchemaSpecDto):
     init_the_init(full_path, code_imports="")
     init_path = os.path.join(full_path, "__init__.py")
-    with open(init_path, "a") as f:
+    with open(init_path, "a", encoding='utf-8') as f:
         f.write(render_poly_schema(spec) + "\n\n")
 
 
