@@ -138,11 +138,13 @@ def prepare_deployables(lazy: bool = False, disable_docs: bool = False, disable_
             write_updated_deployable(deployable, disable_docs)
         # Re-stage any updated staged files.
         staged = subprocess.check_output('git diff --name-only --cached', shell=True, text=True, ).split('\n')
+        rootPath = subprocess.check_output('git rev-parse --show-toplevel', shell=True, text=True).replace('\n', '')
         for deployable in dirty_deployables:
             try:
-                if deployable["file"] in staged:
-                    print(f'Staging {deployable["file"]}')
-                    subprocess.run(['git', 'add', deployable["file"]])
+                deployableName = deployable["file"].replace('\\', '/').replace(f"{rootPath}/", '')
+                if deployableName in staged:
+                    print(f'Staging {deployableName}')
+                    subprocess.run(['git', 'add', deployableName])
             except:
                 print('Warning: File staging failed, check that all files are staged properly.')
 
