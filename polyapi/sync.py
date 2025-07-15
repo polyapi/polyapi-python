@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from typing import List, Dict
+from typing_extensions import cast # type: ignore
 import requests
 
 from polyapi.utils import get_auth_headers
@@ -30,12 +31,14 @@ def group_by(items: List[Dict], key: str) -> Dict[str, List[Dict]]:
 
 def remove_deployable_function(deployable: SyncDeployment) -> bool:
     api_key, _ = get_api_key_and_url()
+    if not api_key:
+        raise Error("Missing api key!")
     headers = get_auth_headers(api_key)
     url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}/{deployable["id"]}'
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
         return False
-    requests.delete(url, headers)
+    requests.delete(url, headers=headers)
     return True
 
 def remove_deployable(deployable: SyncDeployment) -> bool:
@@ -47,6 +50,8 @@ def remove_deployable(deployable: SyncDeployment) -> bool:
 
 def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
     api_key, _ = get_api_key_and_url()
+    if not api_key:
+        raise Error("Missing api key!")
     headers = get_auth_headers(api_key)
     url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}'
     payload = {
@@ -129,15 +134,15 @@ def sync_deployables(dry_run: bool, instance: str | None = None):
                 else:
                     sync_deployment = { **deployable, "instance": instance }
                 if git_revision == deployable['gitRevision']:
-                    deployment = sync_deployable(sync_deployment)
+                    deployment = sync_deployable(cast(SyncDeployment, sync_deployment))
                     if previous_deployment:
                         previous_deployment.update(deployment)
                     else:
                         deployable['deployments'].insert(0, deployment)
                 else:
-                    found = remove_deployable(sync_deployment)
+                    found = remove_deployable(cast(SyncDeployment, sync_deployment))
                     action = 'NOT FOUND' if not found else action
-                    remove_index = all_deployables.index(deployable)
+                    remove_index = all_deployables.index(cast(DeployableRecord, deployable))
                     to_remove.append(all_deployables.pop(remove_index))
 
             print(f"{'Would sync' if dry_run else 'Synced'} {deployable['type'].replace('-', ' ')} {deployable['context']}.{deployable['name']}: {'TO BE ' if dry_run else ''}{action}")
