@@ -19,10 +19,7 @@ GET_TEMPLATE = """
 
 
 TEMPLATE = """
-import uuid
-
-
-client_id = uuid.uuid4().hex
+from polyapi.poly.client_id import client_id
 
 
 class {variable_name}:{get_method}

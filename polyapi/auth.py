@@ -1,5 +1,4 @@
 from typing import List, Dict, Any, Tuple
-import uuid
 
 from polyapi.typedefs import PropertySpecification
 from polyapi.utils import parse_arguments, get_type_and_def
@@ -26,7 +25,8 @@ async def getToken(clientId: str, clientSecret: str, scopes: List[str], callback
 
     Function ID: {function_id}
     \"""
-    eventsClientId = "{client_id}"
+    from polyapi.poly.client_id import client_id
+    eventsClientId = client_id
     function_id = "{function_id}"
 
     options = options or {{}}
@@ -165,7 +165,7 @@ def render_auth_function(
     func_str = ""
 
     if function_name == "getToken":
-        func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description, client_id=uuid.uuid4().hex)
+        func_str = GET_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
     elif function_name == "introspectToken":
         func_str = INTROSPECT_TOKEN_TEMPLATE.format(function_id=function_id, description=function_description)
     elif function_name == "refreshToken":

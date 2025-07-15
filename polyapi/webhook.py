@@ -1,7 +1,6 @@
 import asyncio
 import socketio  # type: ignore
 from socketio.exceptions import ConnectionError  # type: ignore
-import uuid
 import logging
 from typing import Any, Dict, List, Tuple
 
@@ -33,6 +32,7 @@ async def {function_name}(
     Function ID: {function_id}
     \"""
     from polyapi.webhook import client, active_handlers
+    from polyapi.poly.client_id import client_id
 
     print("Starting webhook handler for {function_path}...")
 
@@ -40,7 +40,7 @@ async def {function_name}(
         raise Exception("Client not initialized. Abort!")
 
     options = options or {{}}
-    eventsClientId = "{client_id}"
+    eventsClientId = client_id
     function_id = "{function_id}"
 
     api_key, base_url = get_api_key_and_url()
@@ -131,7 +131,6 @@ def render_webhook_handle(
 
         func_str = WEBHOOK_TEMPLATE.format(
             description=function_description,
-            client_id=uuid.uuid4().hex,
             function_id=function_id,
             function_name=function_name,
             function_args=function_args,

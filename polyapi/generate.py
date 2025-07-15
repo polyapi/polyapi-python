@@ -272,6 +272,14 @@ sys.modules[__name__] = _SchemaModule()
 ''')
 
 
+def _generate_client_id() -> None:
+    full_path = os.path.dirname(os.path.abspath(__file__))
+    full_path = os.path.join(full_path, "poly", "client_id.py")
+    with open(full_path, "w") as f:
+        f.write(f'client_id = "{uuid.uuid4().hex}"')
+
+
+
 def generate_from_cache() -> None:
     """
     Generate using cached values after non-explicit call.
@@ -296,6 +304,8 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
     functions = parse_function_specs(specs, limit_ids=limit_ids)
+
+    _generate_client_id()
 
     # Only process schemas if no_types is False
     if not no_types:
