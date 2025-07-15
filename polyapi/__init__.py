@@ -2,6 +2,8 @@ import os
 import sys
 import copy
 import truststore
+import logging
+import builtins
 from typing import Any, Dict, Optional, overload, Literal
 from typing_extensions import TypedDict
 truststore.inject_into_ssl()
@@ -99,3 +101,18 @@ class _PolyCustom:
 
 
 polyCustom: PolyCustomDict = _PolyCustom()
+
+original_print = print
+
+logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
+
+def log_prints(*objects, sep=' ', end='\n', file=sys.stdout, flush=False):
+    message = sep.join(map(str, objects)) + end
+    if file is sys.stdout:
+        logging.info(message)
+    elif file is sys.stderr:
+        logging.error(message)
+    else: 
+        original_print(*objects, sep=sep, end=end, file=file, flush=flush)
+
+builtins.print = log_prints
