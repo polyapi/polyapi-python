@@ -62,7 +62,7 @@ def transform_query(query: dict) -> dict:
     return query
 
 
-TABI_TABLE_TEMPLATE = """
+TABI_TABLE_TEMPLATE = '''
 {table_name}Columns = Literal[{table_columns}]
 
 
@@ -125,7 +125,8 @@ class {table_name}CountQuery(TypedDict):
 
 
 
-class {table_name}:
+class {table_name}:{table_description}
+    table_id = "{table_id}"
 
     @overload
     @staticmethod
@@ -142,7 +143,7 @@ class {table_name}:
             query = args[0]
         else:
             query = kwargs
-        return execute_query("{table_id}", "count", transform_query(query))
+        return execute_query({table_name}.table_id, "count", transform_query(query))
 
     @overload
     @staticmethod
@@ -163,7 +164,7 @@ class {table_name}:
             query['limit'] = 1000
         if query['limit'] > 1000:
             raise ValueError("Cannot select more than 1000 rows at a time.")
-        return execute_query("{table_id}", "select", transform_query(query))
+        return execute_query({table_name}.table_id, "select", transform_query(query))
 
     @overload
     @staticmethod
@@ -181,7 +182,7 @@ class {table_name}:
         else:
             query = kwargs
         query['limit'] = 1
-        return first_result(execute_query("{table_id}", "select", transform_query(query)))
+        return first_result(execute_query({table_name}.table_id, "select", transform_query(query)))
 
     @overload
     @staticmethod
@@ -200,7 +201,7 @@ class {table_name}:
             query = kwargs
         if len(query['data']) > 1000:
             raise ValueError("Cannot insert more than 1000 rows at a time.")
-        return execute_query("{table_id}", "insert", query)
+        return execute_query({table_name}.table_id, "insert", query)
 
     @overload
     @staticmethod
@@ -217,7 +218,7 @@ class {table_name}:
             query = args[0]
         else:
             query = kwargs
-        return first_result(execute_query("{table_id}", "insert", {{ 'data': [query['data']] }}))
+        return first_result(execute_query({table_name}.table_id, "insert", {{ 'data': [query['data']] }}))
 
     @overload
     @staticmethod
@@ -236,7 +237,7 @@ class {table_name}:
             query = kwargs
         if len(data) > 1000:
             raise ValueError("Cannot upsert more than 1000 rows at a time.")
-        return execute_query("{table_id}", "upsert", query)
+        return execute_query({table_name}.table_id, "upsert", query)
 
     @overload
     @staticmethod
@@ -253,7 +254,7 @@ class {table_name}:
             query = args[0]
         else:
             query = kwargs
-        return first_result(execute_query("{table_id}", "upsert", {{ 'data': [query['data']] }}))
+        return first_result(execute_query({table_name}.table_id, "upsert", {{ 'data': [query['data']] }}))
 
     @overload
     @staticmethod
@@ -270,7 +271,7 @@ class {table_name}:
             query = args[0]
         else:
             query = kwargs
-        return execute_query("{table_id}", 'update', transform_query(query))
+        return execute_query({table_name}.table_id, "update", transform_query(query))
 
     @overload
     @staticmethod
@@ -287,8 +288,8 @@ class {table_name}:
             query = args[0]
         else:
             query = kwargs
-        return execute_query("{table_id}", "delete", query)
-"""
+        return execute_query({table_name}.table_id, "delete", query)
+'''
 
 
 def _get_column_type_str(name: str, schema: Dict[str, Any], is_required: bool) -> str:
@@ -379,10 +380,17 @@ def _render_table(table: TableSpecDto) -> str:
     table_row_classes = _render_table_row_classes(table["name"], table["schema"])
     table_row_subset_class = _render_table_subset_class(table["name"], columns, required_colunms)
     table_where_class = _render_table_where_class(table["name"], columns, required_colunms)
+    if table.get("description", ""):
+        table_description =  '\n    """'
+        table_description += '\n       '.join(table["description"].replace('"', "'").split("\n"))
+        table_description += '\n    """'
+    else:
+        table_description = ""
 
     return TABI_TABLE_TEMPLATE.format(
         table_name=table["name"],
         table_id=table["id"],
+        table_description=table_description,
         table_columns=table_columns,
         table_row_classes=table_row_classes,
         table_row_subset_class=table_row_subset_class,

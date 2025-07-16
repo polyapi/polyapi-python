@@ -77,6 +77,7 @@ class TableSpecDto(TypedDict):
     context: str
     name: str
     contextName: str
+    description: str
     type: Literal['table']
     schema: Dict[Any, Any]
     unresolvedPolySchemaRefs: List

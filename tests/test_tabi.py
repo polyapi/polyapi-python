@@ -8,6 +8,7 @@ TABLE_SPEC_SIMPLE = {
     "name": "MyTable",
     "context": "some.context.here",
     "contextName": "some.context.here.MyTable",
+    "description": "This table stores:\n  - User name\n  - User age\n  - If user is active on the platform",
     "schema": {
         "$schema": "http://json-schema.org/draft-06/schema#",
         "type": "object",
@@ -132,6 +133,12 @@ class MyTableCountQuery(TypedDict):
 
 
 class MyTable:
+    """This table stores:
+         - User name
+         - User age
+         - If user is active on the platform
+    """
+    table_id = "123456789"
 
     @overload
     @staticmethod
@@ -148,7 +155,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return execute_query(123456789, 'count', transform_query(query))
+        return execute_query(MyTable.table_id, "count", transform_query(query))
 
     @overload
     @staticmethod
@@ -169,7 +176,7 @@ class MyTable:
             query['limit'] = 1000
         if query['limit'] > 1000:
             raise ValueError("Cannot select more than 1000 rows at a time.")
-        return execute_query(123456789, 'select', transform_query(query))
+        return execute_query(MyTable.table_id, "select", transform_query(query))
 
     @overload
     @staticmethod
@@ -187,7 +194,7 @@ class MyTable:
         else:
             query = kwargs
         query['limit'] = 1
-        return first_result(execute_query(123456789, 'select', transform_query(query)))
+        return first_result(execute_query(MyTable.table_id, "select", transform_query(query)))
 
     @overload
     @staticmethod
@@ -206,7 +213,7 @@ class MyTable:
             query = kwargs
         if len(query['data']) > 1000:
             raise ValueError("Cannot insert more than 1000 rows at a time.")
-        return execute_query(123456789, 'insert', query)
+        return execute_query(MyTable.table_id, "insert", query)
 
     @overload
     @staticmethod
@@ -223,7 +230,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return first_result(execute_query(123456789, 'insert', { 'data': [query['data']] }))
+        return first_result(execute_query(MyTable.table_id, "insert", { 'data': [query['data']] }))
 
     @overload
     @staticmethod
@@ -242,7 +249,7 @@ class MyTable:
             query = kwargs
         if len(data) > 1000:
             raise ValueError("Cannot upsert more than 1000 rows at a time.")
-        return execute_query(123456789, 'upsert', query)
+        return execute_query(MyTable.table_id, "upsert", query)
 
     @overload
     @staticmethod
@@ -259,7 +266,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return first_result(execute_query(123456789, 'upsert', { 'data': [query['data']] }))
+        return first_result(execute_query(MyTable.table_id, "upsert", { 'data': [query['data']] }))
 
     @overload
     @staticmethod
@@ -276,7 +283,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return execute_query(123456789, 'update', transform_query(query))
+        return execute_query(MyTable.table_id, "update", transform_query(query))
 
     @overload
     @staticmethod
@@ -293,7 +300,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return execute_query(123456789, 'delete', query)
+        return execute_query(MyTable.table_id, "delete", query)
 '''
 
 TABLE_SPEC_COMPLEX = {
@@ -437,6 +444,7 @@ class MyTableCountQuery(TypedDict):
 
 
 class MyTable:
+    table_id = "123456789"
 
     @overload
     @staticmethod
@@ -453,7 +461,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return execute_query(123456789, 'count', transform_query(query))
+        return execute_query(MyTable.table_id, "count", transform_query(query))
 
     @overload
     @staticmethod
@@ -474,7 +482,7 @@ class MyTable:
             query['limit'] = 1000
         if query['limit'] > 1000:
             raise ValueError("Cannot select more than 1000 rows at a time.")
-        return execute_query(123456789, 'select', transform_query(query))
+        return execute_query(MyTable.table_id, "select", transform_query(query))
 
     @overload
     @staticmethod
@@ -492,7 +500,7 @@ class MyTable:
         else:
             query = kwargs
         query['limit'] = 1
-        return first_result(execute_query(123456789, 'select', transform_query(query)))
+        return first_result(execute_query(MyTable.table_id, "select", transform_query(query)))
 
     @overload
     @staticmethod
@@ -511,7 +519,7 @@ class MyTable:
             query = kwargs
         if len(query['data']) > 1000:
             raise ValueError("Cannot insert more than 1000 rows at a time.")
-        return execute_query(123456789, 'insert', query)
+        return execute_query(MyTable.table_id, "insert", query)
 
     @overload
     @staticmethod
@@ -528,7 +536,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return first_result(execute_query(123456789, 'insert', { 'data': [query['data']] }))
+        return first_result(execute_query(MyTable.table_id, "insert", { 'data': [query['data']] }))
 
     @overload
     @staticmethod
@@ -547,7 +555,7 @@ class MyTable:
             query = kwargs
         if len(data) > 1000:
             raise ValueError("Cannot upsert more than 1000 rows at a time.")
-        return execute_query(123456789, 'upsert', query)
+        return execute_query(MyTable.table_id, "upsert", query)
 
     @overload
     @staticmethod
@@ -564,7 +572,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return first_result(execute_query(123456789, 'upsert', { 'data': [query['data']] }))
+        return first_result(execute_query(MyTable.table_id, "upsert", { 'data': [query['data']] }))
 
     @overload
     @staticmethod
@@ -581,7 +589,7 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return execute_query(123456789, 'update', transform_query(query))
+        return execute_query(MyTable.table_id, "update", transform_query(query))
 
     @overload
     @staticmethod
@@ -598,12 +606,11 @@ class MyTable:
             query = args[0]
         else:
             query = kwargs
-        return execute_query(123456789, 'delete', query)
+        return execute_query(MyTable.table_id, "delete", query)
 '''
 
 class T(unittest.TestCase):
     def test_render_simple(self):
-        self.maxDiff = None
         output = _render_table(TABLE_SPEC_SIMPLE)
         self.assertEqual(output, EXPECTED_SIMPLE)
     
