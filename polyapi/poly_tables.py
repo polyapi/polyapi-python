@@ -298,19 +298,19 @@ def _get_column_type_str(name: str, schema: Dict[str, Any], is_required: bool) -
     col_type = schema.get("type", "object")
     if isinstance(col_type, list):
         subtypes = [_get_column_type_str(name, { **schema, "type": t }, is_required) for t in col_type]
-        result = f"Union[{", ".join(subtypes)}]"
+        result = f"Union[{', '.join(subtypes)}]"
     elif col_type == "array":
         if isinstance(schema["items"], list):
             subtypes = [_get_column_type_str(f"{name}{i}", s, True) for i, s in enumerate(schema["items"])]
-            result = f"Tuple[{", ".join(subtypes)}]"
+            result = f"Tuple[{', '.join(subtypes)}]"
         elif isinstance(schema["items"], dict):
-            result = f"List[{_get_column_type_str(name, schema["items"], True)}]"
+            result = f"List[{_get_column_type_str(name, schema['items'], True)}]"
         else:
             result = "List[Any]"
     elif col_type == "object":
         if isinstance(schema.get("patternProperties"), dict):
             # TODO: Handle multiple pattern properties
-            result = f"Dict[str, {_get_column_type_str(f"{name}_", schema["patternProperties"], True)}]"
+            result = f"Dict[str, {_get_column_type_str(f'{name}_', schema["patternProperties"], True)}]"
         elif isinstance(schema.get("properties"), dict) and len(schema["properties"].values()) > 0:
             # TODO: Handle x-poly-refs
             result = f'"{name}"'
