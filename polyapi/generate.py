@@ -4,6 +4,8 @@ import os
 import shutil
 import logging
 import tempfile
+
+from copy import deepcopy
 from typing import Any, List, Optional, Tuple, cast
 
 from .auth import render_auth_function
@@ -136,18 +138,21 @@ def parse_function_specs(
     limit_ids: List[str] | None = None,  # optional list of ids to limit to
 ) -> List[SpecificationDto]:
     functions = []
-    for spec in specs:
-        if not spec:
+    for raw_spec in specs:
+        if not raw_spec:
             continue
 
         # For no_types mode, we might not have function data, but we still want to include the spec
         # if it's a supported function type
-        if spec["type"] not in SUPPORTED_FUNCTION_TYPES:
+        if raw_spec["type"] not in SUPPORTED_FUNCTION_TYPES:
             continue
 
         # Skip if we have a limit and this spec is not in it
-        if limit_ids and spec.get("id") not in limit_ids:
+        if limit_ids and raw_spec.get("id") not in limit_ids:
             continue
+
+        # Should really be fixed in specs api, but for now handle json strings in arg schemas
+        spec = normalize_args_schema(raw_spec)
 
         # For customFunction, check language if we have function data
         if spec["type"] == "customFunction":
@@ -284,6 +289,37 @@ def generate_from_cache() -> None:
         function_ids=cached_function_ids, 
         no_types=cached_no_types
     )
+
+
+def _parse_arg_schema(value: Any) -> Any:
+    if isinstance(value, str):
+        text = value.strip()
+        if text and text[0] in "{[":
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                logging.warning("Could not parse function argument schema (leaving as str): %s", text[:200])
+    return value
+
+
+def normalize_args_schema(
+    raw_spec: SpecificationDto
+) -> SpecificationDto:
+    spec = deepcopy(raw_spec)
+
+    function_block = spec.get("function")
+    if not isinstance(function_block, dict):
+        return spec
+    arguments_block = function_block.get("arguments")
+    if not isinstance(arguments_block, list):
+        return spec
+
+    for argument in arguments_block:
+        arg_type = argument.get("type")
+        if isinstance(arg_type, dict) and "schema" in arg_type:
+            arg_type["schema"] = _parse_arg_schema(arg_type["schema"])
+
+    return spec
 
 
 def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> None:
