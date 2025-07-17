@@ -1,12 +1,11 @@
 from typing import Dict, Optional
 import requests
 import os
-import logging
+import sys
 from requests import Response
 from polyapi.config import get_api_key_and_url, get_mtls_config
 from polyapi.exceptions import PolyApiException
 
-logger = logging.getLogger("poly")
 
 def direct_execute(function_type, function_id, data) -> Response:
     """ execute a specific function id/type
@@ -49,7 +48,7 @@ def direct_execute(function_type, function_id, data) -> Response:
     if (resp.status_code < 200 or resp.status_code >= 300):
         error_content = resp.content.decode("utf-8", errors="ignore")
         if function_type == 'api' and os.getenv("LOGS_ENABLED"):
-            logger.error(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}")
+            print(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}", file=sys.stderr)
         elif function_type != 'api':   
             raise PolyApiException(f"{resp.status_code}: {error_content}")    
     
@@ -73,7 +72,7 @@ def execute(function_type, function_id, data) -> Response:
     if (resp.status_code < 200 or resp.status_code >= 300) and os.getenv("LOGS_ENABLED"):
         error_content = resp.content.decode("utf-8", errors="ignore")
         if function_type == 'api' and os.getenv("LOGS_ENABLED"):
-            logger.error(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}")
+            print(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}", file=sys.stderr)
         elif function_type != 'api':
             raise PolyApiException(f"{resp.status_code}: {error_content}")
 
