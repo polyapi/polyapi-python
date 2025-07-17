@@ -11,7 +11,7 @@ class PropertySpecification(TypedDict):
 
 
 class PropertyType(TypedDict):
-    kind: Literal['void', 'primitive', 'array', 'object', 'function', 'plain']
+    kind: Literal['void', 'primitive', 'array', 'object', 'function', 'plain', 'any']
     spec: NotRequired[Dict]
     name: NotRequired[str]
     type: NotRequired[str]
@@ -35,7 +35,7 @@ class SpecificationDto(TypedDict):
     description: str
     # function is none (or function key not present) if this is actually VariableSpecDto
     function: NotRequired[FunctionSpecification | None]
-    type: Literal['apiFunction', 'customFunction', 'serverFunction', 'authFunction', 'webhookHandle', 'serverVariable']
+    type: Literal['apiFunction', 'customFunction', 'serverFunction', 'authFunction', 'webhookHandle', 'serverVariable', 'table']
     code: NotRequired[str]
     language: str
 
@@ -72,6 +72,17 @@ class SchemaSpecDto(TypedDict):
     # TODO add more
 
 
+class TableSpecDto(TypedDict):
+    id: str
+    context: str
+    name: str
+    contextName: str
+    description: str
+    type: Literal['table']
+    schema: Dict[Any, Any]
+    unresolvedPolySchemaRefs: List
+
+
 Visibility = Union[Literal['PUBLIC'], Literal['TENANT'], Literal['ENVIRONMENT']]
 
 
@@ -91,3 +102,99 @@ class PolyServerFunction(PolyDeployable):
 class PolyClientFunction(PolyDeployable):
     logs_enabled: NotRequired[bool]
     visibility: NotRequired[Visibility]
+
+
+class Table(TypedDict):
+    id: str
+    createdAt: str
+    updatedAt: str
+
+
+class PolyCountResult(TypedDict):
+    count: int
+
+
+class PolyDeleteResults(TypedDict):
+    deleted: int
+
+
+
+QueryMode = Literal["default", "insensitive"]
+
+
+SortOrder = Literal["asc", "desc"]
+
+# Using functional form because of use of reserved keywords
+StringFilter = TypedDict("StringFilter", {
+    "equals": NotRequired[str],
+    "in": NotRequired[List[str]],
+    "not_in": NotRequired[List[str]],
+    "lt": NotRequired[str],
+    "lte": NotRequired[str],
+    "gt": NotRequired[str],
+    "gte": NotRequired[str],
+    "contains": NotRequired[str],
+    "starts_with": NotRequired[str],
+    "ends_with": NotRequired[str],
+    "mode": NotRequired[QueryMode],
+    "not": NotRequired[Union[str, "StringFilter"]],
+})
+
+# Using functional form because of use of reserved keywords
+NullableStringFilter = TypedDict("NullableStringFilter", {
+    "equals": NotRequired[Union[str, None]],
+    "in": NotRequired[List[str]],
+    "not_in": NotRequired[List[str]],
+    "lt": NotRequired[str],
+    "lte": NotRequired[str],
+    "gt": NotRequired[str],
+    "gte": NotRequired[str],
+    "contains": NotRequired[str],
+    "starts_with": NotRequired[str],
+    "ends_with": NotRequired[str],
+    "mode": NotRequired[QueryMode],
+    "not": NotRequired[Union[str, None, "NullableStringFilter"]],
+})
+
+# Using functional form because of use of reserved keywords
+NumberFilter = TypedDict("NumberFilter", {
+    "equals": NotRequired[Union[int, float]],
+    "in": NotRequired[List[Union[int, float]]],
+    "not_in": NotRequired[List[Union[int, float]]],
+    "lt": NotRequired[Union[int, float]],
+    "lte": NotRequired[Union[int, float]],
+    "gt": NotRequired[Union[int, float]],
+    "gte": NotRequired[Union[int, float]],
+    "not": NotRequired[Union[int, float, "NumberFilter"]],
+})
+
+# Using functional form because of use of reserved keywords
+NullableNumberFilter = TypedDict("NullableNumberFilter", {
+    "equals": NotRequired[Union[int, float, None]],
+    "in": NotRequired[List[Union[int, float]]],
+    "not_in": NotRequired[List[Union[int, float]]],
+    "lt": NotRequired[Union[int, float]],
+    "lte": NotRequired[Union[int, float]],
+    "gt": NotRequired[Union[int, float]],
+    "gte": NotRequired[Union[int, float]],
+    "not": NotRequired[Union[int, float, None, "NullableNumberFilter"]],
+})
+
+
+# Using functional form because of use of reserved keywords
+BooleanFilter = TypedDict("BooleanFilter", {
+    "equals": NotRequired[bool],
+    "not": NotRequired[Union[bool, "BooleanFilter"]],
+})
+
+# Using functional form because of use of reserved keywords
+NullableBooleanFilter = TypedDict("NullableBooleanFilter", {
+    "equals": NotRequired[Union[bool, None]],
+    "not": NotRequired[Union[bool, None, "NullableBooleanFilter"]],
+})
+
+# Using functional form because of use of reserved keywords
+NullableObjectFilter = TypedDict("NullableObjectFilter", {
+    "equals": NotRequired[None],
+    "not": NotRequired[Union[None, "NullableObjectFilter"]],
+})

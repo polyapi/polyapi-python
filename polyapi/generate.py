@@ -1,6 +1,7 @@
 import json
 import requests
 import os
+import uuid
 import shutil
 import logging
 import tempfile
@@ -13,11 +14,12 @@ from .client import render_client_function
 from .poly_schemas import generate_schemas
 from .webhook import render_webhook_handle
 
-from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto
+from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto, TableSpecDto
 from .api import render_api_function
 from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
 from .variables import generate_variables
+from .poly_tables import generate_tables
 from .config import get_api_key_and_url, get_direct_execute_config, get_cached_generate_args
 
 SUPPORTED_FUNCTION_TYPES = {
@@ -28,7 +30,7 @@ SUPPORTED_FUNCTION_TYPES = {
     "webhookHandle",
 }
 
-SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema", "snippet"}
+SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema", "snippet", "table"}
 
 
 X_POLY_REF_WARNING = '''"""
@@ -195,14 +197,16 @@ def read_cached_specs() -> List[SpecificationDto]:
         return json.loads(f.read())
 
 
-def get_variables() -> List[VariableSpecDto]:
-    specs = read_cached_specs()
+def get_variables(specs: List[SpecificationDto]) -> List[VariableSpecDto]:
     return [cast(VariableSpecDto, spec) for spec in specs if spec["type"] == "serverVariable"]
 
 
-def get_schemas() -> List[SchemaSpecDto]:
-    specs = read_cached_specs()
+def get_schemas(specs: List[SpecificationDto]) -> List[SchemaSpecDto]:
     return [cast(SchemaSpecDto, spec) for spec in specs if spec["type"] == "schema"]
+
+
+def get_tables(specs: List[SpecificationDto]) -> List[TableSpecDto]:
+    return [cast(TableSpecDto, spec) for spec in specs if spec["type"] == "table"]
 
 
 def remove_old_library():
@@ -216,6 +220,10 @@ def remove_old_library():
         shutil.rmtree(path)
 
     path = os.path.join(currdir, "schemas")
+    if os.path.exists(path):
+        shutil.rmtree(path)
+
+    path = os.path.join(currdir, "tabi")
     if os.path.exists(path):
         shutil.rmtree(path)
 
@@ -277,6 +285,14 @@ sys.modules[__name__] = _SchemaModule()
 ''')
 
 
+def _generate_client_id() -> None:
+    full_path = os.path.dirname(os.path.abspath(__file__))
+    full_path = os.path.join(full_path, "poly", "client_id.py")
+    with open(full_path, "w") as f:
+        f.write(f'client_id = "{uuid.uuid4().hex}"')
+
+
+
 def generate_from_cache() -> None:
     """
     Generate using cached values after non-explicit call.
@@ -333,9 +349,11 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
     functions = parse_function_specs(specs, limit_ids=limit_ids)
 
+    _generate_client_id()
+
     # Only process schemas if no_types is False
     if not no_types:
-        schemas = get_schemas()
+        schemas = get_schemas(specs)
         schema_index = build_schema_index(schemas)
         if schemas:
             schema_limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
@@ -359,7 +377,11 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
         )
         exit()
 
-    variables = get_variables()
+    tables = get_tables(specs)
+    if tables:
+        generate_tables(tables)
+
+    variables = get_variables(specs)
     if variables:
         generate_variables(variables)
 
@@ -371,14 +393,7 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
 
 
 def clear() -> None:
-    base = os.path.dirname(os.path.abspath(__file__))
-    poly_path = os.path.join(base, "poly")
-    if os.path.exists(poly_path):
-        shutil.rmtree(poly_path)
-
-    vari_path = os.path.join(base, "vari")
-    if os.path.exists(vari_path):
-        shutil.rmtree(vari_path)
+    remove_old_library()
     print("Cleared!")
 
 
