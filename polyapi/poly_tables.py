@@ -310,7 +310,7 @@ def _get_column_type_str(name: str, schema: Dict[str, Any], is_required: bool) -
     elif col_type == "object":
         if isinstance(schema.get("patternProperties"), dict):
             # TODO: Handle multiple pattern properties
-            result = f"Dict[str, {_get_column_type_str(f'{name}_', schema["patternProperties"], True)}]"
+            result = f"Dict[str, {_get_column_type_str(f'{name}_', schema['patternProperties'], True)}]"
         elif isinstance(schema.get("properties"), dict) and len(schema["properties"].values()) > 0:
             # TODO: Handle x-poly-refs
             result = f'"{name}"'
