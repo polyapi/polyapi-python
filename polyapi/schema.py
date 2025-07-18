@@ -3,8 +3,6 @@
 import logging
 import contextlib
 import re
-import polyapi
-import builtins
 from typing import Dict
 from jsonschema_gentypes.cli import process_config
 from jsonschema_gentypes import configuration
@@ -91,12 +89,9 @@ def generate_schema_types(input_data: Dict, root=None):
     }
 
     # jsonschema_gentypes prints source to stdout
-    # no option to suppress so we do this
-    # Not reverting the print monkeypatch causes print to bypass redirect
-    builtins.print = polyapi.original_print
+    # no option to surpress so we do this
     with contextlib.redirect_stdout(None):
         process_config(config, [tmp_input])
-    builtins.print = polyapi.log_prints
 
     with open(tmp_output, encoding='utf-8') as f:
         output = f.read()
