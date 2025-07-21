@@ -70,24 +70,6 @@ def bar():
     return "Hello World"
 ```
 
-## See Server Function Logs
-
-In order to see function logs, please first set `logsEnabled` to `true` in Canopy for the function.
-
-https://na1.polyapi.io/canopy/polyui/collections/server-functions
-
-Then in your code, get the poly logger and log with it like so:
-
-```python
-logger = logging.getLogger("poly")
-def bar():
-    logger.warning("I AM THE LOG")
-    return "Hello World"
-```
-
-Finally, click the "Show Logs" button to see your server function logs in Canopy!
-
-
 ## Complex Types In Server Functions
 
 You can define arbitrarily complex argument and return types using TypedDicts.
