@@ -191,19 +191,26 @@ def write_cache_revision(git_revision: Optional[str] = None) -> None:
     with open(CACHE_VERSION_FILE, 'w', encoding='utf-8') as file:
         file.write(git_revision)
 
-def is_cache_up_to_date() -> bool:
-    if not Path(CACHE_VERSION_FILE).exists():
-        return False
-    with open(CACHE_VERSION_FILE, 'r', encoding='utf-8') as file:
-        cached_revision = file.read().strip()
-    git_revision = get_git_revision()
-    return cached_revision == git_revision
 
 def is_cache_up_to_date() -> bool:
     """Check if the cached revision matches the current Git revision."""
+    if not Path(CACHE_VERSION_FILE).exists():
+        return False
+
+    # Check for uncommitted changes
+    try:
+        status = check_output(["git", "status", "--porcelain"], text=True).strip()
+        if status:
+            return False  # Working directory is dirty, so cache is not up-to-date
+    except CalledProcessError:
+        # Not a git repository, or git is not installed.
+        # In this case, we can't rely on git for caching, so we assume not up-to-date.
+        return False
+
     cached_revision = get_cache_deployments_revision()
-    git_revision = get_git_revision()  # This function needs to be defined or imported
+    git_revision = get_git_revision()
     return cached_revision == git_revision
+
 
 def write_deploy_comments(deployments: List[Dict]) -> str:
     """Generate a string of deployment comments for each deployment."""
@@ -288,13 +295,3 @@ def write_updated_deployable(deployable: dict, disable_docs: bool = False) -> di
     deployable['fileRevision'] = get_deployable_file_revision(file_contents)
     return deployable
 
-def write_deploy_comments(deployments: list) -> str:
-    """
-    Generate deployment comments for each deployment record.
-    """
-    canopy_path = 'polyui/collections' if 'localhost' in os.getenv('POLY_API_BASE_URL', '') else 'canopy/polyui/collections'
-    comments = []
-    for d in deployments:
-        instance_url = d['instance'].replace(':8000', ':3000') if d['instance'].endswith(':8000') else d['instance']
-        comments.append(f"# Poly deployed @ {d['deployed']} - {d['context']}.{d['name']} - {instance_url}/{canopy_path}/{d['type']}s/{d['id']} - {d['fileRevision']}")
-    return "\n".join(comments)

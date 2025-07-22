@@ -15,8 +15,8 @@ from polyapi.deployables import (
 )
 
 DEPLOY_ORDER = [
-    'server-function',
     'client-function',
+    'server-function',
 ]
 
 def read_file(file_path: str) -> str:
