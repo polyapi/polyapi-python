@@ -245,8 +245,13 @@ def update_deployment_comments(file_content: str, deployable: dict) -> str:
         file_content = file_content[:range[0]] + file_content[range[1]:]
     if deployable['deployments']:
         deployment_comments = write_deploy_comments(deployable['deployments'])
-        deployable['deploymentCommentRanges'] = [(0, len(deployment_comments) + 1)]
-        file_content = f"{deployment_comments}\n{file_content}"
+        # Add blank line after deployment comments only if file content doesn't start with blank line
+        if file_content.startswith('\n'):
+            deployable['deploymentCommentRanges'] = [(0, len(deployment_comments) + 1)]
+            file_content = f"{deployment_comments}\n{file_content}"
+        else:
+            deployable['deploymentCommentRanges'] = [(0, len(deployment_comments) + 2)]
+            file_content = f"{deployment_comments}\n\n{file_content}"
     return file_content
 
 def update_deployable_function_comments(file_content: str, deployable: dict, disable_docs: bool = False) -> str:
