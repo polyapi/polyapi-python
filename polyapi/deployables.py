@@ -1,4 +1,6 @@
 import os
+import string
+import random
 import subprocess
 import json
 import hashlib
@@ -76,9 +78,10 @@ class SyncDeployment(TypedDict, total=False):
     id: Optional[str]
     deployed: Optional[str]
 
+
 DeployableTypeEntries: List[Tuple[DeployableTypeNames, DeployableTypes]] = [
-    ("PolyServerFunction", "server-function"), # type: ignore
-    ("PolyClientFunction", "client-function"), # type: ignore
+    ("PolyServerFunction", "server-function"),  # type: ignore
+    ("PolyClientFunction", "client-function"),  # type: ignore
 ]
 
 DeployableTypeToName: Dict[DeployableTypeNames, DeployableTypes] = {name: type for name, type in DeployableTypeEntries}
@@ -175,7 +178,7 @@ def get_git_revision(branch_or_tag: str = "HEAD") -> str:
         return check_output(["git", "rev-parse", "--short", branch_or_tag], text=True).strip()
     except CalledProcessError:
         # Return a random 7-character hash as a fallback
-        return "".join(format(ord(str(c)), 'x') for c in os.urandom(4))[:7]
+        return "".join([random.choice(string.ascii_letters + string.digits) for _ in range(7)])
 
 def get_cache_deployments_revision() -> str:
     """Retrieve the cache deployments revision from a file."""

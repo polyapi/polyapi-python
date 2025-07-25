@@ -24,7 +24,7 @@ def read_file(file_path: str) -> str:
         return file.read()
 
 def group_by(items: List[Dict], key: str) -> Dict[str, List[Dict]]:
-    grouped = {}
+    grouped = {}  # type: ignore
     for item in items:
         grouped.setdefault(item[key], []).append(item)
     return grouped
@@ -32,7 +32,7 @@ def group_by(items: List[Dict], key: str) -> Dict[str, List[Dict]]:
 def remove_deployable_function(deployable: SyncDeployment) -> bool:
     api_key, _ = get_api_key_and_url()
     if not api_key:
-        raise Error("Missing api key!")
+        raise Exception("Missing api key!")
     headers = get_auth_headers(api_key)
     url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}/{deployable["id"]}'
     response = requests.get(url, headers=headers)
