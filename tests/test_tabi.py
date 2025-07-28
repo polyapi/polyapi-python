@@ -38,6 +38,9 @@ MyTableColumns = Literal["id","createdAt","updatedAt","name","age","active","opt
 
 
 
+from typing_extensions import Required
+
+
 class MyTableRow(TypedDict, total=False):
     id: Required[str]
     """ Required property """
@@ -347,6 +350,9 @@ MyTableColumns = Literal["id","createdAt","updatedAt","data"]
 
 
 
+from typing_extensions import Required
+
+
 class MyTableRow(TypedDict, total=False):
     id: Required[str]
     """ Required property """
@@ -611,9 +617,11 @@ class MyTable:
 
 class T(unittest.TestCase):
     def test_render_simple(self):
+        self.maxDiff = 20000
         output = _render_table(TABLE_SPEC_SIMPLE)
         self.assertEqual(output, EXPECTED_SIMPLE)
     
     def test_render_complex(self):
+        self.maxDiff = 20000
         output = _render_table(TABLE_SPEC_COMPLEX)
         self.assertEqual(output, EXPECTED_COMPLEX)
