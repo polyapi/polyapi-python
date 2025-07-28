@@ -7,6 +7,19 @@ from polyapi.typedefs import TableSpecDto
 from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 
 
+def scrub_keys(e: Exception) -> Dict[str, Any]:
+    """
+    Scrub the keys of an exception to remove sensitive information.
+    Returns a dictionary with the error message and type.
+    """
+    return {
+        "error": str(e),
+        "type": type(e).__name__,
+        "message": str(e),
+        "args": getattr(e, 'args', None)
+    }
+
+
 def execute_query(table_id, method, query):
     from polyapi import polyCustom
     from polyapi.poly.client_id import client_id
