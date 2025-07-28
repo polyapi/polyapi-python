@@ -60,7 +60,7 @@ class MyTableRow(TypedDict, total=False):
     active: Required[bool]
     """ Required property """
 
-    optional: dict[str, Any]
+    optional: Dict[str, Any]
 
 
 
@@ -370,8 +370,8 @@ class MyTableRow(TypedDict, total=False):
 
 class _MyTableRowdata(TypedDict, total=False):
     foo: str
-    nested: list["_MyTableRowdatanesteditem"]
-    other: str | int | float | dict[str, Any] | list[Any] | bool | None
+    nested: List["_MyTableRowdatanesteditem"]
+    other: Union[str, Union[int, float], Dict[str, Any], List[Any], bool, None]
     """
     x-poly-ref:
       path: some.other.Schema
