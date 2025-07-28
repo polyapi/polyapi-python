@@ -38,9 +38,6 @@ MyTableColumns = Literal["id","createdAt","updatedAt","name","age","active","opt
 
 
 
-from typing_extensions import Required
-
-
 class MyTableRow(TypedDict, total=False):
     id: Required[str]
     """ Required property """
@@ -60,7 +57,7 @@ class MyTableRow(TypedDict, total=False):
     active: Required[bool]
     """ Required property """
 
-    optional: Dict[str, Any]
+    optional: dict[str, Any]
 
 
 
@@ -350,9 +347,6 @@ MyTableColumns = Literal["id","createdAt","updatedAt","data"]
 
 
 
-from typing_extensions import Required
-
-
 class MyTableRow(TypedDict, total=False):
     id: Required[str]
     """ Required property """
@@ -370,8 +364,8 @@ class MyTableRow(TypedDict, total=False):
 
 class _MyTableRowdata(TypedDict, total=False):
     foo: str
-    nested: List["_MyTableRowdatanesteditem"]
-    other: Union[str, Union[int, float], Dict[str, Any], List[Any], bool, None]
+    nested: list["_MyTableRowdatanesteditem"]
+    other: str | int | float | dict[str, Any] | list[Any] | bool | None
     """
     x-poly-ref:
       path: some.other.Schema
