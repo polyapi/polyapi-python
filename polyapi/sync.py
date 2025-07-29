@@ -129,7 +129,8 @@ def sync_deployables(dry_run: bool, instance: str | None = None):
                         **deployable,
                         **previous_deployment,
                         "description": deployable["types"]["description"],
-                        "instance": instance
+                        "instance": instance,
+                        "type": deployable["type"]
                     }
                 else:
                     sync_deployment = { **deployable, "instance": instance }
