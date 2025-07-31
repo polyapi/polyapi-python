@@ -1,11 +1,19 @@
 import unittest
-from polyapi.schema import clean_malformed_examples, wrapped_generate_schema_types
+from polyapi.schema import clean_malformed_examples, wrapped_generate_schema_types, generate_schema_types
 
 SCHEMA = {
     "$schema": "http://json-schema.org/draft-06/schema#",
     "type": "object",
     "properties": {"name": {"type": "string"}},
     "required": ["name"],
+    "additionalProperties": False,
+    "definitions": {},
+}
+
+CHARACTER_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-06/schema#",
+    "type": "object",
+    "properties": {"CHARACTER_SCHEMA_NAME": {"description": "This is — “bad”, right?", "type": "string"}},
     "additionalProperties": False,
     "definitions": {},
 }
@@ -24,3 +32,9 @@ class T(unittest.TestCase):
     def test_clean_malformed_examples(self):
         output = clean_malformed_examples(APALEO_MALFORMED_EXAMPLE)
         self.assertNotIn("# example: {", output)
+    
+    def test_character_encoding(self):
+        output = generate_schema_types(CHARACTER_SCHEMA, "Dict")
+        expected = 'from typing import TypedDict\n\n\nclass Dict(TypedDict, total=False):\n    CHARACTER_SCHEMA_NAME: str\n    """ This is — “bad”, right? """\n\n'
+        self.assertEqual(output, expected)
+        

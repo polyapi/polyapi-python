@@ -93,7 +93,7 @@ def generate_schema_types(input_data: Dict, root=None):
     with contextlib.redirect_stdout(None):
         process_config(config, [tmp_input])
 
-    with open(tmp_output) as f:
+    with open(tmp_output, encoding='utf-8') as f:
         output = f.read()
 
     output = clean_malformed_examples(output)

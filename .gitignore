@@ -34,4 +34,5 @@ function_add_test.py
 lib_test*.py
 polyapi/poly
 polyapi/vari
+polyapi/tabi
 polyapi/schemas

@@ -1,9 +1,12 @@
 import json
 import requests
 import os
+import uuid
 import shutil
 import logging
 import tempfile
+
+from copy import deepcopy
 from typing import Any, List, Optional, Tuple, cast
 
 from .auth import render_auth_function
@@ -11,11 +14,12 @@ from .client import render_client_function
 from .poly_schemas import generate_schemas
 from .webhook import render_webhook_handle
 
-from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto
+from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto, TableSpecDto
 from .api import render_api_function
 from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
 from .variables import generate_variables
+from .poly_tables import generate_tables
 from .config import get_api_key_and_url, get_direct_execute_config, get_cached_generate_args
 
 SUPPORTED_FUNCTION_TYPES = {
@@ -26,7 +30,7 @@ SUPPORTED_FUNCTION_TYPES = {
     "webhookHandle",
 }
 
-SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema", "snippet"}
+SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema", "snippet", "table"}
 
 
 X_POLY_REF_WARNING = '''"""
@@ -136,18 +140,21 @@ def parse_function_specs(
     limit_ids: List[str] | None = None,  # optional list of ids to limit to
 ) -> List[SpecificationDto]:
     functions = []
-    for spec in specs:
-        if not spec:
+    for raw_spec in specs:
+        if not raw_spec:
             continue
 
         # For no_types mode, we might not have function data, but we still want to include the spec
         # if it's a supported function type
-        if spec["type"] not in SUPPORTED_FUNCTION_TYPES:
+        if raw_spec["type"] not in SUPPORTED_FUNCTION_TYPES:
             continue
 
         # Skip if we have a limit and this spec is not in it
-        if limit_ids and spec.get("id") not in limit_ids:
+        if limit_ids and raw_spec.get("id") not in limit_ids:
             continue
+
+        # Should really be fixed in specs api, but for now handle json strings in arg schemas
+        spec = normalize_args_schema(raw_spec)
 
         # For customFunction, check language if we have function data
         if spec["type"] == "customFunction":
@@ -190,14 +197,16 @@ def read_cached_specs() -> List[SpecificationDto]:
         return json.loads(f.read())
 
 
-def get_variables() -> List[VariableSpecDto]:
-    specs = read_cached_specs()
+def get_variables(specs: List[SpecificationDto]) -> List[VariableSpecDto]:
     return [cast(VariableSpecDto, spec) for spec in specs if spec["type"] == "serverVariable"]
 
 
-def get_schemas() -> List[SchemaSpecDto]:
-    specs = read_cached_specs()
+def get_schemas(specs: List[SpecificationDto]) -> List[SchemaSpecDto]:
     return [cast(SchemaSpecDto, spec) for spec in specs if spec["type"] == "schema"]
+
+
+def get_tables(specs: List[SpecificationDto]) -> List[TableSpecDto]:
+    return [cast(TableSpecDto, spec) for spec in specs if spec["type"] == "table"]
 
 
 def remove_old_library():
@@ -211,6 +220,10 @@ def remove_old_library():
         shutil.rmtree(path)
 
     path = os.path.join(currdir, "schemas")
+    if os.path.exists(path):
+        shutil.rmtree(path)
+
+    path = os.path.join(currdir, "tabi")
     if os.path.exists(path):
         shutil.rmtree(path)
 
@@ -272,6 +285,14 @@ sys.modules[__name__] = _SchemaModule()
 ''')
 
 
+def _generate_client_id() -> None:
+    full_path = os.path.dirname(os.path.abspath(__file__))
+    full_path = os.path.join(full_path, "poly", "client_id.py")
+    with open(full_path, "w") as f:
+        f.write(f'client_id = "{uuid.uuid4().hex}"')
+
+
+
 def generate_from_cache() -> None:
     """
     Generate using cached values after non-explicit call.
@@ -286,6 +307,37 @@ def generate_from_cache() -> None:
     )
 
 
+def _parse_arg_schema(value: Any) -> Any:
+    if isinstance(value, str):
+        text = value.strip()
+        if text and text[0] in "{[":
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                logging.warning("Could not parse function argument schema (leaving as str): %s", text[:200])
+    return value
+
+
+def normalize_args_schema(
+    raw_spec: SpecificationDto
+) -> SpecificationDto:
+    spec = deepcopy(raw_spec)
+
+    function_block = spec.get("function")
+    if not isinstance(function_block, dict):
+        return spec
+    arguments_block = function_block.get("arguments")
+    if not isinstance(arguments_block, list):
+        return spec
+
+    for argument in arguments_block:
+        arg_type = argument.get("type")
+        if isinstance(arg_type, dict) and "schema" in arg_type:
+            arg_type["schema"] = _parse_arg_schema(arg_type["schema"])
+
+    return spec
+
+
 def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> None:
     generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
     print(generate_msg, end="", flush=True)
@@ -297,9 +349,11 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
     functions = parse_function_specs(specs, limit_ids=limit_ids)
 
+    _generate_client_id()
+
     # Only process schemas if no_types is False
     if not no_types:
-        schemas = get_schemas()
+        schemas = get_schemas(specs)
         schema_index = build_schema_index(schemas)
         if schemas:
             schema_limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
@@ -323,7 +377,11 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
         )
         exit()
 
-    variables = get_variables()
+    tables = get_tables(specs)
+    if tables:
+        generate_tables(tables)
+
+    variables = get_variables(specs)
     if variables:
         generate_variables(variables)
 
@@ -335,14 +393,7 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
 
 
 def clear() -> None:
-    base = os.path.dirname(os.path.abspath(__file__))
-    poly_path = os.path.join(base, "poly")
-    if os.path.exists(poly_path):
-        shutil.rmtree(poly_path)
-
-    vari_path = os.path.join(base, "vari")
-    if os.path.exists(vari_path):
-        shutil.rmtree(vari_path)
+    remove_old_library()
     print("Cleared!")
 
 

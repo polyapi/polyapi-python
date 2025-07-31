@@ -1,9 +1,8 @@
 import keyword
 import re
 import os
-import uuid
 from urllib.parse import urlparse
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
 from polyapi.typedefs import PropertySpecification, PropertyType
@@ -20,15 +19,17 @@ from polyapi.schema import (
 CODE_IMPORTS = "from typing import List, Dict, Any, Optional, Callable\nfrom typing_extensions import TypedDict, NotRequired\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url, get_direct_execute_config\nfrom polyapi.execute import execute, execute_post, variable_get, variable_update, direct_execute\n\n"
 
 
-def init_the_init(full_path: str, code_imports="") -> None:
+def init_the_init(full_path: str, code_imports: Optional[str] = None) -> None:
     init_path = os.path.join(full_path, "__init__.py")
     if not os.path.exists(init_path):
-        code_imports = code_imports or CODE_IMPORTS
+        if code_imports is None:
+            code_imports = CODE_IMPORTS
         with open(init_path, "w") as f:
             f.write(code_imports)
 
 
-def add_import_to_init(full_path: str, next: str, code_imports="") -> None:
+def add_import_to_init(full_path: str, next: str, code_imports: Optional[str] = None) -> None:
+    init_the_init(full_path, code_imports=code_imports)
     init_the_init(full_path, code_imports=code_imports)
 
     init_path = os.path.join(full_path, "__init__.py")

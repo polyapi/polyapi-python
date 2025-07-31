@@ -1,4 +1,6 @@
 import os
+import string
+import random
 import subprocess
 import json
 import hashlib
@@ -65,20 +67,21 @@ class SyncDeployment(TypedDict, total=False):
     context: str
     name: str
     description: str
-    type: str
+    type: DeployableTypes
     fileRevision: str
     file: str
     types: DeployableFunctionTypes
-    typeSchemas: Dict[str, any]
+    typeSchemas: Dict[str, Any]
     dependencies: List[str]
-    config: Dict[str, any]
+    config: Dict[str, Any]
     instance: str
-    id: Optional[str] = None
-    deployed: Optional[str] = None
+    id: Optional[str]
+    deployed: Optional[str]
+
 
 DeployableTypeEntries: List[Tuple[DeployableTypeNames, DeployableTypes]] = [
-    ("PolyServerFunction", "server-function"),
-    ("PolyClientFunction", "client-function"),
+    ("PolyServerFunction", "server-function"),  # type: ignore
+    ("PolyClientFunction", "client-function"),  # type: ignore
 ]
 
 DeployableTypeToName: Dict[DeployableTypeNames, DeployableTypes] = {name: type for name, type in DeployableTypeEntries}
@@ -118,13 +121,13 @@ def get_all_deployable_files_windows(config: PolyDeployConfig) -> List[str]:
     pattern = ' '.join(f"/C:\"polyConfig: {name}\"" for name in config["type_names"]) or '/C:"polyConfig"'
 
     exclude_command = f" | findstr /V /I \"{exclude_pattern}\"" if exclude_pattern else ''
-    search_command = f" | findstr /S /M /I /F:/ {pattern} *.*"
+    search_command = f" | findstr /M /I /F:/ {pattern}"
 
     result = []
     for dir_path in config["include_dirs"]:
         if dir_path != '.':
             include_pattern = " ".join(f"{dir_path}*.{f}" for f in config["include_files_or_extensions"]) or "*"
-        dir_command = f"dir {include_pattern} /S /P /B > NUL"
+        dir_command = f"dir {include_pattern} /S /P /B"
         full_command = f"{dir_command}{exclude_command}{search_command}"
         try:
             output = subprocess.check_output(full_command, shell=True, text=True)
@@ -175,7 +178,7 @@ def get_git_revision(branch_or_tag: str = "HEAD") -> str:
         return check_output(["git", "rev-parse", "--short", branch_or_tag], text=True).strip()
     except CalledProcessError:
         # Return a random 7-character hash as a fallback
-        return "".join(format(ord(c), 'x') for c in os.urandom(4))[:7]
+        return "".join([random.choice(string.ascii_letters + string.digits) for _ in range(7)])
 
 def get_cache_deployments_revision() -> str:
     """Retrieve the cache deployments revision from a file."""
