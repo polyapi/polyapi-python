@@ -25,6 +25,7 @@ def function_add_or_update(
     server: bool,
     logs_enabled: Optional[bool],
     generate_contexts: Optional[str],
+    visibility: Optional[str],
     generate: bool = True,
     execution_api_key: str = ""
 ):
@@ -55,6 +56,7 @@ def function_add_or_update(
         "description": description or parsed["types"]["description"],
         "code": code,
         "language": "python",
+        "visibility": visibility or "ENVIRONMENT",
         "returnType": get_jsonschema_type(return_type),
         "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])} for p in parsed["types"]["params"]],
         "logsEnabled": logs_enabled,
