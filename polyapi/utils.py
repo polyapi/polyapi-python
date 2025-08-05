@@ -24,7 +24,7 @@ def init_the_init(full_path: str, code_imports: Optional[str] = None) -> None:
     if not os.path.exists(init_path):
         if code_imports is None:
             code_imports = CODE_IMPORTS
-        with open(init_path, "w") as f:
+        with open(init_path, "w", encoding='utf-8') as f:
             f.write(code_imports)
 
 
@@ -33,7 +33,7 @@ def add_import_to_init(full_path: str, next: str, code_imports: Optional[str] = 
     init_the_init(full_path, code_imports=code_imports)
 
     init_path = os.path.join(full_path, "__init__.py")
-    with open(init_path, "a+") as f:
+    with open(init_path, "a+", encoding='utf-8') as f:
         import_stmt = "from . import {}\n".format(next)
         f.seek(0)
         lines = f.readlines()
