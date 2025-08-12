@@ -465,6 +465,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 # Parse docstring which may contain param types and descriptions
                 self._extract_docstring_from_function(node)
                 function_args = [arg for arg in node.args.args]
+                function_args.extend(node.args.kwonlyargs)
                 docstring_params = deployable["types"]["params"]
                 parsed_params = []
                 # parse params from actual function and merge in any data from the docstring
