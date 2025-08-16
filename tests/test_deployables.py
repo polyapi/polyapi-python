@@ -122,3 +122,67 @@ class T(unittest.TestCase):
         parsed_deployable = parse_function_code(EXPECTED_SERVER_FN_DOCSTRINGS)
         updated_file_contents = update_deployable_function_comments(EXPECTED_SERVER_FN_DOCSTRINGS, parsed_deployable)
         self.assertEqual(EXPECTED_SERVER_FN_DOCSTRINGS, updated_file_contents)
+
+    def test_deployment_comments_with_imports_at_top(self):
+        """Test that deployment comments are placed at the very top, before import statements."""
+        # File content that starts with imports (no existing deployment comments)
+        file_with_imports = '''from typing import Dict
+from polyapi.typedefs import PolyServerFunction
+
+polyConfig: PolyServerFunction = {
+    "name": "foobar",
+    "context": "testing",
+    "logsEnabled": True,
+}
+
+def foobar(foo: str, bar: Dict[str, str]) -> int:
+    """A function that does something really important."""
+    print("Okay then!")
+    return 7
+'''
+
+        expected_with_deployment_comments = '''# Poly deployed @ 2024-11-12T14:43:22.631113 - testing.foobar - https://na1.polyapi.io/canopy/polyui/collections/server-functions/jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h - 086aedd
+
+from typing import Dict
+from polyapi.typedefs import PolyServerFunction
+
+polyConfig: PolyServerFunction = {
+    "name": "foobar",
+    "context": "testing",
+    "logsEnabled": True,
+}
+
+def foobar(foo: str, bar: Dict[str, str]) -> int:
+    """A function that does something really important."""
+    print("Okay then!")
+    return 7
+'''
+
+        test_deployable = parse_function_code(file_with_imports, "foobar")
+        
+        # Add a mock deployment to test comment placement
+        test_deployable["deployments"] = [{
+            'context': 'testing',
+            'deployed': '2024-11-12T14:43:22.631113',
+            'fileRevision': '086aedd',
+            'id': 'jh23h5g3h5b24jh5b2j3h45v2jhg43v52j3h',
+            'instance': 'https://na1.polyapi.io',
+            'name': 'foobar',
+            'type': 'server-function'
+        }]
+        
+        # Update deployment comments this should place comments at the very top
+        updated_file_contents = update_deployment_comments(file_with_imports, test_deployable)
+        
+        self.assertEqual(updated_file_contents, expected_with_deployment_comments)
+        
+        # ensure the first line is a deployment comment, not an import
+        first_line = updated_file_contents.split('\n')[0]
+        self.assertTrue(first_line.startswith('# Poly deployed @'), 
+                       f"Expected deployment comment at top, but first line was: {first_line}")
+        
+        # Ensure imports come after the deployment comment and blank line
+        lines = updated_file_contents.split('\n')
+        import_line_index = next(i for i, line in enumerate(lines) if line.startswith('from typing import'))
+        self.assertGreater(import_line_index, 1, 
+                          "Import statements should come after deployment comments and blank line")

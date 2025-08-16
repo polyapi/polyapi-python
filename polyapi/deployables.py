@@ -194,7 +194,9 @@ def write_cache_revision(git_revision: Optional[str] = None) -> None:
     with open(CACHE_VERSION_FILE, 'w', encoding='utf-8') as file:
         file.write(git_revision)
 
+
 def is_cache_up_to_date() -> bool:
+    """Check if the cached revision matches the current Git revision."""
     if not Path(CACHE_VERSION_FILE).exists():
         return False
     with open(CACHE_VERSION_FILE, 'r', encoding='utf-8') as file:
@@ -202,21 +204,17 @@ def is_cache_up_to_date() -> bool:
     git_revision = get_git_revision()
     return cached_revision == git_revision
 
-def is_cache_up_to_date() -> bool:
-    """Check if the cached revision matches the current Git revision."""
-    cached_revision = get_cache_deployments_revision()
-    git_revision = get_git_revision()  # This function needs to be defined or imported
-    return cached_revision == git_revision
 
-def write_deploy_comments(deployments: List[Dict]) -> str:
-    """Generate a string of deployment comments for each deployment."""
+def write_deploy_comments(deployments: list) -> str:
+    """
+    Generate deployment comments for each deployment record.
+    """
     canopy_path = 'polyui/collections' if 'localhost' in os.getenv('POLY_API_BASE_URL', '') else 'canopy/polyui/collections'
     comments = []
     for d in deployments:
         instance_url = d['instance'].replace(':8000', ':3000') if d['instance'].endswith(':8000') else d['instance']
-        comment = f"# Poly deployed @ {d['deployed']} - {d['context']}.{d['name']} - {instance_url}/{canopy_path}/{d['type']}s/{d['id']} - {d['fileRevision']}"
-        comments.append(comment)
-    return '\n'.join(comments)
+        comments.append(f"# Poly deployed @ {d['deployed']} - {d['context']}.{d['name']} - {instance_url}/{canopy_path}/{d['type']}s/{d['id']} - {d['fileRevision']}")
+    return "\n".join(comments)
 
 def print_docstring_function_comment(description: str, args: list, returns: dict) -> str:
     docstring = f'"""{description}\n\n'
@@ -250,8 +248,13 @@ def update_deployment_comments(file_content: str, deployable: dict) -> str:
         file_content = file_content[:range[0]] + file_content[range[1]:]
     if deployable['deployments']:
         deployment_comments = write_deploy_comments(deployable['deployments'])
-        deployable['deploymentCommentRanges'] = [(0, len(deployment_comments) + 1)]
-        file_content = f"{deployment_comments}\n{file_content}"
+        # Add blank line after deployment comments only if file content doesn't start with blank line
+        if file_content.startswith('\n'):
+            deployable['deploymentCommentRanges'] = [(0, len(deployment_comments) + 1)]
+            file_content = f"{deployment_comments}\n{file_content}"
+        else:
+            deployable['deploymentCommentRanges'] = [(0, len(deployment_comments) + 2)]
+            file_content = f"{deployment_comments}\n\n{file_content}"
     return file_content
 
 def update_deployable_function_comments(file_content: str, deployable: dict, disable_docs: bool = False) -> str:
@@ -291,13 +294,3 @@ def write_updated_deployable(deployable: dict, disable_docs: bool = False) -> di
     deployable['fileRevision'] = get_deployable_file_revision(file_contents)
     return deployable
 
-def write_deploy_comments(deployments: list) -> str:
-    """
-    Generate deployment comments for each deployment record.
-    """
-    canopy_path = 'polyui/collections' if 'localhost' in os.getenv('POLY_API_BASE_URL', '') else 'canopy/polyui/collections'
-    comments = []
-    for d in deployments:
-        instance_url = d['instance'].replace(':8000', ':3000') if d['instance'].endswith(':8000') else d['instance']
-        comments.append(f"# Poly deployed @ {d['deployed']} - {d['context']}.{d['name']} - {instance_url}/{canopy_path}/{d['type']}s/{d['id']} - {d['fileRevision']}")
-    return "\n".join(comments)

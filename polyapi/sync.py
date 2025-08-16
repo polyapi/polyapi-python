@@ -15,8 +15,8 @@ from polyapi.deployables import (
 )
 
 DEPLOY_ORDER = [
-    'server-function',
     'client-function',
+    'server-function',
 ]
 
 def read_file(file_path: str) -> str:
@@ -129,7 +129,8 @@ def sync_deployables(dry_run: bool, instance: str | None = None):
                         **deployable,
                         **previous_deployment,
                         "description": deployable["types"]["description"],
-                        "instance": instance
+                        "instance": instance,
+                        "type": deployable["type"]
                     }
                 else:
                     sync_deployment = { **deployable, "instance": instance }
