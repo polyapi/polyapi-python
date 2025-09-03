@@ -6,6 +6,21 @@ from polyapi.utils import add_import_to_init, init_the_init
 from polyapi.typedefs import TableSpecDto
 from polyapi.constants import JSONSCHEMA_TO_PYTHON_TYPE_MAP
 
+def scrub(data) -> Dict[str, Any]:
+    if (not data or not isinstance(data, (Dict, List))): return data
+    if isinstance(data, List):
+        return [scrub(item) for item in data]
+    else:
+        temp = {}
+        secrets = ["x_api_key", "x-api-key", "access_token", "access-token", "authorization", "api_key", "api-key", "apikey", "accesstoken", "token", "password", "key"]
+        for key, value in data.items():
+            if isinstance(value, (Dict, List)):
+                temp[key] = scrub(data[key])
+            elif key.lower() in secrets:
+                temp[key] = '********'
+            else:
+                temp[key] = data[key]
+        return temp
 
 def scrub_keys(e: Exception) -> Dict[str, Any]:
     """
@@ -16,7 +31,7 @@ def scrub_keys(e: Exception) -> Dict[str, Any]:
         "error": str(e),
         "type": type(e).__name__,
         "message": str(e),
-        "args": getattr(e, 'args', None)
+        "args": scrub(getattr(e, 'args', None))
     }
 
 
