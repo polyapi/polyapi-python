@@ -113,7 +113,7 @@ def execute_from_cli():
     fn_add_parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
     fn_add_parser.add_argument("--disable-ai", "--skip-generate", action="store_true", help="Pass --disable-ai skip AI generation of missing descriptions")
     fn_add_parser.add_argument("--generate-contexts", type=str, help="Server function only – only include certain contexts to speed up function execution")
-    fn_add_parser.add_argument("--visiblity", type=str, help="Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive")
+    fn_add_parser.add_argument("--visibility", type=str, default="environment", help="Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive")
 
     def add_function(args):
         initialize_config()
