@@ -464,6 +464,12 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             if node.name == self._name:
                 # Parse docstring which may contain param types and descriptions
                 self._extract_docstring_from_function(node)
+
+                if node.args.kwonlyargs:
+                    print_red("ERROR")
+                    print("Function signature has keyword-only arguments (after `*`). Please use only positional arguments.")
+                    sys.exit(1)
+
                 function_args = [arg for arg in node.args.args]
                 docstring_params = deployable["types"]["params"]
                 parsed_params = []

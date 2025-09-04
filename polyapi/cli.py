@@ -113,11 +113,13 @@ def execute_from_cli():
     fn_add_parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
     fn_add_parser.add_argument("--disable-ai", "--skip-generate", action="store_true", help="Pass --disable-ai skip AI generation of missing descriptions")
     fn_add_parser.add_argument("--generate-contexts", type=str, help="Server function only – only include certain contexts to speed up function execution")
+    fn_add_parser.add_argument("--visibility", type=str, default="environment", help="Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive")
 
     def add_function(args):
         initialize_config()
         logs_enabled = args.logs == "enabled" if args.logs else None
         err = ""
+        visibility = args.visibility.upper()
         if args.server and args.client:
             err = "Specify either `--server` or `--client`. Found both."
         elif not args.server and not args.client:
@@ -126,6 +128,8 @@ def execute_from_cli():
             err = "Option `logs` is only for server functions (--server)."
         elif args.generate_contexts and not args.server:
             err = "Option `generate-contexts` is only for server functions (--server)."
+        elif visibility not in ["PUBLIC", "TENANT", "ENVIRONMENT"]:
+            err = "Invalid visiblity argument, visibility must be one of ['PUBLIC', 'TENANT', 'ENVIRONMENT']"
 
         if err:
             print_red("ERROR")
@@ -142,7 +146,8 @@ def execute_from_cli():
             logs_enabled=logs_enabled,
             generate=not args.disable_ai,
             execution_api_key=args.execution_api_key,
-            generate_contexts=args.generate_contexts
+            generate_contexts=args.generate_contexts,
+            visibility=visibility
         )
 
     fn_add_parser.set_defaults(command=add_function)
