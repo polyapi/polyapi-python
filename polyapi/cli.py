@@ -47,8 +47,11 @@ def execute_from_cli():
     setup_parser.add_argument("url", nargs="?", help="URL for the Poly API")
 
     def setup(args):
-        if args.api_key and args.url:
-            set_api_key_and_url(args.url, args.api_key)
+        api_key = args.api_key or os.getenv("POLY_API_KEY")
+        url = args.url or os.getenv("POLY_API_BASE_URL")
+
+        if api_key and url:
+            set_api_key_and_url(api_key, url)
         else:
             initialize_config(force=True)
             # setup command should have default cache values
