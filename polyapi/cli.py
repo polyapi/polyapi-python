@@ -42,13 +42,15 @@ def execute_from_cli():
 
     ###########################################################################
     # Setup command
+
     setup_parser = subparsers.add_parser("setup", help="Setup your Poly connection")
-    setup_parser.add_argument("api_key", nargs="?", help="API key for Poly API")
     setup_parser.add_argument("url", nargs="?", help="URL for the Poly API")
+    setup_parser.add_argument("api_key", nargs="?", help="API key for Poly API")
+
 
     def setup(args):
-        api_key = args.api_key or os.getenv("POLY_API_KEY")
         url = args.url or os.getenv("POLY_API_BASE_URL")
+        api_key = args.api_key or os.getenv("POLY_API_KEY")
 
         if api_key and url:
             set_api_key_and_url(url, api_key)
