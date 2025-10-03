@@ -51,7 +51,7 @@ def execute_from_cli():
         url = args.url or os.getenv("POLY_API_BASE_URL")
 
         if api_key and url:
-            set_api_key_and_url(api_key, url)
+            set_api_key_and_url(url, api_key)
         else:
             initialize_config(force=True)
             # setup command should have default cache values

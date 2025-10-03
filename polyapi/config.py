@@ -73,7 +73,7 @@ def get_api_key_and_url() -> Tuple[str | None, str | None]:
     return key, url
 
 
-def set_api_key_and_url(key: str, url: str):
+def set_api_key_and_url(url: str, key: str):
     config = configparser.ConfigParser()
     config["polyapi"] = {}
     config.set("polyapi", "poly_api_key", key)
@@ -107,7 +107,7 @@ def initialize_config(force=False):
                 print_yellow("\n".join(errors))
                 sys.exit(1)
 
-            set_api_key_and_url(key, url)
+            set_api_key_and_url(url, key)
             print_green("Poly setup complete.")
 
     if not key or not url:
