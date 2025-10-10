@@ -118,6 +118,10 @@ class PolyDeleteResults(TypedDict):
     deleted: int
 
 
+class PolyDeleteResult(TypedDict):
+    deleted: bool
+
+
 
 QueryMode = Literal["default", "insensitive"]
 
