@@ -55,6 +55,10 @@ def first_result(rsp):
         return rsp['results'][0] if rsp['results'] else None
     return rsp
 
+def delete_one_response(rsp):
+    if isinstance(rsp, dict) and isinstance(rsp.get('deleted'), int):
+        return { 'deleted': bool(rsp.get('deleted')) }
+    return { 'deleted': false }
 
 _key_transform_map = {
     "not_": "not",
@@ -303,6 +307,30 @@ class {table_name}:{table_description}
 
     @overload
     @staticmethod
+    def update_one(id: str, query: {table_name}UpdateManyQuery) -> {table_name}Row: ...
+    @overload
+    @staticmethod
+    def update_one(*, id: str, where: Optional[{table_name}WhereFilter], data: {table_name}Subset) -> {table_name}Row: ...
+
+    @staticmethod
+    def update_one(*args, **kwargs) -> {table_name}Row:
+        if args:
+            if len(args) != 2 or or not isinstance(args[0], str) not isinstance(args[1], dict):
+                raise TypeError("Expected id and query as arguments or as kwargs")
+            query = args[1]
+            if not isinstance(query["where"], dict):
+                query["where"] = {{}}
+            query["where"]["id"] = args[0]
+        else:
+            query = kwargs
+            if not isinstance(query["where"], dict):
+                query["where"] = {{}}
+            query["where"]["id"] = kwargs["id"]
+            query.pop("id", None)
+        return first_result(execute_query({table_name}.table_id, "update", transform_query(query)))
+
+    @overload
+    @staticmethod
     def delete_many(query: {table_name}DeleteQuery) -> PolyDeleteResults: ...
     @overload
     @staticmethod
@@ -316,7 +344,31 @@ class {table_name}:{table_description}
             query = args[0]
         else:
             query = kwargs
-        return execute_query({table_name}.table_id, "delete", query)
+        return execute_query({table_name}.table_id, "delete", transform_query(query))
+
+    @overload
+    @staticmethod
+    def delete_one(query: {table_name}DeleteQuery) -> PolyDeleteResult: ...
+    @overload
+    @staticmethod
+    def delete_one(*, where: Optional[{table_name}WhereFilter]) -> PolyDeleteResult: ...
+
+    @staticmethod
+    def delete_one(*args, **kwargs) -> PolyDeleteResult:
+        if args:
+            if len(args) != 2 or or not isinstance(args[0], str) not isinstance(args[1], dict):
+                raise TypeError("Expected id and query as arguments or as kwargs")
+            query = args[1]
+            if not isinstance(query["where"], dict):
+                query["where"] = {{}}
+            query["where"]["id"] = args[0]
+        else:
+            query = kwargs
+            if not isinstance(query["where"], dict):
+                query["where"] = {{}}
+            query["where"]["id"] = kwargs["id"]
+            query.pop("id", None)
+        return delete_one_response(execute_query({table_name}.table_id, "delete", transform_query(query)))
 '''
 
 

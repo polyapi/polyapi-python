@@ -42,7 +42,7 @@ Unresolved schema, please add the following schema to complete it:
   path:'''
 
 
-def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> List:
+def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, ids: Optional[List[str]] = None, no_types: bool = False) -> List:
     api_key, api_url = get_api_key_and_url()
     assert api_key
     headers = get_auth_headers(api_key)
@@ -55,8 +55,8 @@ def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] =
     if names:
         params["names"] = names
         
-    if function_ids:
-        params["functionIds"] = function_ids
+    if ids:
+        params["ids"] = ids
 
     # Add apiFunctionDirectExecute parameter if direct execute is enabled
     if get_direct_execute_config():
@@ -297,12 +297,12 @@ def generate_from_cache() -> None:
     """
     Generate using cached values after non-explicit call.
     """
-    cached_contexts, cached_names, cached_function_ids, cached_no_types = get_cached_generate_args()
+    cached_contexts, cached_names, cached_ids, cached_no_types = get_cached_generate_args()
     
     generate(
         contexts=cached_contexts, 
         names=cached_names, 
-        function_ids=cached_function_ids, 
+        ids=cached_ids, 
         no_types=cached_no_types
     )
 
@@ -338,12 +338,12 @@ def normalize_args_schema(
     return spec
 
 
-def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, function_ids: Optional[List[str]] = None, no_types: bool = False) -> None:
+def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, ids: Optional[List[str]] = None, no_types: bool = False) -> None:
     generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
     print(generate_msg, end="", flush=True)
     remove_old_library()
 
-    specs = get_specs(contexts=contexts, names=names, function_ids=function_ids, no_types=no_types)
+    specs = get_specs(contexts=contexts, names=names, ids=ids, no_types=no_types)
     cache_specs(specs)
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
