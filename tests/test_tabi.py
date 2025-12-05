@@ -57,7 +57,7 @@ class MyTableRow(TypedDict, total=False):
     active: Required[bool]
     """ Required property """
 
-    optional: dict[str, Any]
+    optional: Dict[str, Any]
 
 
 
@@ -295,7 +295,7 @@ class MyTable:
     @staticmethod
     def update_one(*args, **kwargs) -> MyTableRow:
         if args:
-            if len(args) != 2 or or not isinstance(args[0], str) not isinstance(args[1], dict):
+            if len(args) != 2 or not isinstance(args[0], str) or not isinstance(args[1], dict):
                 raise TypeError("Expected id and query as arguments or as kwargs")
             query = args[1]
             if not isinstance(query["where"], dict):
@@ -336,7 +336,7 @@ class MyTable:
     @staticmethod
     def delete_one(*args, **kwargs) -> PolyDeleteResult:
         if args:
-            if len(args) != 2 or or not isinstance(args[0], str) not isinstance(args[1], dict):
+            if len(args) != 2 or not isinstance(args[0], str) or not isinstance(args[1], dict):
                 raise TypeError("Expected id and query as arguments or as kwargs")
             query = args[1]
             if not isinstance(query["where"], dict):
