@@ -57,7 +57,7 @@ class MyTableRow(TypedDict, total=False):
     active: Required[bool]
     """ Required property """
 
-    optional: Dict[str, Any]
+    optional: dict[str, Any]
 
 
 
