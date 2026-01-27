@@ -315,7 +315,7 @@ class {table_name}:{table_description}
     @staticmethod
     def update_one(*args, **kwargs) -> {table_name}Row:
         if args:
-            if len(args) != 2 or or not isinstance(args[0], str) not isinstance(args[1], dict):
+            if len(args) != 2 or not isinstance(args[0], str) or not isinstance(args[1], dict):
                 raise TypeError("Expected id and query as arguments or as kwargs")
             query = args[1]
             if not isinstance(query["where"], dict):
@@ -356,7 +356,7 @@ class {table_name}:{table_description}
     @staticmethod
     def delete_one(*args, **kwargs) -> PolyDeleteResult:
         if args:
-            if len(args) != 2 or or not isinstance(args[0], str) not isinstance(args[1], dict):
+            if len(args) != 2 or not isinstance(args[0], str) or not isinstance(args[1], dict):
                 raise TypeError("Expected id and query as arguments or as kwargs")
             query = args[1]
             if not isinstance(query["where"], dict):

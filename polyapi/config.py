@@ -96,7 +96,8 @@ def initialize_config(force=False):
         if not key:
             key = input("? Poly App Key or User Key: ").strip()
         else:
-            key_input = input(f"? Poly App Key or User Key ({key}): ").strip()
+            display_key = '*' * 8 + key[-4:]
+            key_input = input(f"? Poly App Key or User Key ({display_key}): ").strip()
             key = key_input if key_input else key
 
         if url and key:
