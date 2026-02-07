@@ -3,7 +3,7 @@ import json
 import types
 import sys
 import re
-from typing import Dict, List, Mapping, Optional, Tuple, Any
+from typing import Dict, List, Mapping, Optional, Tuple, Any, Union
 from typing import _TypedDictMeta as BaseTypedDict  # type: ignore
 from typing_extensions import _TypedDictMeta, cast # type: ignore
 from stdlib_list import stdlib_list
@@ -390,7 +390,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 deployable["config"] = _parse_dict(node.value)
                 self._name = deployable["config"]["name"]
 
-        def _extract_docstring_from_function(self, node: ast.FunctionDef):
+        def _extract_docstring_from_function(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]):
             start_lineno = (node.body[0].lineno if node.body else node.lineno) - 1
             start_offset = self._line_offsets[start_lineno]
             end_offset = start_offset
@@ -452,15 +452,19 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             for name in node.names:
                 req = _get_req_name_if_not_in_base(name.name, pip_name_lookup)
                 if req:
+                    if "dependencies" not in deployable or deployable["dependencies"] is None:
+                        deployable["dependencies"] = []
                     deployable["dependencies"].append(req)
 
         def visit_ImportFrom(self, node: ast.ImportFrom):
             if node.module:
                 req = _get_req_name_if_not_in_base(node.module, pip_name_lookup)
                 if req:
+                    if "dependencies" not in deployable or deployable["dependencies"] is None:
+                        deployable["dependencies"] = []
                     deployable["dependencies"].append(req)
 
-        def visit_FunctionDef(self, node: ast.FunctionDef):
+        def _handle_function_def(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]):
             if node.name == self._name:
                 # Parse docstring which may contain param types and descriptions
                 self._extract_docstring_from_function(node)
@@ -505,6 +509,12 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                     deployable["types"]["returns"]["typeSchema"] = return_type_schema
                 else:
                     deployable["types"]["returns"]["type"] = "Any"
+
+        def visit_FunctionDef(self, node: ast.FunctionDef):
+            self._handle_function_def(node)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
+            self._handle_function_def(node)
 
         def generic_visit(self, node):
             if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
