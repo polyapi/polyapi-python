@@ -1,5 +1,4 @@
 import json
-import requests
 import os
 import uuid
 import shutil
@@ -20,6 +19,7 @@ from .server import render_server_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
 from .variables import generate_variables
 from .poly_tables import generate_tables
+from . import http_client
 from .config import get_api_key_and_url, get_direct_execute_config, get_cached_generate_args
 
 SUPPORTED_FUNCTION_TYPES = {
@@ -62,7 +62,7 @@ def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] =
     if get_direct_execute_config():
         params["apiFunctionDirectExecute"] = "true"
 
-    resp = requests.get(url, headers=headers, params=params)
+    resp = http_client.get(url, headers=headers, params=params)
     if resp.status_code == 200:
         return resp.json()
     else:
