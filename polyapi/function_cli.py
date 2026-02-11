@@ -1,7 +1,6 @@
 import sys
 from typing import Any, List, Optional
-import requests
-
+from polyapi import http_client
 from polyapi.config import get_api_key_and_url
 from polyapi.utils import get_auth_headers, print_green, print_red, print_yellow
 from polyapi.parser import parse_function_code, get_jsonschema_type
@@ -87,7 +86,7 @@ def function_add_or_update(
         sys.exit(1)
 
     headers = get_auth_headers(api_key)
-    resp = requests.post(url, headers=headers, json=data)
+    resp = http_client.post(url, headers=headers, json=data)
     if resp.status_code in [200, 201]:
         print_green("DEPLOYED")
         function_id = resp.json()["id"]
@@ -126,5 +125,5 @@ def spec_delete(function_type: str, function_id: str):
         print(f"Unknown function type: {function_type}")
         sys.exit(1)
     headers = get_auth_headers(api_key)
-    resp = requests.delete(url, headers=headers)
+    resp = http_client.delete(url, headers=headers)
     return resp
