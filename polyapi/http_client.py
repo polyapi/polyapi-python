@@ -16,14 +16,14 @@ def is_async() -> bool:
 def _get_sync_client() -> httpx.Client:
     global _sync_client
     if _sync_client is None:
-        _sync_client = httpx.Client(verify=False)
+        _sync_client = httpx.Client(verify=False, timeout=None)
     return _sync_client
 
 
 def _get_async_client() -> httpx.AsyncClient:
     global _async_client
     if _async_client is None:
-        _async_client = httpx.AsyncClient(verify=False)
+        _async_client = httpx.AsyncClient(verify=False, timeout=None)
     return _async_client
 
 
