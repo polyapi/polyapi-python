@@ -124,10 +124,10 @@ def render_webhook_handle(
 ) -> Tuple[str, str]:
     try:
         function_args, function_args_def = parse_arguments(function_name, arguments)
-
-        if "WebhookEventType" in function_args:
-            # let's add the function name import!
-            function_args = function_args.replace("WebhookEventType", f"{to_func_namespace(function_name)}.WebhookEventType")
+        # we don't need this bandaid anymore! 
+        # if "WebhookEventType" in function_args:
+        #     # let's add the function name import!
+        #     function_args = function_args.replace("WebhookEventType", f"{to_func_namespace(function_name)}.WebhookEventType")
 
         func_str = WEBHOOK_TEMPLATE.format(
             description=function_description,
