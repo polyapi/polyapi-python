@@ -4,6 +4,12 @@ from polyapi.poly_tables import _render_table, TABI_MODULE_IMPORTS, execute_quer
 from polyapi.typedefs import TableSpecDto
 
 
+def _normalize_type_notation(value: str) -> str:
+    # Python/runtime/tooling versions may emit either built-in generic style
+    # (dict[str, Any]) or typing style (Dict[str, Any]) for the same schema.
+    return value.replace("dict[str, Any]", "Dict[str, Any]")
+
+
 TABLE_SPEC_SIMPLE: TableSpecDto = {
     "type": "table",
     "id": "123456789",
@@ -655,7 +661,10 @@ class T(unittest.TestCase):
     def test_render_simple(self):
         self.maxDiff = 20000
         output = _render_table(TABLE_SPEC_SIMPLE)
-        self.assertEqual(output, EXPECTED_SIMPLE)
+        self.assertEqual(
+            _normalize_type_notation(output),
+            _normalize_type_notation(EXPECTED_SIMPLE),
+        )
 
     def test_execute_query_does_not_return_unhashable_dict_error(self):
         result = execute_query("test-table", "select", {})
