@@ -15,6 +15,11 @@ GET_TEMPLATE = """
     def get() -> {variable_type}:
         resp = variable_get("{variable_id}")
         return resp.text
+
+    @staticmethod
+    async def get_async() -> {variable_type}:
+        resp = await variable_get_async("{variable_id}")
+        return resp.text
 """
 
 
@@ -28,6 +33,11 @@ class {variable_name}:{get_method}
     @staticmethod
     def update(value: {variable_type}):
         resp = variable_update("{variable_id}", value)
+        return resp.json()
+
+    @staticmethod
+    async def update_async(value: {variable_type}):
+        resp = await variable_update_async("{variable_id}", value)
         return resp.json()
 
     @classmethod

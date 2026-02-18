@@ -1,5 +1,3 @@
-from typing import Union
-from collections.abc import Coroutine
 import httpx
 import os
 import logging
@@ -41,17 +39,22 @@ def _sync_direct_execute(function_type, function_id, data) -> httpx.Response:
 
     has_mtls, cert_path, key_path, ca_path = get_mtls_config()
 
+    # Direct-execute hits URL that may need custom TLS
+    # settings (mTLS certs or disabled verification). httpx Client.request()
+    # doesn't accept per-request transport kwargs, so use one-off calls.
     if has_mtls:
-        resp = http_client.request(
+        resp = httpx.request(
             url=endpoint_info_data["url"],
             cert=(cert_path, key_path),
             verify=ca_path,
+            timeout=None,
             **request_params
         )
     else:
-        resp = http_client.request(
+        resp = httpx.request(
             url=endpoint_info_data["url"],
             verify=False,
+            timeout=None,
             **request_params
         )
 
@@ -72,30 +75,34 @@ async def _async_direct_execute(function_type, function_id, data) -> httpx.Respo
 
     has_mtls, cert_path, key_path, ca_path = get_mtls_config()
 
+    # One-off async client for custom TLS settings on external URLs.
     if has_mtls:
-        resp = await http_client.async_request(
-            url=endpoint_info_data["url"],
-            cert=(cert_path, key_path),
-            verify=ca_path,
-            **request_params
-        )
+        async with httpx.AsyncClient(
+            cert=(cert_path, key_path), verify=ca_path, timeout=None
+        ) as client:
+            resp = await client.request(
+                url=endpoint_info_data["url"], **request_params
+            )
     else:
-        resp = await http_client.async_request(
-            url=endpoint_info_data["url"],
-            verify=False,
-            **request_params
-        )
+        async with httpx.AsyncClient(verify=False, timeout=None) as client:
+            resp = await client.request(
+                url=endpoint_info_data["url"], **request_params
+            )
 
     _check_endpoint_error(resp, function_type, function_id, data)
     return resp
 
 
-def direct_execute(function_type, function_id, data) -> Union[httpx.Response, Coroutine]:
-    """ execute a specific function id/type
+def direct_execute(function_type, function_id, data) -> httpx.Response:
+    """ execute a specific function id/type (sync)
     """
-    if http_client.is_async():
-        return _async_direct_execute(function_type, function_id, data)
     return _sync_direct_execute(function_type, function_id, data)
+
+
+async def direct_execute_async(function_type, function_id, data) -> httpx.Response:
+    """ execute a specific function id/type (async)
+    """
+    return await _async_direct_execute(function_type, function_id, data)
 
 
 def _sync_execute(function_type, function_id, data) -> httpx.Response:
@@ -132,12 +139,16 @@ async def _async_execute(function_type, function_id, data) -> httpx.Response:
     return resp
 
 
-def execute(function_type, function_id, data) -> Union[httpx.Response, Coroutine]:
-    """ execute a specific function id/type
+def execute(function_type, function_id, data) -> httpx.Response:
+    """ execute a specific function id/type (sync)
     """
-    if http_client.is_async():
-        return _async_execute(function_type, function_id, data)
     return _sync_execute(function_type, function_id, data)
+
+
+async def execute_async(function_type, function_id, data) -> httpx.Response:
+    """ execute a specific function id/type (async)
+    """
+    return await _async_execute(function_type, function_id, data)
 
 
 def _sync_execute_post(path, data):
@@ -153,9 +164,11 @@ async def _async_execute_post(path, data):
 
 
 def execute_post(path, data):
-    if http_client.is_async():
-        return _async_execute_post(path, data)
     return _sync_execute_post(path, data)
+
+
+async def execute_post_async(path, data):
+    return await _async_execute_post(path, data)
 
 
 def _sync_variable_get(variable_id: str) -> httpx.Response:
@@ -180,10 +193,12 @@ async def _async_variable_get(variable_id: str) -> httpx.Response:
     return resp
 
 
-def variable_get(variable_id: str) -> Union[httpx.Response, Coroutine]:
-    if http_client.is_async():
-        return _async_variable_get(variable_id)
+def variable_get(variable_id: str) -> httpx.Response:
     return _sync_variable_get(variable_id)
+
+
+async def variable_get_async(variable_id: str) -> httpx.Response:
+    return await _async_variable_get(variable_id)
 
 
 def _sync_variable_update(variable_id: str, value) -> httpx.Response:
@@ -208,7 +223,9 @@ async def _async_variable_update(variable_id: str, value) -> httpx.Response:
     return resp
 
 
-def variable_update(variable_id: str, value) -> Union[httpx.Response, Coroutine]:
-    if http_client.is_async():
-        return _async_variable_update(variable_id, value)
+def variable_update(variable_id: str, value) -> httpx.Response:
     return _sync_variable_update(variable_id, value)
+
+
+async def variable_update_async(variable_id: str, value) -> httpx.Response:
+    return await _async_variable_update(variable_id, value)

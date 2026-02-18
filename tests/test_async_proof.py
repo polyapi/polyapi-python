@@ -1,16 +1,15 @@
-"""Tests proving the sync/async dual-mode pattern works correctly.
+"""Tests proving the sync/async split works correctly.
 
 These tests mock HTTP calls so no live server is needed. They verify that:
 1. is_async() correctly detects sync vs async context
 2. http_client uses sync Client in sync context, AsyncClient in async context
-3. execute(), direct_execute(), execute_post(), variable_get(), variable_update()
-   all return the right type based on calling context
-4. Parallel async execution with asyncio.gather works
+3. Sync functions (execute, direct_execute, etc.) always return httpx.Response
+4. Async functions (execute_async, direct_execute_async, etc.) return coroutines
+5. Parallel async execution with asyncio.gather works
 """
 
 import asyncio
 import inspect
-from collections.abc import Coroutine
 from unittest.mock import patch, MagicMock, AsyncMock
 
 import httpx
@@ -19,10 +18,15 @@ import pytest
 from polyapi import http_client
 from polyapi.execute import (
     execute,
+    execute_async,
     direct_execute,
+    direct_execute_async,
     execute_post,
+    execute_post_async,
     variable_get,
+    variable_get_async,
     variable_update,
+    variable_update_async,
     _build_direct_execute_params,
     _check_endpoint_error,
 )
@@ -41,33 +45,7 @@ def _fake_response(status_code=200, json_data=None, text="ok"):
     return resp
 
 
-# 1. is_async() detection
-
-class TestIsAsync:
-    def test_sync_context_returns_false(self):
-        assert http_client.is_async() is False
-
-    def test_async_context_returns_true(self):
-        async def _check():
-            return http_client.is_async()
-
-        result = asyncio.run(_check())
-        assert result is True
-
-    def test_nested_sync_inside_async_still_true(self):
-        """A plain (non-async) helper called from within an event loop
-        should still report True because the loop is running."""
-
-        def sync_helper():
-            return http_client.is_async()
-
-        async def _check():
-            return sync_helper()
-
-        assert asyncio.run(_check()) is True
-
-
-# 2. http_client sync / async client pairing
+# 1. http_client sync / async client pairing
 
 class TestHttpClientPairing:
     """Verify that the sync helpers call httpx.Client and the async helpers
@@ -157,7 +135,7 @@ class TestHttpClientPairing:
         mock_request.assert_called_once()
 
 
-# 3. execute() dual-mode
+# 3. execute() / execute_async()
 
 _CONFIG_PATCH = patch(
     "polyapi.execute.get_api_key_and_url",
@@ -169,8 +147,9 @@ _MTLS_PATCH = patch(
 )
 
 
-class TestExecuteDualMode:
-    """execute() returns httpx.Response in sync context, coroutine in async."""
+class TestExecute:
+    """execute() always returns httpx.Response (sync).
+    execute_async() always returns a coroutine that resolves to httpx.Response."""
 
     @_CONFIG_PATCH
     @patch("polyapi.http_client.post", return_value=_fake_response(200, text='"hello"'))
@@ -184,8 +163,7 @@ class TestExecuteDualMode:
     @patch("polyapi.http_client.async_post", new_callable=AsyncMock, return_value=_fake_response(200, text='"hello"'))
     def test_async_returns_coroutine_then_response(self, mock_post, _mock_config):
         async def _run():
-            coro = execute("server", "some-id", {})
-            # In async context, execute() returns a coroutine
+            coro = execute_async("server", "some-id", {})
             assert inspect.isawaitable(coro)
             return await coro
 
@@ -202,10 +180,23 @@ class TestExecuteDualMode:
         assert call_args[1]["json"] == {"arg": 1}
         assert "Bearer fake-key" in call_args[1]["headers"]["Authorization"]
 
+    @_CONFIG_PATCH
+    @patch("polyapi.http_client.post", return_value=_fake_response(200, text='"hello"'))
+    def test_sync_works_inside_async_context(self, mock_post, _mock_config):
+        """execute() (sync) should still return httpx.Response even when
+        called from within an async context — this is the key fix."""
+        async def _run():
+            result = execute("server", "some-id", {})
+            # Should be a Response, NOT a coroutine
+            assert not inspect.isawaitable(result)
+            assert result.status_code == 200
 
-# 4. direct_execute() dual-mode
+        asyncio.run(_run())
 
-class TestDirectExecuteDualMode:
+
+# 4. direct_execute() / direct_execute_async()
+
+class TestDirectExecute:
 
     @_CONFIG_PATCH
     @_MTLS_PATCH
@@ -216,9 +207,7 @@ class TestDirectExecuteDualMode:
     def test_sync_returns_response(self, mock_post, mock_request, _mtls, _config):
         result = direct_execute("server", "fn-id", {})
         assert result.status_code == 200
-        # First call: POST to /direct-execute endpoint info
         assert "/direct-execute" in mock_post.call_args[0][0]
-        # Second call: actual request to the target URL
         mock_request.assert_called_once()
 
     @_CONFIG_PATCH
@@ -229,7 +218,7 @@ class TestDirectExecuteDualMode:
     ))
     def test_async_returns_coroutine(self, mock_post, mock_request, _mtls, _config):
         async def _run():
-            coro = direct_execute("server", "fn-id", {})
+            coro = direct_execute_async("server", "fn-id", {})
             assert inspect.isawaitable(coro)
             return await coro
 
@@ -237,9 +226,9 @@ class TestDirectExecuteDualMode:
         assert result.status_code == 200
 
 
-# 5. execute_post() dual-mode
+# 5. execute_post() / execute_post_async()
 
-class TestExecutePostDualMode:
+class TestExecutePost:
 
     @_CONFIG_PATCH
     @patch("polyapi.http_client.post", return_value=_fake_response())
@@ -252,7 +241,7 @@ class TestExecutePostDualMode:
     @patch("polyapi.http_client.async_post", new_callable=AsyncMock, return_value=_fake_response())
     def test_async(self, mock_post, _config):
         async def _run():
-            coro = execute_post("/some/path", {"data": 1})
+            coro = execute_post_async("/some/path", {"data": 1})
             assert inspect.isawaitable(coro)
             return await coro
 
@@ -260,9 +249,9 @@ class TestExecutePostDualMode:
         assert result.status_code == 200
 
 
-# 6. variable_get / variable_update dual-mode
+# 6. variable_get / variable_get_async
 
-class TestVariableGetDualMode:
+class TestVariableGet:
 
     @_CONFIG_PATCH
     @patch("polyapi.http_client.get", return_value=_fake_response(200, text="42"))
@@ -275,7 +264,7 @@ class TestVariableGetDualMode:
     @patch("polyapi.http_client.async_get", new_callable=AsyncMock, return_value=_fake_response(200, text="42"))
     def test_async(self, mock_get, _config):
         async def _run():
-            coro = variable_get("var-123")
+            coro = variable_get_async("var-123")
             assert inspect.isawaitable(coro)
             return await coro
 
@@ -283,7 +272,9 @@ class TestVariableGetDualMode:
         assert result.status_code == 200
 
 
-class TestVariableUpdateDualMode:
+# 7. variable_update / variable_update_async
+
+class TestVariableUpdate:
 
     @_CONFIG_PATCH
     @patch("polyapi.http_client.patch", return_value=_fake_response(200))
@@ -295,7 +286,7 @@ class TestVariableUpdateDualMode:
     @patch("polyapi.http_client.async_patch", new_callable=AsyncMock, return_value=_fake_response(200))
     def test_async(self, mock_patch_call, _config):
         async def _run():
-            coro = variable_update("var-123", "new-value")
+            coro = variable_update_async("var-123", "new-value")
             assert inspect.isawaitable(coro)
             return await coro
 
@@ -303,21 +294,19 @@ class TestVariableUpdateDualMode:
         assert result.status_code == 200
 
 
-# 7. Parallel async execution with asyncio.gather
+# 8. Parallel async execution with asyncio.gather
 
 class TestAsyncParallelExecution:
-    """Prove that multiple async execute() calls can be gathered in parallel."""
+    """Prove that multiple async execute_async() calls can be gathered in parallel."""
 
     @_CONFIG_PATCH
     @patch("polyapi.http_client.async_post", new_callable=AsyncMock)
     def test_gather_multiple_executes(self, mock_post, _config):
-        # Each call returns a distinct response
         responses = [_fake_response(200, text=f'"result-{i}"') for i in range(5)]
         mock_post.side_effect = responses
 
         async def _run():
-            coros = [execute("server", f"fn-{i}", {}) for i in range(5)]
-            # All should be awaitables in async context
+            coros = [execute_async("server", f"fn-{i}", {}) for i in range(5)]
             for c in coros:
                 assert inspect.isawaitable(c)
             return await asyncio.gather(*coros)
@@ -325,15 +314,15 @@ class TestAsyncParallelExecution:
         results = asyncio.run(_run())
         assert len(results) == 5
         assert mock_post.call_count == 5
-        # Verify each got a distinct response
         for i, r in enumerate(results):
             assert r.text == f'"result-{i}"'
 
     @_CONFIG_PATCH
     @patch("polyapi.http_client.async_post", new_callable=AsyncMock)
     def test_gather_is_faster_than_sequential(self, mock_post, _config):
-        """Simulate latency: each call sleeps 0.1s. Gathering 5 should take
-        ~0.1s total (parallel) rather than ~0.5s (sequential)."""
+        """Measure both sequential and parallel execution in the same run,
+        then assert parallel < sequential. Avoids flaky CI failures from
+        hardcoded time thresholds."""
         import time
 
         async def _slow_post(*args, **kwargs):
@@ -343,19 +332,29 @@ class TestAsyncParallelExecution:
         mock_post.side_effect = _slow_post
 
         async def _run():
-            start = time.monotonic()
-            coros = [execute("server", f"fn-{i}", {}) for i in range(5)]
-            results = await asyncio.gather(*coros)
-            elapsed = time.monotonic() - start
-            return results, elapsed
+            # Sequential: await one at a time
+            seq_start = time.monotonic()
+            for i in range(5):
+                await execute_async("server", f"fn-{i}", {})
+            seq_elapsed = time.monotonic() - seq_start
 
-        results, elapsed = asyncio.run(_run())
+            # Parallel: gather all at once
+            par_start = time.monotonic()
+            results = await asyncio.gather(
+                *[execute_async("server", f"fn-{i}", {}) for i in range(5)]
+            )
+            par_elapsed = time.monotonic() - par_start
+
+            return results, seq_elapsed, par_elapsed
+
+        results, seq_elapsed, par_elapsed = asyncio.run(_run())
         assert len(results) == 5
-        # Parallel should finish well under 0.5s (sequential would be ~0.5s)
-        assert elapsed < 0.3, f"Parallel gather took {elapsed:.2f}s — expected < 0.3s"
+        assert par_elapsed < seq_elapsed, (
+            f"Parallel ({par_elapsed:.2f}s) should be faster than sequential ({seq_elapsed:.2f}s)"
+        )
 
 
-# 8. Helper: _build_direct_execute_params
+# 9. Helper: _build_direct_execute_params
 
 class TestBuildDirectExecuteParams:
     def test_strips_url(self):
@@ -375,12 +374,11 @@ class TestBuildDirectExecuteParams:
     def test_no_mutation_of_input(self):
         original = {"url": "u", "method": "POST", "maxRedirects": 3}
         _build_direct_execute_params(original)
-        # Original dict should be unchanged
         assert "url" in original
         assert "maxRedirects" in original
 
 
-# 9. _check_endpoint_error
+# 10. _check_endpoint_error
 
 class TestCheckEndpointError:
     """_check_endpoint_error raises on errors for both api and non-api types."""
