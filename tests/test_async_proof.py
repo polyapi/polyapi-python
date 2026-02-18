@@ -41,7 +41,7 @@ def _fake_response(status_code=200, json_data=None, text="ok"):
     resp.status_code = status_code
     resp.text = text
     resp.content = text.encode()
-    resp.json.return_value = json_data or {}
+    resp.json.return_value = {} if json_data is None else json_data
     return resp
 
 
@@ -200,7 +200,7 @@ class TestDirectExecute:
 
     @_CONFIG_PATCH
     @_MTLS_PATCH
-    @patch("polyapi.http_client.request", return_value=_fake_response(200, text='{"result": 1}'))
+    @patch("polyapi.execute.httpx.request", return_value=_fake_response(200, text='{"result": 1}'))
     @patch("polyapi.http_client.post", return_value=_fake_response(
         200, json_data={"url": "https://target.example.com", "method": "GET"},
     ))
@@ -212,15 +212,20 @@ class TestDirectExecute:
 
     @_CONFIG_PATCH
     @_MTLS_PATCH
-    @patch("polyapi.http_client.async_request", new_callable=AsyncMock, return_value=_fake_response(200))
     @patch("polyapi.http_client.async_post", new_callable=AsyncMock, return_value=_fake_response(
         200, json_data={"url": "https://target.example.com", "method": "GET"},
     ))
-    def test_async_returns_coroutine(self, mock_post, mock_request, _mtls, _config):
+    def test_async_returns_coroutine(self, mock_post, _mtls, _config):
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=_fake_response(200))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
         async def _run():
-            coro = direct_execute_async("server", "fn-id", {})
-            assert inspect.isawaitable(coro)
-            return await coro
+            with patch("polyapi.execute.httpx.AsyncClient", return_value=mock_client):
+                coro = direct_execute_async("server", "fn-id", {})
+                assert inspect.isawaitable(coro)
+                return await coro
 
         result = asyncio.run(_run())
         assert result.status_code == 200
