@@ -1,8 +1,16 @@
 import unittest
-from polyapi.poly_tables import _render_table
+from unittest.mock import Mock, patch
+from polyapi.poly_tables import _render_table, TABI_MODULE_IMPORTS, execute_query
+from polyapi.typedefs import TableSpecDto
 
 
-TABLE_SPEC_SIMPLE = {
+def _normalize_type_notation(value: str) -> str:
+    # Python/runtime/tooling versions may emit either built-in generic style
+    # (dict[str, Any]) or typing style (Dict[str, Any]) for the same schema.
+    return value.replace("dict[str, Any]", "Dict[str, Any]")
+
+
+TABLE_SPEC_SIMPLE: TableSpecDto = {
     "type": "table",
     "id": "123456789",
     "name": "MyTable",
@@ -13,24 +21,18 @@ TABLE_SPEC_SIMPLE = {
         "$schema": "http://json-schema.org/draft-06/schema#",
         "type": "object",
         "properties": {
-            "id": { "type": "string" },
-            "createdAt": { "type": "string" },
-            "updatedAt": { "type": "string" },
-            "name": { "type": "string" },
-            "age": { "type": "integer" },
-            "active": { "type": "boolean" },
-            "optional": { "type": "object" }
+            "id": {"type": "string"},
+            "createdAt": {"type": "string"},
+            "updatedAt": {"type": "string"},
+            "name": {"type": "string"},
+            "age": {"type": "integer"},
+            "active": {"type": "boolean"},
+            "optional": {"type": "object"},
         },
-        "required": [
-            "id",
-            "createdAt",
-            "updatedAt",
-            "name",
-            "age",
-            "active"
-        ],
+        "required": ["id", "createdAt", "updatedAt", "name", "age", "active"],
         "additionalProperties": False,
-    }
+    },
+    "unresolvedPolySchemaRefs": [],
 }
 
 EXPECTED_SIMPLE = '''
@@ -57,7 +59,7 @@ class MyTableRow(TypedDict, total=False):
     active: Required[bool]
     """ Required property """
 
-    optional: dict[str, Any]
+    optional: Dict[str, Any]
 
 
 
@@ -351,43 +353,40 @@ class MyTable:
         return delete_one_response(execute_query(MyTable.table_id, "delete", transform_query(query)))
 '''
 
-TABLE_SPEC_COMPLEX = {
+TABLE_SPEC_COMPLEX: TableSpecDto = {
     "type": "table",
     "id": "123456789",
     "name": "MyTable",
     "context": "some.context.here",
     "contextName": "some.context.here.MyTable",
+    "description": "",
     "schema": {
         "$schema": "http://json-schema.org/draft-06/schema#",
         "type": "object",
         "properties": {
-            "id": { "type": "string" },
-            "createdAt": { "type": "string" },
-            "updatedAt": { "type": "string" },
+            "id": {"type": "string"},
+            "createdAt": {"type": "string"},
+            "updatedAt": {"type": "string"},
             "data": {
                 "type": "object",
                 "properties": {
-                    "foo": { "type": "string" },
+                    "foo": {"type": "string"},
                     "nested": {
                         "type": "array",
                         "items": {
                             "type": "object",
-                            "properties": { "name": { "type": "string" } },
-                            "required": ["name"]
-                        }
+                            "properties": {"name": {"type": "string"}},
+                            "required": ["name"],
+                        },
                     },
-                    "other": { "x-poly-ref": { "path": "some.other.Schema" }}
-                }
-            }
+                    "other": {"x-poly-ref": {"path": "some.other.Schema"}},
+                },
+            },
         },
-        "required": [
-            "id",
-            "createdAt",
-            "updatedAt",
-            "data"
-        ],
+        "required": ["id", "createdAt", "updatedAt", "data"],
         "additionalProperties": False,
-    }
+    },
+    "unresolvedPolySchemaRefs": [],
 }
 
 EXPECTED_COMPLEX = '''
@@ -657,12 +656,59 @@ class MyTable:
         return execute_query(MyTable.table_id, "delete", query)
 '''
 
+
 class T(unittest.TestCase):
     def test_render_simple(self):
         self.maxDiff = 20000
         output = _render_table(TABLE_SPEC_SIMPLE)
-        self.assertEqual(output, EXPECTED_SIMPLE)
-    
+        self.assertEqual(
+            _normalize_type_notation(output),
+            _normalize_type_notation(EXPECTED_SIMPLE),
+        )
+
+    def test_execute_query_does_not_return_unhashable_dict_error(self):
+        result = execute_query("test-table", "select", {})
+        self.assertIsInstance(result, dict)
+        self.assertNotIn("unhashable type: 'dict'", str(result))
+
+    def test_execute_query_uses_absolute_url_and_auth_header(self):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"ok": True}
+
+        with (
+            patch(
+                "polyapi.poly_tables.get_api_key_and_url",
+                return_value=("test-api-key", "https://na1.polyapi.io"),
+            ),
+            patch(
+                "polyapi.poly_tables.requests.post", return_value=response
+            ) as post_mock,
+        ):
+            result = execute_query("table-id-123", "select", {"where": {"id": "abc"}})
+
+        self.assertEqual(result, {"ok": True})
+        post_mock.assert_called_once()
+        called_url = (
+            post_mock.call_args.kwargs["url"]
+            if "url" in post_mock.call_args.kwargs
+            else post_mock.call_args.args[0]
+        )
+        called_headers = post_mock.call_args.kwargs["headers"]
+        self.assertEqual(
+            called_url.split("?")[0],
+            "https://na1.polyapi.io/tables/table-id-123/select",
+        )
+        self.assertEqual(called_headers["Authorization"], "Bearer test-api-key")
+
+    def test_generated_module_executes_with_delete_one_types(self):
+        source = f"{TABI_MODULE_IMPORTS}\n\n\n{_render_table(TABLE_SPEC_SIMPLE)}"
+        generated_scope = {}
+        exec(source, generated_scope)
+        self.assertIn("MyTable", generated_scope)
+        self.assertIn("PolyDeleteResult", generated_scope)
+        self.assertIn("delete_one_response", generated_scope)
+
     @unittest.skip("too brittle, will restore later")
     def test_render_complex(self):
         self.maxDiff = 20000
