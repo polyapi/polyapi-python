@@ -19,14 +19,6 @@ def _check_endpoint_error(resp, function_type, function_id, data):
             raise PolyApiException(f"{resp.status_code}: {error_content}")
 
 
-def _check_response_error(resp, function_type, function_id, data):
-    if resp.status_code < 200 or resp.status_code >= 300:
-        error_content = resp.content.decode("utf-8", errors="ignore")
-        if function_type == 'api' and os.getenv("LOGS_ENABLED"):
-            logger.error(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}")
-        elif function_type != 'api':
-            raise PolyApiException(f"{resp.status_code}: {error_content}")
-
 
 def _build_direct_execute_params(endpoint_info_data):
     request_params = endpoint_info_data.copy()
@@ -63,7 +55,7 @@ def _sync_direct_execute(function_type, function_id, data) -> httpx.Response:
             **request_params
         )
 
-    _check_response_error(resp, function_type, function_id, data)
+    _check_endpoint_error(resp, function_type, function_id, data)
     return resp
 
 
@@ -94,7 +86,7 @@ async def _async_direct_execute(function_type, function_id, data) -> httpx.Respo
             **request_params
         )
 
-    _check_response_error(resp, function_type, function_id, data)
+    _check_endpoint_error(resp, function_type, function_id, data)
     return resp
 
 

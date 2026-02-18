@@ -24,12 +24,12 @@ from polyapi.execute import (
     variable_get,
     variable_update,
     _build_direct_execute_params,
+    _check_endpoint_error,
 )
+from polyapi.exceptions import PolyApiException
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 def _fake_response(status_code=200, json_data=None, text="ok"):
     """Build a fake httpx.Response."""
@@ -378,3 +378,24 @@ class TestBuildDirectExecuteParams:
         # Original dict should be unchanged
         assert "url" in original
         assert "maxRedirects" in original
+
+
+# 9. _check_endpoint_error
+
+class TestCheckEndpointError:
+    """_check_endpoint_error raises on errors for both api and non-api types."""
+
+    def test_raises_for_api_with_logs(self):
+        resp = _fake_response(status_code=500, text="server broke")
+        with patch.dict("os.environ", {"LOGS_ENABLED": "1"}):
+            with pytest.raises(PolyApiException, match="500"):
+                _check_endpoint_error(resp, "api", "fn-1", {})
+
+    def test_raises_for_non_api(self):
+        resp = _fake_response(status_code=500, text="server broke")
+        with pytest.raises(PolyApiException, match="500"):
+            _check_endpoint_error(resp, "server", "fn-1", {})
+
+    def test_no_raise_on_success(self):
+        resp = _fake_response(status_code=200, text="ok")
+        _check_endpoint_error(resp, "api", "fn-1", {})
