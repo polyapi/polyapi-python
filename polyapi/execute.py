@@ -96,7 +96,7 @@ async def _async_direct_execute(function_type, function_id, data) -> httpx.Respo
                 url=endpoint_info_data["url"], **request_params
             )
 
-    _check_endpoint_error(resp, function_type, function_id, data)
+    _check_response_error(resp, function_type, function_id, data)
     return resp
 
 
