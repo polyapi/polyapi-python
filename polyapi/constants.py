@@ -23,6 +23,7 @@ PYTHON_TO_JSONSCHEMA_TYPE_MAP = {
 
 BASIC_PYTHON_TYPES = set(PYTHON_TO_JSONSCHEMA_TYPE_MAP.keys())
 
+# initial pass
 SAFE_IMPORT_MODULES = {
     "typing", "typing_extensions", "types",
     "re", "os", "sys", "json", "datetime", "math",
