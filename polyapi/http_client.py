@@ -60,10 +60,14 @@ async def async_request(method, url, **kwargs) -> httpx.Response:
 
 
 def close():
-    global _sync_client, _async_client
+    global _sync_client
     if _sync_client is not None:
         _sync_client.close()
         _sync_client = None
+
+async def close_async():
+    global _sync_client, _async_client
+    close()
     if _async_client is not None:
-        asyncio.get_event_loop().run_until_complete(_async_client.aclose())
+        await _async_client.aclose()
         _async_client = None

@@ -73,7 +73,6 @@ def print_red(s: str):
 
 def add_type_import_path(function_name: str, arg: str) -> str:
     """if not basic type, coerce to camelCase and add the import path"""
-    # outdated og comment - for now, just treat Callables as basic types 
     # from now, we start qualifying non-basic types :)) 
     # e.g. Callable[[EmailAddress, Dict, Dict, Dict], None]
         # becomes Callable[[Set_profile_email.EmailAddress, Dict, Dict, Dict], None]

@@ -7,6 +7,14 @@ from polyapi import http_client
 
 logger = logging.getLogger("poly")
 
+def _check_response_error(resp, function_type, function_id, data):
+    if resp.status_code < 200 or resp.status_code >= 300:
+        error_content = resp.content.decode("utf-8", errors="ignore")
+        if function_type == 'api' and os.getenv("LOGS_ENABLED"):
+            logger.error(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}")
+        elif function_type != 'api':
+            raise PolyApiException(f"{resp.status_code}: {error_content}")
+
 
 def _check_endpoint_error(resp, function_type, function_id, data):
     if resp.status_code < 200 or resp.status_code >= 300:
@@ -15,7 +23,6 @@ def _check_endpoint_error(resp, function_type, function_id, data):
             raise PolyApiException(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}")
         elif function_type != 'api':
             raise PolyApiException(f"{resp.status_code}: {error_content}")
-
 
 
 def _build_direct_execute_params(endpoint_info_data):
@@ -58,7 +65,7 @@ def _sync_direct_execute(function_type, function_id, data) -> httpx.Response:
             **request_params
         )
 
-    _check_endpoint_error(resp, function_type, function_id, data)
+    _check_response_error(resp, function_type, function_id, data)
     return resp
 
 
@@ -111,14 +118,7 @@ def _sync_execute(function_type, function_id, data) -> httpx.Response:
     url = f"{api_url}/functions/{function_type}/{function_id}/execute"
 
     resp = http_client.post(url, json=data, headers=headers)
-
-    if (resp.status_code < 200 or resp.status_code >= 300) and os.getenv("LOGS_ENABLED"):
-        error_content = resp.content.decode("utf-8", errors="ignore")
-        if function_type == 'api' and os.getenv("LOGS_ENABLED"):
-            logger.error(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}")
-        elif function_type != 'api':
-            raise PolyApiException(f"{resp.status_code}: {error_content}")
-
+    _check_response_error(resp, function_type, function_id, data)
     return resp
 
 
@@ -128,14 +128,7 @@ async def _async_execute(function_type, function_id, data) -> httpx.Response:
     url = f"{api_url}/functions/{function_type}/{function_id}/execute"
 
     resp = await http_client.async_post(url, json=data, headers=headers)
-
-    if (resp.status_code < 200 or resp.status_code >= 300) and os.getenv("LOGS_ENABLED"):
-        error_content = resp.content.decode("utf-8", errors="ignore")
-        if function_type == 'api' and os.getenv("LOGS_ENABLED"):
-            logger.error(f"Error executing api function with id: {function_id}. Status code: {resp.status_code}. Request data: {data}, Response: {error_content}")
-        elif function_type != 'api':
-            raise PolyApiException(f"{resp.status_code}: {error_content}")
-
+    _check_response_error(resp, function_type, function_id, data)
     return resp
 
 

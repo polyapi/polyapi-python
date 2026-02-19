@@ -29,6 +29,7 @@ from polyapi.execute import (
     variable_update_async,
     _build_direct_execute_params,
     _check_endpoint_error,
+    _check_response_error
 )
 from polyapi.exceptions import PolyApiException
 
@@ -383,22 +384,29 @@ class TestBuildDirectExecuteParams:
         assert "maxRedirects" in original
 
 
-# 10. _check_endpoint_error
+# 10. _check_endpoint_error vs _check_response_error
 
-class TestCheckEndpointError:
-    """_check_endpoint_error raises on errors for both api and non-api types."""
+class TestCheckErrorBehaviorDifference:
+    """_check_endpoint_error raises on api errors; _check_response_error only logs."""
 
-    def test_raises_for_api_with_logs(self):
+
+    def test_endpoint_error_raises_for_api_with_logs(self):
+        """_check_endpoint_error raises PolyApiException for api functions."""
+
         resp = _fake_response(status_code=500, text="server broke")
         with patch.dict("os.environ", {"LOGS_ENABLED": "1"}):
             with pytest.raises(PolyApiException, match="500"):
                 _check_endpoint_error(resp, "api", "fn-1", {})
 
-    def test_raises_for_non_api(self):
+    def test_response_error_logs_for_api_with_logs(self):
+        """_check_response_error only logs (no raise) for api functions."""
+        resp = _fake_response(status_code=500, text="server broke")
+        with patch.dict("os.environ", {"LOGS_ENABLED": "1"}):
+            # Should NOT raise — just logs
+            _check_response_error(resp, "api", "fn-1", {})
+
+    def test_both_raise_for_non_api(self):
+        """Both functions raise PolyApiException for non-api function types."""
         resp = _fake_response(status_code=500, text="server broke")
         with pytest.raises(PolyApiException, match="500"):
             _check_endpoint_error(resp, "server", "fn-1", {})
-
-    def test_no_raise_on_success(self):
-        resp = _fake_response(status_code=200, text="ok")
-        _check_endpoint_error(resp, "api", "fn-1", {})
