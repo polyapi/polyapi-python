@@ -145,6 +145,14 @@ This script is handy for checking for any mypy types:
 
 Please ignore \[name-defined\] errors for now. This is a known bug we are working to fix!
 
+## Strategies for QA'ing Changes To Generate Or Other Core Functionality
+
+Our https://na1.polyapi.io has a large OOB catalog (as does eu1/na2). We also have several big internal PolyAPI projects with Python (message @eupharis if you need a pointer to which ones).
+
+Running `python -m polyapi generate` in all these projects and then checking the flake8 and check_mypy steps above is a great way to build confidence that the `generate` changes has no gotchas.
+
+Of course all this is in addition to the changes passing through normal unittests and integration tests!
+
 ## Support
 
 If you run into any issues or want help getting started with this project, please contact support@polyapi.io

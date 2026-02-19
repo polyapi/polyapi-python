@@ -6,6 +6,7 @@ import json
 import hashlib
 from pathlib import Path
 from typing import TypedDict, List, Dict, Tuple, Optional, Any, Union
+from typing_extensions import Required
 from subprocess import check_output, CalledProcessError
 
 
@@ -54,7 +55,7 @@ class DeployableRecord(ParsedDeployableConfig, total=False):
     gitRevision: str
     fileRevision: str
     file: str
-    types: DeployableFunctionTypes
+    types: Required[DeployableFunctionTypes]
     typeSchemas: Dict[str, Any]
     dependencies: List[str]
     deployments: List[Deployment]

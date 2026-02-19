@@ -73,9 +73,23 @@ def print_red(s: str):
 
 def add_type_import_path(function_name: str, arg: str) -> str:
     """if not basic type, coerce to camelCase and add the import path"""
-    # for now, just treat Callables as basic types
+    # outdated og comment - for now, just treat Callables as basic types 
+    # from now, we start qualifying non-basic types :)) 
+    # e.g. Callable[[EmailAddress, Dict, Dict, Dict], None]
+        # becomes Callable[[Set_profile_email.EmailAddress, Dict, Dict, Dict], None]
+    
     if arg.startswith("Callable"):
-        return arg
+        inner = arg[len("Callable["):-1]  # strip outer Callable[...]
+        parts = [p.strip() for p in inner.split(",")]
+        qualified = []
+        for p in parts:
+            clean = p.strip("[] ")
+            if clean and clean not in BASIC_PYTHON_TYPES:
+                replacement = f"{to_func_namespace(function_name)}.{camelCase(clean)}"
+                p = p.replace(clean, replacement)
+            qualified.append(p)
+        return "Callable[" + ",".join(qualified) + "]"
+        # return arg
 
     if arg in BASIC_PYTHON_TYPES:
         return arg
