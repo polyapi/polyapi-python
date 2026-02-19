@@ -4,6 +4,7 @@ import os
 import uuid
 import shutil
 import logging
+import ast
 import tempfile
 
 from copy import deepcopy
@@ -21,6 +22,11 @@ from .utils import add_import_to_init, get_auth_headers, init_the_init, print_gr
 from .variables import generate_variables
 from .poly_tables import generate_tables
 from .config import get_api_key_and_url, get_direct_execute_config, get_cached_generate_args
+
+# Track emitted type definitions per __init__.py for deduplication
+# Maps: directory_path -> {type_name -> source_code}
+_emitted_types: dict[str, dict[str, str]] = {}
+
 
 SUPPORTED_FUNCTION_TYPES = {
     "apiFunction",
@@ -342,7 +348,7 @@ def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = 
     generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
     print(generate_msg, end="", flush=True)
     remove_old_library()
-
+    _emitted_types.clear()
     specs = get_specs(contexts=contexts, names=names, ids=ids, no_types=no_types)
     cache_specs(specs)
 
@@ -397,7 +403,16 @@ def clear() -> None:
     print("Cleared!")
 
 
-def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
+def render_spec(spec: SpecificationDto) -> Tuple[str, str, str]:
+    """Render a spec into generated code.
+    
+    Returns:
+        (module_scope_types, func_str, func_type_defs)
+        
+        module_scope_types: type definitions for module scope (client functions only)
+        func_str:           function code (wrapped in try/except for client functions)
+        func_type_defs:     type stubs for the {FuncName}.py IDE helper file
+    """
     function_type = spec["type"]
     function_description = spec["description"]
     function_name = spec["name"]
@@ -410,10 +425,7 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
         assert spec["function"]
         # Handle cases where arguments might be missing or None
         if spec["function"].get("arguments"):
-            arguments = [
-                arg for arg in spec["function"]["arguments"]
-            ]
-        
+            arguments = [arg for arg in spec["function"]["arguments"]]
         # Handle cases where returnType might be missing or None
         if spec["function"].get("returnType"):
             return_type = spec["function"]["returnType"]
@@ -421,49 +433,31 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
             # Provide a fallback return type when missing
             return_type = {"kind": "any"}
 
+    module_scope_types = ""
+
     if function_type == "apiFunction":
         func_str, func_type_defs = render_api_function(
-            function_type,
-            function_name,
-            function_id,
-            function_description,
-            arguments,
-            return_type,
+            function_type, function_name, function_id,
+            function_description, arguments, return_type,
         )
     elif function_type == "customFunction":
-        func_str, func_type_defs = render_client_function(
-            function_name,
-            spec.get("code", ""),
-            arguments,
-            return_type,
+        module_scope_types, func_str, func_type_defs = render_client_function(
+            function_name, spec.get("code", ""), arguments, return_type,
         )
     elif function_type == "serverFunction":
         func_str, func_type_defs = render_server_function(
-            function_type,
-            function_name,
-            function_id,
-            function_description,
-            arguments,
-            return_type,
+            function_type, function_name, function_id,
+            function_description, arguments, return_type,
         )
     elif function_type == "authFunction":
         func_str, func_type_defs = render_auth_function(
-            function_type,
-            function_name,
-            function_id,
-            function_description,
-            arguments,
-            return_type,
+            function_type, function_name, function_id,
+            function_description, arguments, return_type,
         )
     elif function_type == "webhookHandle":
         func_str, func_type_defs = render_webhook_handle(
-            function_type,
-            function_context,
-            function_name,
-            function_id,
-            function_description,
-            arguments,
-            return_type,
+            function_type, function_context, function_name,
+            function_id, function_description, arguments, return_type,
         )
 
     if X_POLY_REF_WARNING in func_type_defs:
@@ -471,7 +465,62 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
         # let's add a more user friendly error explaining what is going on
         func_type_defs = func_type_defs.replace(X_POLY_REF_WARNING, X_POLY_REF_BETTER_WARNING)
 
-    return func_str, func_type_defs
+    return module_scope_types, func_str, func_type_defs
+
+
+def _deduplicate_types(full_path: str, module_scope_types: str) -> str:
+    """Remove type definitions that have already been emitted for this context.
+    
+    Uses AST to parse the module_scope_types string, identifies each 
+    top-level definition by name, and strips duplicates.
+    
+    Keeps definitions whose name hasn't been seen, or whose content differs
+    from the previously emitted version (last-writer-wins for changed types).
+    """
+    if not module_scope_types.strip():
+        return ""
+    
+    if full_path not in _emitted_types:
+        _emitted_types[full_path] = {}
+    
+    seen = _emitted_types[full_path]
+    
+    try:
+        tree = ast.parse(module_scope_types)
+    except SyntaxError:
+        return module_scope_types  # Can't parse, emit as-is
+    
+    lines = module_scope_types.split('\n')
+    keep_lines: set[int] = set(range(len(lines)))  # Start by keeping all
+    
+    for node in ast.iter_child_nodes(tree):
+        name = None
+        if isinstance(node, ast.ClassDef):
+            name = node.name
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            if isinstance(target, ast.Name):
+                name = target.id
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            name = node.target.id
+        
+        if not name:
+            continue
+        
+        start = node.lineno - 1
+        end = node.end_lineno or start + 1
+        source = '\n'.join(lines[start:end])
+        
+        if name in seen and seen[name] == source:
+            # Exact duplicate — skip it
+            for i in range(start, end):
+                keep_lines.discard(i)
+        else:
+            # New or changed — keep it, update registry
+            seen[name] = source
+    
+    return '\n'.join(line for i, line in enumerate(lines) if i in keep_lines).strip()
+
 
 
 def add_function_file(
@@ -479,62 +528,58 @@ def add_function_file(
     function_name: str,
     spec: SpecificationDto,
 ):
-    """
-    Atomically add a function file to prevent partial corruption during generation failures.
+    """Atomically add a function to a context's __init__.py.
     
-    This function generates all content first, then writes files atomically using temporary files
-    to ensure that either the entire operation succeeds or no changes are made to the filesystem.
+    For client functions, type definitions are placed at module scope
+    (outside try/except) and deduplicated across sibling functions.
     """
     try:
-        # first lets add the import to the __init__
         init_the_init(full_path)
 
-        func_str, func_type_defs = render_spec(spec)
+        module_scope_types, func_str, func_type_defs = render_spec(spec)
 
         if not func_str:
-            # If render_spec failed and returned empty string, don't create any files
             raise Exception("Function rendering failed - empty function string returned")
 
-        # Prepare all content first before writing any files
+        # Deduplicate types against previously emitted types for this context
+        unique_types = _deduplicate_types(full_path, module_scope_types)
+
         func_namespace = to_func_namespace(function_name)
         init_path = os.path.join(full_path, "__init__.py")
         func_file_path = os.path.join(full_path, f"{func_namespace}.py")
         
-        # Read current __init__.py content if it exists
         init_content = ""
         if os.path.exists(init_path):
             with open(init_path, "r", encoding='utf-8') as f:
                 init_content = f.read()
         
-        # Prepare new content to append to __init__.py
-        new_init_content = init_content + f"\n\nfrom . import {func_namespace}\n\n{func_str}"
+        # Build new content: import + module-scope types + wrapped function
+        new_parts = [init_content, f"\n\nfrom . import {func_namespace}\n"]
+        if unique_types:
+            new_parts.append(f"\n{unique_types}\n")
+        new_parts.append(f"\n{func_str}")
+        new_init_content = ''.join(new_parts)
         
-        # Use temporary files for atomic writes
-        # Write to __init__.py atomically
+        # Atomic writes
         with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp", encoding='utf-8') as temp_init:
             temp_init.write(new_init_content)
             temp_init_path = temp_init.name
         
-        # Write to function file atomically  
         with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp", encoding='utf-8') as temp_func:
             temp_func.write(func_type_defs)
             temp_func_path = temp_func.name
         
-        # Atomic operations: move temp files to final locations
         shutil.move(temp_init_path, init_path)
         shutil.move(temp_func_path, func_file_path)
         
     except Exception as e:
-        # Clean up any temporary files that might have been created
         try:
             if 'temp_init_path' in locals() and os.path.exists(temp_init_path):
                 os.unlink(temp_init_path)
             if 'temp_func_path' in locals() and os.path.exists(temp_func_path):
                 os.unlink(temp_func_path)
         except:
-            pass  # Best effort cleanup
-        
-        # Re-raise the original exception
+            pass
         raise e
 
 
