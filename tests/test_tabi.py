@@ -682,7 +682,7 @@ class T(unittest.TestCase):
                 return_value=("test-api-key", "https://na1.polyapi.io"),
             ),
             patch(
-                "polyapi.poly_tables.requests.post", return_value=response
+                "polyapi.http_client.post", return_value=response
             ) as post_mock,
         ):
             result = execute_query("table-id-123", "select", {"where": {"id": "abc"}})

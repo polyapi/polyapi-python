@@ -2,8 +2,7 @@ import os
 import sys
 import subprocess
 from typing import List, Tuple, Literal
-import requests
-
+from polyapi import http_client
 from polyapi.utils import get_auth_headers
 from polyapi.config import get_api_key_and_url
 from polyapi.parser import parse_function_code
@@ -32,7 +31,7 @@ def get_server_function_description(description: str, arguments, code: str) -> s
     api_key, api_url = get_api_key_and_url()
     headers = get_auth_headers(api_key)
     data = {"description": description, "arguments": arguments, "code": code}
-    response = requests.post(f"{api_url}/functions/server/description-generation", headers=headers, json=data)
+    response = http_client.post(f"{api_url}/functions/server/description-generation", headers=headers, json=data)
     return response.json()
 
 def get_client_function_description(description: str, arguments, code: str) -> str:
@@ -40,7 +39,7 @@ def get_client_function_description(description: str, arguments, code: str) -> s
     headers = get_auth_headers(api_key)
     # Simulated API call to generate client function descriptions
     data = {"description": description, "arguments": arguments, "code": code}
-    response = requests.post(f"{api_url}/functions/client/description-generation", headers=headers, json=data)
+    response = http_client.post(f"{api_url}/functions/client/description-generation", headers=headers, json=data)
     return response.json()
 
 def fill_in_missing_function_details(deployable: DeployableRecord, code: str) -> DeployableRecord:

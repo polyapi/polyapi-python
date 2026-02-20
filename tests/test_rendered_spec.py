@@ -40,7 +40,7 @@ class T(unittest.TestCase):
         self.assertEqual(_get_spec.call_count, 1)
         self.assertFalse(updated)
 
-    @patch("polyapi.rendered_spec.requests.post")
+    @patch("polyapi.http_client.post")
     @patch("polyapi.rendered_spec._get_spec")
     def test_get_and_update_rendered_spec_success(self, _get_spec, post):
         """ pass in a bad id to update and make sure it returns False
