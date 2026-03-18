@@ -156,6 +156,6 @@ class T(unittest.TestCase):
             RETURN_TYPE_NAMED_RETURN_TYPE["function"]["arguments"],
             return_type,
         )
-        self.assertIn("-> ReturnType", func_str)
+        self.assertIn("-> dict", func_str)
         self.assertNotIn(".returnType", func_str)
         self.assertNotIn(".ReturnType", func_str)
