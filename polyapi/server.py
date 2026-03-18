@@ -62,7 +62,7 @@ def render_server_function(
         return_type_def=return_type_def,
     )
     func_str = SERVER_FUNCTION_TEMPLATE.format(
-        return_type_name=add_type_import_path(function_name, return_type_name),
+        return_type_name=_normalize_return_type_for_annotation(function_name, return_type_name),
         function_type="server",
         function_name=function_name,
         function_id=function_id,
@@ -72,6 +72,12 @@ def render_server_function(
         data=data,
     )
     return func_str, func_type_defs
+
+
+def _normalize_return_type_for_annotation(function_name: str, return_type_name: str) -> str:
+    if return_type_name == "ReturnType":
+        return "ReturnType"
+    return add_type_import_path(function_name, return_type_name)
 
 
 def _get_server_return_action(return_type_name: str) -> str:

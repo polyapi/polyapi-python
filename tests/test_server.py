@@ -66,6 +66,34 @@ LIST_RECOMMENDATIONS = {
 }
 
 
+RETURN_TYPE_NAMED_RETURN_TYPE = {
+    "id": "ret-1234",
+    "type": "serverFunction",
+    "context": "mixed",
+    "name": "fooFunc",
+    "description": "Return type name collision regression test.",
+    "requirements": [],
+    "function": {
+        "arguments": [],
+        "returnType": {
+            "kind": "object",
+            "schema": {
+                "title": "ReturnType",
+                "type": "object",
+                "properties": {
+                    "value": {"type": "string"},
+                },
+                "required": ["value"],
+            },
+        },
+        "synchronous": True,
+    },
+    "code": "",
+    "language": "javascript",
+    "visibilityMetadata": {"visibility": "ENVIRONMENT"},
+}
+
+
 class T(unittest.TestCase):
     def test_render_function_twilio_server(self):
         # same test but try it as a serverFunction rather than an apiFunction
@@ -117,3 +145,18 @@ class T(unittest.TestCase):
 # stay_date: Required[str]
 # """ Required property """'''
 #         self.assertIn(expected_return_type, func_str)
+
+    def test_render_function_return_type_name_collision_does_not_reference_module_attr(self):
+        return_type = RETURN_TYPE_NAMED_RETURN_TYPE["function"]["returnType"]
+        func_str, func_type_defs = render_server_function(
+            RETURN_TYPE_NAMED_RETURN_TYPE["type"],
+            RETURN_TYPE_NAMED_RETURN_TYPE["name"],
+            RETURN_TYPE_NAMED_RETURN_TYPE["id"],
+            RETURN_TYPE_NAMED_RETURN_TYPE["description"],
+            RETURN_TYPE_NAMED_RETURN_TYPE["function"]["arguments"],
+            return_type,
+        )
+        self.assertIn("class ReturnType", func_type_defs)
+        self.assertIn("-> ReturnType", func_str)
+        self.assertNotIn(".returnType", func_str)
+        self.assertNotIn(".ReturnType", func_str)

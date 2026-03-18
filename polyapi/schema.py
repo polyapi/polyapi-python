@@ -50,6 +50,13 @@ def wrapped_generate_schema_types(type_spec: dict, root, fallback_type):
             # if we have no root, just add "My"
             root = "My" + root
 
+    if isinstance(root, list):
+        root = "_".join([str(x) for x in root if x is not None]) or fallback_type
+    elif root is None:
+        root = fallback_type
+    elif not isinstance(root, str):
+        root = str(root)
+
     root = clean_title(root)
 
     try:
@@ -131,10 +138,19 @@ def clean_title(title: str) -> str:
     """ used by library generation, sometimes functions can be added with spaces in the title
     or other nonsense. fix them!
     """
+    if isinstance(title, list):
+        title = "_".join([str(x) for x in title if x is not None])
+    elif title is None:
+        title = ""
+    elif not isinstance(title, str):
+        title = str(title)
+
     title = title.replace(" ", "")
     # certain reserved words cant be titles, let's replace them
     if title == "List":
         title = "List_"
+    if not title:
+        title = "Dict"
     return title
 
 

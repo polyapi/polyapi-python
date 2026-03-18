@@ -531,10 +531,27 @@ def _render_table(table: TableSpecDto) -> str:
     table_where_class = _render_table_where_class(
         table["name"], columns, required_columns
     )
-    if table.get("description", ""):
+    raw_description = table.get("description", "")
+
+    def _flatten_description(value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            flat: List[str] = []
+            for item in value:
+                flat.extend(_flatten_description(item))
+            return flat
+        return [str(value)]
+
+    if isinstance(raw_description, str):
+        normalized_description = raw_description
+    else:
+        normalized_description = "\n".join(_flatten_description(raw_description))
+
+    if normalized_description:
         table_description = '\n    """'
         table_description += "\n       ".join(
-            table["description"].replace('"', "'").split("\n")
+            normalized_description.replace('"', "'").split("\n")
         )
         table_description += '\n    """'
     else:
