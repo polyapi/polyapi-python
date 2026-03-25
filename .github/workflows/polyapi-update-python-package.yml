@@ -1,4 +1,5 @@
 name: Update python pip package
+
 on:
   push:
     paths:
@@ -6,106 +7,143 @@ on:
     branches:
       - develop
       - main
+  pull_request:
+    types: [closed]
+    paths:
+      - "pyproject.toml"
+    branches:
+      - develop
+      - main
+      - eu1
+      - na2
 
 jobs:
-  develop-build:
+  build-distribution:
     name: Build distribution 📦
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/develop' }}
-    environment: dev
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.x"
+      - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build a binary wheel and a source tarball
-      run: python3 -m build
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build tomli twine
 
+      - name: Build a binary wheel and a source tarball
+        run: python -m build
 
-  dev-publish-to-pypi:
-    name: Publish Python 🐍 distribution 📦 to PyPI
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Resolve package version
+        id: pkg
+        shell: bash
+        run: |
+          VERSION=$(python -c "import pathlib, tomli; data = tomli.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8')); print(data['project']['version'])")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved package version: ${VERSION}"
+
+    outputs:
+      package_version: ${{ steps.pkg.outputs.version }}
+
+  publish-and-update-client-versions:
+    name: Publish to PyPI and update BE client-versions
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/develop' }}
-    needs: develop-build
-    environment:
-      name: dev
-      url: https://pypi.org/p/polyapi-python
-
-    permissions:
-      id-token: write
-    steps:
-
-    - name: Download all the dists
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution 📦 to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-
-
-  main-build:
-    name: Build distribution 📦
-    runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
-    environment: main
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.x"
-
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build a binary wheel and a source tarball
-      run: python3 -m build
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-
-
-  main-publish-to-pypi:
-    name: >-
-      Publish Python 🐍 distribution 📦 to PyPI
-    if: ${{ github.ref == 'refs/heads/main' }}
-    needs:
-    - main-build
-    runs-on: ubuntu-latest
-    environment:
-      name: main
-      url: https://pypi.org/p/polyapi-python
+    needs: build-distribution
     permissions:
       id-token: write
 
+    if: >-
+      ${{
+        github.ref == 'refs/heads/develop' ||
+        github.ref == 'refs/heads/main' ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.merged == true &&
+          (
+            (github.event.pull_request.head.ref == 'develop' && github.event.pull_request.base.ref == 'main') ||
+            (github.event.pull_request.head.ref == 'main' && github.event.pull_request.base.ref == 'na2') ||
+            (github.event.pull_request.head.ref == 'main' && github.event.pull_request.base.ref == 'eu1')
+          )
+        )
+      }}
 
     steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution 📦 to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Resolve instance and BE URL
+        id: target
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            if [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+              INSTANCE="develop"
+              BE_URL="https://dev.polyapi.io"
+            elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+              INSTANCE="na1"
+              BE_URL="https://na1.polyapi.io"
+            else
+              echo "Unsupported push target: ${GITHUB_REF}"
+              exit 1
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            HEAD="${{ github.event.pull_request.head.ref }}"
+            BASE="${{ github.event.pull_request.base.ref }}"
+            if [[ "${HEAD}" == "develop" && "${BASE}" == "main" ]]; then
+              INSTANCE="na1"
+              BE_URL="https://na1.polyapi.io"
+            elif [[ "${HEAD}" == "main" && "${BASE}" == "na2" ]]; then
+              INSTANCE="na2"
+              BE_URL="https://na2.polyapi.io"
+            elif [[ "${HEAD}" == "main" && "${BASE}" == "eu1" ]]; then
+              INSTANCE="eu1"
+              BE_URL="https://eu1.polyapi.io"
+            else
+              echo "Unsupported path for publishing: ${HEAD} -> ${BASE}"
+              exit 1
+            fi
+          else
+            echo "Unsupported event: ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+
+          echo "instance=${INSTANCE}" >> "$GITHUB_OUTPUT"
+          echo "be_url=${BE_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish distribution 📦 to PyPI
+        id: publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Update backend client-versions
+        if: ${{ success() }}
+        env:
+          BE_URL: ${{ steps.target.outputs.be_url }}
+          INSTANCE: ${{ steps.target.outputs.instance }}
+          VERSION: ${{ needs.build-distribution.outputs.package_version }}
+          POLY_SUPER_ADMIN_USER_KEY: ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "${POLY_SUPER_ADMIN_USER_KEY}" ]]; then
+            echo "Missing required secret POLY_SUPER_ADMIN_USER_KEY"
+            exit 1
+          fi
+
+          curl --fail-with-body -X POST \
+            "${BE_URL}/client-versions" \
+            -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"python\":\"${VERSION}\"}"

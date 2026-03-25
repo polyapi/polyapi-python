@@ -10,6 +10,7 @@ from .function_cli import function_add_or_update, function_execute
 from .rendered_spec import get_and_update_rendered_spec
 from .prepare import prepare_deployables
 from .sync import sync_deployables
+from .version_check import check_for_client_version_update
 
 
 def _get_version_string():
@@ -23,6 +24,8 @@ def _get_version_string():
 
 
 def execute_from_cli():
+    check_for_client_version_update()
+
     # First we setup all our argument parsing logic
     # Then we parse the arguments (waaay at the bottom)
     parser = argparse.ArgumentParser(
