@@ -2,9 +2,11 @@ import unittest
 import os
 import shutil
 import importlib.util
+import tempfile
 from unittest.mock import patch, MagicMock
-from polyapi.utils import get_type_and_def, rewrite_reserved
-from polyapi.generate import render_spec, create_empty_schemas_module, generate_functions, create_function
+from polyapi.typedefs import SpecificationDto
+from polyapi.utils import get_type_and_def, rewrite_reserved, to_type_module_alias
+from polyapi.generate import render_spec, create_empty_schemas_module, generate_functions, create_function, add_function_file
 from polyapi.poly_schemas import generate_schemas, create_schema
 from polyapi.variables import generate_variables, create_variable
 
@@ -660,3 +662,45 @@ def test_nested_function() -> schemas.api.v1.user.profile:
                     # The failed function directory should not exist
                     func_dir = os.path.join(context_dir, "failing_function")
                     self.assertFalse(os.path.exists(func_dir))
+
+    def test_add_function_file_aliases_pascal_case_type_module(self):
+        spec: SpecificationDto = {
+            "id": "test-func-id",
+            "name": "CreateAJsonPost",
+            "context": "test_context",
+            "type": "apiFunction",
+            "description": "Test function",
+            "language": "python",
+            "function": {
+                "arguments": [],
+                "returnType": {
+                    "kind": "object",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                        },
+                        "required": ["id"],
+                        "title": "ReturnType",
+                    },
+                },
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            add_function_file(temp_dir, spec["name"], spec)
+
+            init_path = os.path.join(temp_dir, "__init__.py")
+            with open(init_path, "r", encoding="utf-8") as file:
+                init_content = file.read()
+
+            type_module_alias = to_type_module_alias(spec["name"])
+            self.assertIn(
+                f"from . import {spec['name']} as {type_module_alias}",
+                init_content,
+            )
+            self.assertIn(f"def {spec['name']}(", init_content)
+            self.assertIn(
+                f"-> {type_module_alias}.{spec['name']}Response",
+                init_content,
+            )
