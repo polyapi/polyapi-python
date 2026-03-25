@@ -101,8 +101,11 @@ def generate_schema_types(input_data: Dict, root=None):
     return output
 
 
-# Regex to match everything between "# example: {\n" and "^}$"
-MALFORMED_EXAMPLES_PATTERN = re.compile(r"# example: \{\n.*?^\}$", flags=re.DOTALL | re.MULTILINE)
+# Matches commented example headers emitted by jsonschema-gentypes before a raw
+# multiline JSON object/array body that is not commented out.
+MALFORMED_EXAMPLE_HEADER_PATTERN = re.compile(
+    r"^\s*#\s*(?:\|\s*)?example:\s*([\[{])\s*$"
+)
 
 # Regex to fix invalid escape sequences in docstrings
 INVALID_ESCAPE_PATTERNS = [
@@ -117,8 +120,24 @@ def clean_malformed_examples(example: str) -> str:
     """ there is a bug in the `jsonschmea_gentypes` library where if an example from a jsonchema is an object,
     it will break the code because the object won't be properly commented out. Also fixes invalid escape sequences.
     """
-    # Remove malformed examples
-    cleaned_example = MALFORMED_EXAMPLES_PATTERN.sub("", example)
+    cleaned_lines = []
+    balance = 0
+    skipping_example = False
+
+    for line in example.splitlines(keepends=True):
+        if not skipping_example:
+            if MALFORMED_EXAMPLE_HEADER_PATTERN.match(line):
+                skipping_example = True
+                balance = line.count("{") + line.count("[") - line.count("}") - line.count("]")
+                continue
+            cleaned_lines.append(line)
+            continue
+
+        balance += line.count("{") + line.count("[") - line.count("}") - line.count("]")
+        if balance <= 0:
+            skipping_example = False
+
+    cleaned_example = "".join(cleaned_lines)
     
     # Fix invalid escape sequences in docstrings
     for pattern, replacement in INVALID_ESCAPE_PATTERNS:
