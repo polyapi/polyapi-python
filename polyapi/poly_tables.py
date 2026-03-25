@@ -1,5 +1,5 @@
 import os
-import requests
+from polyapi import http_client
 from typing_extensions import NotRequired, TypedDict
 from typing import (
     List,
@@ -88,7 +88,7 @@ def execute_query(table_id, method, query):
         headers = {"x-poly-execution-id": polyCustom.get("executionId")}
         if auth_key:
             headers["Authorization"] = f"Bearer {auth_key}"
-        response = requests.post(url, json=query, headers=headers)
+        response = http_client.post(url, json=query, headers=headers)
         response.raise_for_status()
         return response.json()
     except Exception as e:

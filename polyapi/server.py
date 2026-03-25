@@ -24,6 +24,20 @@ def {function_name}(
         return resp.text  # type: ignore # fallback for debugging
 
 
+async def {function_name}_async(
+{args}
+) -> {return_type_name}:
+    \"""{function_description}
+
+    Function ID: {function_id}
+    \"""
+    resp = await execute_async("{function_type}", "{function_id}", {data})
+    try:
+        return {return_action}
+    except:
+        return resp.text  # type: ignore # fallback for debugging
+
+
 """
 
 

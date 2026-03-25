@@ -117,6 +117,16 @@ def introspectToken(token: str) -> AuthFunctionResponse:
     url = "/auth-providers/{function_id}/introspect"
     resp = execute_post(url, {{"token": token}})
     return resp.json()
+
+
+async def introspectToken_async(token: str) -> AuthFunctionResponse:
+    \"""{description}
+
+    Function ID: {function_id}
+    \"""
+    url = "/auth-providers/{function_id}/introspect"
+    resp = await execute_post_async(url, {{"token": token}})
+    return resp.json()
 """
 
 REFRESH_TOKEN_TEMPLATE = """
@@ -128,6 +138,16 @@ def refreshToken(token: str) -> AuthFunctionResponse:
     url = "/auth-providers/{function_id}/refresh"
     resp = execute_post(url, {{"token": token}})
     return resp.json()
+
+
+async def refreshToken_async(token: str) -> AuthFunctionResponse:
+    \"""{description}
+
+    Function ID: {function_id}
+    \"""
+    url = "/auth-providers/{function_id}/refresh"
+    resp = await execute_post_async(url, {{"token": token}})
+    return resp.json()
 """
 
 REVOKE_TOKEN_TEMPLATE = """
@@ -138,6 +158,19 @@ def revokeToken(token: str) -> Optional[AuthFunctionResponse]:
     \"""
     url = "/auth-providers/{function_id}/revoke"
     resp = execute_post(url, {{"token": token}})
+    try:
+        return resp.json()
+    except:
+        return None
+
+
+async def revokeToken_async(token: str) -> Optional[AuthFunctionResponse]:
+    \"""{description}
+
+    Function ID: {function_id}
+    \"""
+    url = "/auth-providers/{function_id}/revoke"
+    resp = await execute_post_async(url, {{"token": token}})
     try:
         return resp.json()
     except:
