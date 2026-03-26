@@ -84,11 +84,11 @@ jobs:
             exit 1
           fi
 
-          curl --fail-with-body -X POST \
-            "${BASE_URL}/client-versions" \
+          curl --fail-with-body -X PATCH \
+            "${BASE_URL}/config-variables/SupportedClientVersions" \
             -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
             -H "Content-Type: application/json" \
-            -d "{\"python\":\"${VERSION}\"}"
+            -d "{\"name\":\"SupportedClientVersions\",\"value\":{\"python\":\"${VERSION}\"}}"
 
   publish-na1:
     name: Publish to PyPI and update na1 BE client-versions
@@ -130,11 +130,11 @@ jobs:
             exit 1
           fi
 
-          curl --fail-with-body -X POST \
-            "${BASE_URL}/client-versions" \
+          curl --fail-with-body -X PATCH \
+            "${BASE_URL}/config-variables/SupportedClientVersions" \
             -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
             -H "Content-Type: application/json" \
-            -d "{\"python\":\"${VERSION}\"}"
+            -d "{\"name\":\"SupportedClientVersions\",\"value\":{\"python\":\"${VERSION}\"}}"
 
   publish-na2:
     name: Publish to PyPI and update na2 client-versions
@@ -173,11 +173,11 @@ jobs:
             exit 1
           fi
 
-          curl --fail-with-body -X POST \
-            "${BASE_URL}/client-versions" \
+          curl --fail-with-body -X PATCH \
+            "${BASE_URL}/config-variables/SupportedClientVersions" \
             -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
             -H "Content-Type: application/json" \
-            -d "{\"python\":\"${VERSION}\"}"
+            -d "{\"name\":\"SupportedClientVersions\",\"value\":{\"python\":\"${VERSION}\"}}"
 
   publish-eu1:
     name: Publish to PyPI and update eu1 BE client-versions
@@ -216,8 +216,8 @@ jobs:
             exit 1
           fi
 
-          curl --fail-with-body -X POST \
-            "${BASE_URL}/client-versions" \
+          curl --fail-with-body -X PATCH \
+            "${BASE_URL}/config-variables/SupportedClientVersions" \
             -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
             -H "Content-Type: application/json" \
-            -d "{\"python\":\"${VERSION}\"}"
+            -d "{\"name\":\"SupportedClientVersions\",\"value\":{\"python\":\"${VERSION}\"}}"

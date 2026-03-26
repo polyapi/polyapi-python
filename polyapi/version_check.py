@@ -36,8 +36,6 @@ def _normalize_version(version: str | None) -> Version | None:
     except InvalidVersion:
         pass
 
-    # best-effort coercion similar to semver.coerce:
-    # pull first numeric dotted segment with optional pre-release/dev suffix
     match = re.search(r"(\d+(?:\.\d+){0,2}(?:[a-zA-Z]+\d*)?)", candidate)
     if not match:
         return None
@@ -81,17 +79,25 @@ def _resolve_instance_tag(base_url: str | None) -> str | None:
 
 
 def _get_client_versions(base_url: str) -> dict:
-    url = f"{base_url.rstrip('/')}/client-versions"
-    resp = http_get(url, timeout=5.0)
+    url = f"{base_url.rstrip('/')}/config-variables/SupportedClientVersions"
+    api_key, _ = get_api_key_and_url()
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    resp = http_get(url, headers=headers, timeout=5.0)
     resp.raise_for_status()
     payload = resp.json()
     if not isinstance(payload, dict):
-        raise ValueError("Invalid client-versions payload, expected object.")
-    return payload
+        raise ValueError("Invalid SupportedClientVersions config variablepayload.")
 
+    value = payload.get("value")
+    if isinstance(value, dict):
+        return value
+
+    if isinstance(payload.get("python"), str):
+        return payload
+
+    raise ValueError("Invalid SupportedClientVersions config variable payload.")
 
 def _resolve_target_version(versions_payload: dict) -> str | None:
-    # Per-instance response shape: { "python": "1.14.5", "typescript": "1.20.0" }
     if isinstance(versions_payload, dict):
         value = versions_payload.get("python")
         if isinstance(value, str) and value.strip():
@@ -152,7 +158,7 @@ def check_for_client_version_update() -> None:
     try:
         versions_payload = _get_client_versions(base_url)
     except Exception as ex:
-        logger.error("Failed to fetch client versions from backend: %s", ex)
+        logger.error("Failed to fetch client versions from the service: %s", ex)
         return
 
     available_version = _resolve_target_version(versions_payload)
@@ -161,7 +167,7 @@ def check_for_client_version_update() -> None:
         return
 
     using_older_version = normalized_current < normalized_available
-    using_newer_version = normalized_current > normalized_available  # noqa: F841
+    using_newer_version = normalized_current > normalized_available
 
     if not using_older_version and not using_newer_version:
         return
