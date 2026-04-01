@@ -3,6 +3,7 @@ import httpx
 
 _sync_client: httpx.Client | None = None
 _async_client: httpx.AsyncClient | None = None
+_async_client_loop: asyncio.AbstractEventLoop | None = None
 
 
 def _get_sync_client() -> httpx.Client:
@@ -13,9 +14,11 @@ def _get_sync_client() -> httpx.Client:
 
 
 def _get_async_client() -> httpx.AsyncClient:
-    global _async_client
-    if _async_client is None:
+    global _async_client, _async_client_loop
+    current_loop = asyncio.get_running_loop()
+    if _async_client is None or _async_client_loop is not current_loop:
         _async_client = httpx.AsyncClient(timeout=None)
+        _async_client_loop = current_loop
     return _async_client
 
 
@@ -66,8 +69,15 @@ def close():
         _sync_client = None
 
 async def close_async():
-    global _sync_client, _async_client
+    global _sync_client, _async_client, _async_client_loop
     close()
-    if _async_client is not None:
-        await _async_client.aclose()
-        _async_client = None
+    client = _async_client
+    client_loop = _async_client_loop
+    _async_client = None
+    _async_client_loop = None
+    if client is None:
+        return
+
+    current_loop = asyncio.get_running_loop()
+    if client_loop is current_loop:
+        await client.aclose()
