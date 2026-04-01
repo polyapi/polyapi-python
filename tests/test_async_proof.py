@@ -56,10 +56,12 @@ class TestHttpClientPairing:
         # Reset singletons so each test starts fresh
         http_client._sync_client = None
         http_client._async_client = None
+        http_client._async_client_loop = None
 
     def teardown_method(self):
         http_client._sync_client = None
         http_client._async_client = None
+        http_client._async_client_loop = None
 
     @patch.object(httpx.Client, "post", return_value=_fake_response())
     def test_sync_post_uses_sync_client(self, mock_post):
@@ -79,6 +81,90 @@ class TestHttpClientPairing:
         mock_post.assert_called_once()
         assert resp.status_code == 200
         assert http_client._async_client is not None
+        assert http_client._async_client_loop is not None
+
+    def test_async_post_reuses_client_within_same_loop(self):
+        first_client = MagicMock()
+        first_client.post = AsyncMock(return_value=_fake_response())
+
+        with patch("polyapi.http_client.httpx.AsyncClient", return_value=first_client) as mock_async_client:
+            async def _run():
+                first_response = await http_client.async_post("https://example.com/first", json={})
+                second_response = await http_client.async_post("https://example.com/second", json={})
+                return first_response, second_response, asyncio.get_running_loop()
+
+            first_response, second_response, current_loop = asyncio.run(_run())
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+        assert mock_async_client.call_count == 1
+        assert first_client.post.await_count == 2
+        assert http_client._async_client is first_client
+        assert http_client._async_client_loop is current_loop
+
+    def test_async_post_recreates_client_after_loop_change(self):
+        first_client = MagicMock()
+        first_client.post = AsyncMock(return_value=_fake_response())
+        second_client = MagicMock()
+        second_client.post = AsyncMock(return_value=_fake_response())
+
+        with patch(
+            "polyapi.http_client.httpx.AsyncClient",
+            side_effect=[first_client, second_client],
+        ) as mock_async_client:
+            async def _run_once(url: str):
+                response = await http_client.async_post(url, json={})
+                return response, http_client._async_client, asyncio.get_running_loop()
+
+            first_response, first_cached_client, first_loop = asyncio.run(_run_once("https://example.com/first"))
+            second_response, second_cached_client, second_loop = asyncio.run(_run_once("https://example.com/second"))
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+        assert mock_async_client.call_count == 2
+        assert first_client.post.await_count == 1
+        assert second_client.post.await_count == 1
+        assert first_cached_client is first_client
+        assert second_cached_client is second_client
+        assert first_loop is not second_loop
+        assert http_client._async_client is second_client
+        assert http_client._async_client_loop is second_loop
+
+    def test_close_async_clears_cached_client_for_current_loop(self):
+        async def _run():
+            cached_client = MagicMock()
+            cached_client.aclose = AsyncMock()
+            http_client._async_client = cached_client
+            http_client._async_client_loop = asyncio.get_running_loop()
+
+            await http_client.close_async()
+
+            return cached_client
+
+        cached_client = asyncio.run(_run())
+
+        cached_client.aclose.assert_awaited_once()
+        assert http_client._async_client is None
+        assert http_client._async_client_loop is None
+
+    def test_close_async_drops_stale_client_without_cross_loop_close(self):
+        stale_client = MagicMock()
+        stale_client.aclose = AsyncMock()
+
+        async def _seed_stale_client():
+            http_client._async_client = stale_client
+            http_client._async_client_loop = asyncio.get_running_loop()
+
+        asyncio.run(_seed_stale_client())
+
+        async def _close_on_new_loop():
+            await http_client.close_async()
+
+        asyncio.run(_close_on_new_loop())
+
+        stale_client.aclose.assert_not_awaited()
+        assert http_client._async_client is None
+        assert http_client._async_client_loop is None
 
     @patch.object(httpx.Client, "get", return_value=_fake_response())
     def test_sync_get(self, mock_get):
