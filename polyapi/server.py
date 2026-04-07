@@ -81,8 +81,16 @@ def _normalize_return_type_for_annotation(function_name: str, return_type_name: 
 
 
 def _get_server_return_action(return_type_name: str) -> str:
-    if return_type_name == "str":
+    normalized_type = return_type_name.replace(" ", "")
+
+    if normalized_type in {"str", "Optional[str]"}:
         return_action = "resp.text"
+    elif "|" in normalized_type:
+        union_parts = {part for part in normalized_type.split("|") if part}
+        if union_parts == {"str", "None"}:
+            return_action = "resp.text"
+        else:
+            return_action = "resp.json()"
     else:
         return_action = "resp.json()"
     return return_action

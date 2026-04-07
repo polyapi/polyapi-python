@@ -159,3 +159,52 @@ class T(unittest.TestCase):
         self.assertIn("-> dict", func_str)
         self.assertNotIn(".returnType", func_str)
         self.assertNotIn(".ReturnType", func_str)
+
+    def test_render_function_string_union_returns_text(self):
+        function_name = "getMaybeName"
+        return_type = {"kind": "plain", "value": "Promise<string | null>"}
+
+        func_str, _ = render_server_function(
+            "serverFunction",
+            function_name,
+            "ret-str-null-1",
+            "",
+            [],
+            return_type,
+        )
+
+        self.assertIn("-> str | None", func_str)
+        self.assertIn("try:\n        return resp.text", func_str)
+        self.assertNotIn("return resp.json()", func_str)
+
+    def test_render_function_mixed_string_union_returns_json(self):
+        function_name = "getMaybePayload"
+        return_type = {"kind": "plain", "value": "string | object"}
+
+        func_str, _ = render_server_function(
+            "serverFunction",
+            function_name,
+            "ret-str-obj-1",
+            "",
+            [],
+            return_type,
+        )
+
+        self.assertIn("-> str | Dict", func_str)
+        self.assertIn("try:\n        return resp.json()", func_str)
+
+    def test_render_function_number_nullable_returns_json(self):
+        function_name = "getMaybeCount"
+        return_type = {"kind": "plain", "value": "number | null"}
+
+        func_str, _ = render_server_function(
+            "serverFunction",
+            function_name,
+            "ret-num-null-1",
+            "",
+            [],
+            return_type,
+        )
+
+        self.assertIn("-> float | None", func_str)
+        self.assertIn("try:\n        return resp.json()", func_str)
