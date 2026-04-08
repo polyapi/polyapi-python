@@ -72,11 +72,6 @@ def print_red(s: str):
 
 
 def normalize_cross_language_type(type_name: str) -> str:
-    """Normalize TS-flavored type strings into safe Python typing hints.
-
-    This prevents TypeScript utility types (e.g. ReturnType<...>) from leaking
-    into Python codegen where they would be treated as importable symbols.
-    """
     value = (type_name or "").strip()
     if not value:
         return "Any"
@@ -97,6 +92,10 @@ def normalize_cross_language_type(type_name: str) -> str:
 
     if value.startswith("Awaited<") and value.endswith(">"):
         return normalize_cross_language_type(value[len("Awaited<"):-1])
+
+    if value.endswith("[]"):
+        item_type = normalize_cross_language_type(value[:-2])
+        return f"List[{item_type}]"
 
     if "|" in value:
         parts = [p.strip() for p in value.split("|") if p.strip()]
