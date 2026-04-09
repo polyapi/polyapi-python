@@ -3,15 +3,13 @@ import argparse
 
 from polyapi.utils import print_green, print_red
 
+from .cli_constants import CLI_COMMANDS
 from .config import initialize_config, set_api_key_and_url
 from .generate import generate, clear
 from .function_cli import function_add_or_update, function_execute
 from .rendered_spec import get_and_update_rendered_spec
 from .prepare import prepare_deployables
 from .sync import sync_deployables
-
-
-CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "update_rendered_spec"]
 
 
 def _get_version_string():

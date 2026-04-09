@@ -1,6 +1,6 @@
 import unittest
 
-from polyapi.utils import to_func_namespace
+from polyapi.utils import to_type_module_alias
 
 from .test_api import TWILIO
 from polyapi.server import render_server_function
@@ -109,7 +109,7 @@ class T(unittest.TestCase):
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
-        self.assertIn(f"-> {to_func_namespace(name)}.ResponseType", func_str)
+        self.assertIn(f"-> {to_type_module_alias(name)}.ResponseType", func_str)
 
     def test_render_function_get_products_count(self):
         return_type = GET_PRODUCTS_COUNT["function"]["returnType"]
@@ -145,6 +145,7 @@ class T(unittest.TestCase):
 # stay_date: Required[str]
 # """ Required property """'''
 #         self.assertIn(expected_return_type, func_str)
+
 
     def test_render_function_return_type_name_collision_does_not_reference_module_attr(self):
         return_type = RETURN_TYPE_NAMED_RETURN_TYPE["function"]["returnType"]

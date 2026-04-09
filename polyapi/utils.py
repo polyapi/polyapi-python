@@ -108,6 +108,11 @@ def normalize_cross_language_type(type_name: str) -> str:
     return primitive_map.get(value, value)
 
 
+def to_type_module_alias(function_name: str) -> str:
+    """Return the internal alias used for a function's generated type module."""
+    return f"_{to_func_namespace(function_name)}_types"
+
+
 def add_type_import_path(function_name: str, arg: str) -> str:
     """if not basic type, coerce to camelCase and add the import path"""
     # from now, we start qualifying non-basic types :)) 
@@ -121,6 +126,7 @@ def add_type_import_path(function_name: str, arg: str) -> str:
             for token in arg.split("|")
             if token.strip()
         )
+    type_module_alias = to_type_module_alias(function_name)
     
     if arg.startswith("Callable"):
         inner = arg[len("Callable["):-1]  # strip outer Callable[...]
@@ -129,7 +135,7 @@ def add_type_import_path(function_name: str, arg: str) -> str:
         for p in parts:
             clean = p.strip("[] ")
             if clean and clean not in BASIC_PYTHON_TYPES:
-                replacement = f"{to_func_namespace(function_name)}.{camelCase(clean)}"
+                replacement = f"{type_module_alias}.{camelCase(clean)}"
                 p = p.replace(clean, replacement)
             qualified.append(p)
         return "Callable[" + ",".join(qualified) + "]"
@@ -145,11 +151,11 @@ def add_type_import_path(function_name: str, arg: str) -> str:
         else:
             if '"' in sub:
                 sub = sub.replace('"', "")
-                return f'List["{to_func_namespace(function_name)}.{camelCase(sub)}"]'
+                return f'List["{type_module_alias}.{camelCase(sub)}"]'
             else:
-                return f"List[{to_func_namespace(function_name)}.{camelCase(sub)}]"
+                return f"List[{type_module_alias}.{camelCase(sub)}]"
 
-    return f"{to_func_namespace(function_name)}.{camelCase(arg)}"
+    return f"{type_module_alias}.{camelCase(arg)}"
 
 
 def get_type_and_def(

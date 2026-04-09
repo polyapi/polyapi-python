@@ -16,7 +16,7 @@ from .webhook import render_webhook_handle
 from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto, TableSpecDto
 from .api import render_api_function
 from .server import render_server_function
-from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
+from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace, to_type_module_alias
 from .variables import generate_variables
 from .poly_tables import generate_tables
 from . import http_client
@@ -520,8 +520,10 @@ def add_function_file(
             with open(init_path, "r", encoding='utf-8') as f:
                 init_content = f.read()
         
-        # Prepare new content to append to __init__.py
-        new_init_content = init_content + f"\n\nfrom . import {func_namespace}\n\n{func_str}"
+        # Import the generated type module under a private alias so PascalCase function
+        # names do not shadow their own module symbol in __init__.py.
+        type_module_alias = to_type_module_alias(function_name)
+        new_init_content = init_content + f"\n\nfrom . import {func_namespace} as {type_module_alias}\n\n{func_str}"
         
         # Use temporary files for atomic writes
         # Write to __init__.py atomically
