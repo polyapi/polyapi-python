@@ -12,6 +12,14 @@ from typing import List, Dict, Any, TypedDict
 {return_type_def}
 """
 
+_TYPING_SUBSCRIPT_NAMES = frozenset({
+    'Literal', 'Dict', 'List', 'Set', 'FrozenSet', 'Tuple', 'Type',
+    'Optional', 'Union', 'ClassVar', 'Final', 'Annotated', 'Required',
+    'NotRequired', 'ReadOnly',
+    # lowercase generics (3.9+)
+    'dict', 'list', 'set', 'frozenset', 'tuple', 'type',
+})
+
 
 def _is_safe_import(node: ast.stmt) -> bool:
     """Check if an import statement is safe to place at module scope.
@@ -38,8 +46,8 @@ def _rhs_is_type_construct(node: ast.expr) -> bool:
     We check the VALUE, not the name — much more reliable than naming conventions.
     """
     # X = Literal[...], X = Dict[str, Any], X = list[Foo], X = Union[...]
-    if isinstance(node, ast.Subscript):
-        return True
+    if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
+        return node.value.id in _TYPING_SUBSCRIPT_NAMES
     # X = str | int | float new Union
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
         return True
