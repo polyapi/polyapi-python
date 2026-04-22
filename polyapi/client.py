@@ -21,6 +21,13 @@ _TYPING_SUBSCRIPT_NAMES = frozenset({
 })
 
 
+def _import_bound_names(node: ast.stmt) -> set:
+    """Names bound in the local namespace by an import statement."""
+    if isinstance(node, (ast.Import, ast.ImportFrom)):
+        return {alias.asname or alias.name.split('.')[0] for alias in node.names}
+    return set()
+
+
 def _is_safe_import(node: ast.stmt) -> bool:
     """Check if an import statement is safe to place at module scope.
 
@@ -98,23 +105,43 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
     # must also be at module scope
     module_scope_names: set[str] = set(class_names)
 
-    # Get all module-level assigned symbol names for reference
+    # Get all module-level assigned symbol names for reference (imports count as assigned)
     module_level_symbols: set[str] = {
         sym.get_name() for sym in st.get_symbols() if sym.is_assigned()
     }
+
+    # AST-level deps from base classes and decorators: symtable misses these
+    # because they're evaluated in the enclosing scope, not the class body.
+    # e.g. `class A(pydantic.BaseModel)` — `pydantic` is in the module scope,
+    # not in the class body's symbol table.
+    class_outer_deps: dict[str, set[str]] = {}
+    for _node in ast.iter_child_nodes(tree):
+        if isinstance(_node, ast.ClassDef) and _node.name in class_names:
+            outer: set[str] = set()
+            exprs = list(_node.bases) + [kw.value for kw in _node.keywords] + list(_node.decorator_list)
+            for expr in exprs:
+                for n in ast.walk(expr):
+                    if isinstance(n, ast.Name):
+                        outer.add(n.id)
+            class_outer_deps[_node.name] = outer
 
     # BFS: find all module-level symbols reachable from classes
     queue = list(class_names)
     while queue:
         name = queue.pop()
-        if name not in child_tables:
-            continue
-        for sym in child_tables[name].get_symbols():
-            if sym.is_free() or (sym.is_global() and sym.is_referenced()):
-                dep = sym.get_name()
-                if dep in module_level_symbols and dep not in module_scope_names:
-                    module_scope_names.add(dep)
-                    queue.append(dep)  # transitively check this dep's deps
+        # deps from class body via symtable
+        if name in child_tables:
+            for sym in child_tables[name].get_symbols():
+                if sym.is_free() or (sym.is_global() and sym.is_referenced()):
+                    dep = sym.get_name()
+                    if dep in module_level_symbols and dep not in module_scope_names:
+                        module_scope_names.add(dep)
+                        queue.append(dep)
+        # deps from base classes and decorators (not visible in class body symtable)
+        for dep in class_outer_deps.get(name, set()):
+            if dep in module_level_symbols and dep not in module_scope_names:
+                module_scope_names.add(dep)
+                queue.append(dep)
 
     # Phase 4: Classify each AST node using the symtable results
     type_import_lines: set[int] = set()
@@ -129,9 +156,13 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         is_type_import = False
         is_type_def = False
 
-        # Imports: safe typing/stdlib imports go to module scope
+        # Imports: safe typing/stdlib imports go to module scope;
+        # also promote any import that binds a name required by a module-scope class.
         if isinstance(node, (ast.Import, ast.ImportFrom)):
-            is_type_import = _is_safe_import(node)
+            is_type_import = (
+                _is_safe_import(node)
+                or bool(_import_bound_names(node) & module_scope_names)
+            )
 
         # Class definitions: symtable confirmed these are classes
         elif isinstance(node, ast.ClassDef):
