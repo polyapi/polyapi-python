@@ -521,8 +521,8 @@ def _deduplicate_types(full_path: str, module_scope_types: str) -> str:
         if not name:
             continue
         
-        start = node.lineno - 1
-        end = node.end_lineno or start + 1
+        start = getattr(node, 'lineno', 1) - 1
+        end = getattr(node, 'end_lineno', None) or start + 1
         source = '\n'.join(lines[start:end])
         
         if name in seen and seen[name] == source:
