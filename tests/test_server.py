@@ -1,6 +1,6 @@
 import unittest
 
-from polyapi.utils import to_func_namespace
+from polyapi.utils import to_type_module_alias
 
 from .test_api import TWILIO
 from polyapi.server import render_server_function
@@ -66,6 +66,34 @@ LIST_RECOMMENDATIONS = {
 }
 
 
+RETURN_TYPE_NAMED_RETURN_TYPE = {
+    "id": "ret-1234",
+    "type": "serverFunction",
+    "context": "mixed",
+    "name": "fooFunc",
+    "description": "Return type name collision regression test.",
+    "requirements": [],
+    "function": {
+        "arguments": [],
+        "returnType": {
+            "kind": "object",
+            "schema": {
+                "title": "ReturnType",
+                "type": "object",
+                "properties": {
+                    "value": {"type": "string"},
+                },
+                "required": ["value"],
+            },
+        },
+        "synchronous": True,
+    },
+    "code": "",
+    "language": "javascript",
+    "visibilityMetadata": {"visibility": "ENVIRONMENT"},
+}
+
+
 class T(unittest.TestCase):
     def test_render_function_twilio_server(self):
         # same test but try it as a serverFunction rather than an apiFunction
@@ -81,7 +109,7 @@ class T(unittest.TestCase):
         self.assertIn(TWILIO["id"], func_str)
         self.assertIn("conversationSID: str", func_str)
         self.assertIn("authToken: str", func_str)
-        self.assertIn(f"-> {to_func_namespace(name)}.ResponseType", func_str)
+        self.assertIn(f"-> {to_type_module_alias(name)}.ResponseType", func_str)
 
     def test_render_function_get_products_count(self):
         return_type = GET_PRODUCTS_COUNT["function"]["returnType"]
@@ -117,3 +145,67 @@ class T(unittest.TestCase):
 # stay_date: Required[str]
 # """ Required property """'''
 #         self.assertIn(expected_return_type, func_str)
+
+
+    def test_render_function_return_type_name_collision_does_not_reference_module_attr(self):
+        return_type = RETURN_TYPE_NAMED_RETURN_TYPE["function"]["returnType"]
+        func_str, func_type_defs = render_server_function(
+            RETURN_TYPE_NAMED_RETURN_TYPE["type"],
+            RETURN_TYPE_NAMED_RETURN_TYPE["name"],
+            RETURN_TYPE_NAMED_RETURN_TYPE["id"],
+            RETURN_TYPE_NAMED_RETURN_TYPE["description"],
+            RETURN_TYPE_NAMED_RETURN_TYPE["function"]["arguments"],
+            return_type,
+        )
+        self.assertIn("-> dict", func_str)
+        self.assertNotIn(".returnType", func_str)
+        self.assertNotIn(".ReturnType", func_str)
+
+    def test_render_function_string_union_returns_text(self):
+        function_name = "getMaybeName"
+        return_type = {"kind": "plain", "value": "Promise<string | null>"}
+
+        func_str, _ = render_server_function(
+            "serverFunction",
+            function_name,
+            "ret-str-null-1",
+            "",
+            [],
+            return_type,
+        )
+
+        self.assertIn("-> str | None", func_str)
+        self.assertIn("try:\n        return resp.text", func_str)
+        self.assertNotIn("return resp.json()", func_str)
+
+    def test_render_function_mixed_string_union_returns_json(self):
+        function_name = "getMaybePayload"
+        return_type = {"kind": "plain", "value": "string | object"}
+
+        func_str, _ = render_server_function(
+            "serverFunction",
+            function_name,
+            "ret-str-obj-1",
+            "",
+            [],
+            return_type,
+        )
+
+        self.assertIn("-> str | Dict", func_str)
+        self.assertIn("try:\n        return resp.json()", func_str)
+
+    def test_render_function_number_nullable_returns_json(self):
+        function_name = "getMaybeCount"
+        return_type = {"kind": "plain", "value": "number | null"}
+
+        func_str, _ = render_server_function(
+            "serverFunction",
+            function_name,
+            "ret-num-null-1",
+            "",
+            [],
+            return_type,
+        )
+
+        self.assertIn("-> float | None", func_str)
+        self.assertIn("try:\n        return resp.json()", func_str)

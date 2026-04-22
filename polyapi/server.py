@@ -24,6 +24,20 @@ def {function_name}(
         return resp.text  # type: ignore # fallback for debugging
 
 
+async def {function_name}_async(
+{args}
+) -> {return_type_name}:
+    \"""{function_description}
+
+    Function ID: {function_id}
+    \"""
+    resp = await execute_async("{function_type}", "{function_id}", {data})
+    try:
+        return {return_action}
+    except:
+        return resp.text  # type: ignore # fallback for debugging
+
+
 """
 
 
@@ -48,7 +62,7 @@ def render_server_function(
         return_type_def=return_type_def,
     )
     func_str = SERVER_FUNCTION_TEMPLATE.format(
-        return_type_name=add_type_import_path(function_name, return_type_name),
+        return_type_name=_normalize_return_type_for_annotation(function_name, return_type_name),
         function_type="server",
         function_name=function_name,
         function_id=function_id,
@@ -60,9 +74,23 @@ def render_server_function(
     return func_str, func_type_defs
 
 
+def _normalize_return_type_for_annotation(function_name: str, return_type_name: str) -> str:
+    if return_type_name == "ReturnType":
+        return "ReturnType"
+    return add_type_import_path(function_name, return_type_name)
+
+
 def _get_server_return_action(return_type_name: str) -> str:
-    if return_type_name == "str":
+    normalized_type = return_type_name.replace(" ", "")
+
+    if normalized_type in {"str", "Optional[str]"}:
         return_action = "resp.text"
+    elif "|" in normalized_type:
+        union_parts = {part for part in normalized_type.split("|") if part}
+        if union_parts == {"str", "None"}:
+            return_action = "resp.text"
+        else:
+            return_action = "resp.json()"
     else:
         return_action = "resp.json()"
     return return_action

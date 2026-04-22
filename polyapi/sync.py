@@ -2,8 +2,7 @@ import os
 from datetime import datetime
 from typing import List, Dict
 from typing_extensions import cast # type: ignore
-import requests
-
+from polyapi import http_client
 from polyapi.utils import get_auth_headers
 from polyapi.config import get_api_key_and_url
 from polyapi.parser import get_jsonschema_type
@@ -35,10 +34,10 @@ def remove_deployable_function(deployable: SyncDeployment) -> bool:
         raise Exception("Missing api key!")
     headers = get_auth_headers(api_key)
     url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}/{deployable["id"]}'
-    response = requests.get(url, headers=headers)
+    response = http_client.get(url, headers=headers)
     if response.status_code != 200:
         return False
-    requests.delete(url, headers=headers)
+    http_client.delete(url, headers=headers)
     return True
 
 def remove_deployable(deployable: SyncDeployment) -> bool:
@@ -65,7 +64,7 @@ def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
         "returnTypeSchema": deployable["types"]["returns"]["typeSchema"],
         "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])  } for p in deployable["types"]["params"]],
     }
-    response = requests.post(url, headers=headers, json=payload)
+    response = http_client.post(url, headers=headers, json=payload)
     response.raise_for_status()
     return response.json()['id']
 

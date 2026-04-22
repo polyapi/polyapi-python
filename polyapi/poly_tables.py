@@ -1,5 +1,5 @@
 import os
-import requests
+from polyapi import http_client
 from typing_extensions import NotRequired, TypedDict
 from typing import (
     List,
@@ -88,7 +88,7 @@ def execute_query(table_id, method, query):
         headers = {"x-poly-execution-id": polyCustom.get("executionId")}
         if auth_key:
             headers["Authorization"] = f"Bearer {auth_key}"
-        response = requests.post(url, json=query, headers=headers)
+        response = http_client.post(url, json=query, headers=headers)
         response.raise_for_status()
         return response.json()
     except Exception as e:
@@ -531,10 +531,27 @@ def _render_table(table: TableSpecDto) -> str:
     table_where_class = _render_table_where_class(
         table["name"], columns, required_columns
     )
-    if table.get("description", ""):
+    raw_description = table.get("description", "")
+
+    def _flatten_description(value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            flat: List[str] = []
+            for item in value:
+                flat.extend(_flatten_description(item))
+            return flat
+        return [str(value)]
+
+    if isinstance(raw_description, str):
+        normalized_description = raw_description
+    else:
+        normalized_description = "\n".join(_flatten_description(raw_description))
+
+    if normalized_description:
         table_description = '\n    """'
         table_description += "\n       ".join(
-            table["description"].replace('"', "'").split("\n")
+            normalized_description.replace('"', "'").split("\n")
         )
         table_description += '\n    """'
     else:

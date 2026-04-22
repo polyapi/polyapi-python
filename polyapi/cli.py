@@ -3,15 +3,13 @@ import argparse
 
 from polyapi.utils import print_green, print_red
 
+from .cli_constants import CLI_COMMANDS
 from .config import initialize_config, set_api_key_and_url
 from .generate import generate, clear
 from .function_cli import function_add_or_update, function_execute
 from .rendered_spec import get_and_update_rendered_spec
 from .prepare import prepare_deployables
 from .sync import sync_deployables
-
-
-CLI_COMMANDS = ["setup", "generate", "function", "clear", "help", "update_rendered_spec"]
 
 
 def _get_version_string():
@@ -116,7 +114,7 @@ def execute_from_cli():
     fn_add_parser.add_argument("--client", action="store_true", help="Marks the function as a client function")
     fn_add_parser.add_argument("--logs", choices=["enabled", "disabled"], default=None, help="Enable or disable logs for the function.")
     fn_add_parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
-    fn_add_parser.add_argument("--disable-ai", "--skip-generate", action="store_true", help="Pass --disable-ai skip AI generation of missing descriptions")
+    fn_add_parser.add_argument("--skip-generate", action="store_true", help="Skip running generate after function add command, especially useful if you are deploying a bunch of functions at once. Run generate manually at the end!")
     fn_add_parser.add_argument("--generate-contexts", type=str, help="Server function only – only include certain contexts to speed up function execution")
     fn_add_parser.add_argument("--visibility", type=str, default="environment", help="Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive")
 
@@ -149,7 +147,7 @@ def execute_from_cli():
             client=args.client,
             server=args.server,
             logs_enabled=logs_enabled,
-            generate=not args.disable_ai,
+            generate=not args.skip_generate,
             execution_api_key=args.execution_api_key,
             generate_contexts=args.generate_contexts,
             visibility=visibility

@@ -35,6 +35,25 @@ def {function_name}(
         return {api_response_type}(resp.json())  # type: ignore
 
 
+async def {function_name}_async(
+{args}
+) -> {api_response_type}:
+    \"""{function_description}
+
+    Function ID: {function_id}
+    \"""
+    if get_direct_execute_config():
+        resp = await direct_execute_async("{function_type}", "{function_id}", {data})
+        return {api_response_type}({{
+            "status": resp.status_code,
+            "headers": dict(resp.headers),
+            "data": resp.json()
+        }})  # type: ignore
+    else:
+        resp = await execute_async("{function_type}", "{function_id}", {data})
+        return {api_response_type}(resp.json())  # type: ignore
+
+
 """
 
 

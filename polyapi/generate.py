@@ -1,5 +1,4 @@
 import json
-import requests
 import os
 import uuid
 import shutil
@@ -18,9 +17,10 @@ from .webhook import render_webhook_handle
 from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto, TableSpecDto
 from .api import render_api_function
 from .server import render_server_function
-from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace
+from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace, to_type_module_alias
 from .variables import generate_variables
 from .poly_tables import generate_tables
+from . import http_client
 from .config import get_api_key_and_url, get_direct_execute_config, get_cached_generate_args
 
 # Track emitted type definitions per __init__.py for deduplication
@@ -68,7 +68,7 @@ def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] =
     if get_direct_execute_config():
         params["apiFunctionDirectExecute"] = "true"
 
-    resp = requests.get(url, headers=headers, params=params)
+    resp = http_client.get(url, headers=headers, params=params)
     if resp.status_code == 200:
         return resp.json()
     else:
@@ -414,7 +414,21 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str, str]:
         func_type_defs:     type stubs for the {FuncName}.py IDE helper file
     """
     function_type = spec["type"]
-    function_description = spec["description"]
+    raw_description = spec.get("description", "")
+    def _flatten_description(value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            flat: List[str] = []
+            for item in value:
+                flat.extend(_flatten_description(item))
+            return flat
+        return [str(value)]
+
+    if isinstance(raw_description, str):
+        function_description = raw_description
+    else:
+        function_description = "\n".join(_flatten_description(raw_description))
     function_name = spec["name"]
     function_context = spec["context"]
     function_id = spec["id"]
@@ -553,14 +567,13 @@ def add_function_file(
             with open(init_path, "r", encoding='utf-8') as f:
                 init_content = f.read()
         
-        # Build new content: import + module-scope types + wrapped function
-        new_parts = [init_content, f"\n\nfrom . import {func_namespace}\n"]
-        if unique_types:
-            new_parts.append(f"\n{unique_types}\n")
-        new_parts.append(f"\n{func_str}")
-        new_init_content = ''.join(new_parts)
+        # Import the generated type module under a private alias so PascalCase function
+        # names do not shadow their own module symbol in __init__.py.
+        type_module_alias = to_type_module_alias(function_name)
+        new_init_content = init_content + f"\n\nfrom . import {func_namespace} as {type_module_alias}\n\n{func_str}"
         
-        # Atomic writes
+        # Use temporary files for atomic writes
+        # Write to __init__.py atomically
         with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=full_path, suffix=".tmp", encoding='utf-8') as temp_init:
             temp_init.write(new_init_content)
             temp_init_path = temp_init.name

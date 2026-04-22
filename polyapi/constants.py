@@ -3,8 +3,8 @@ JSONSCHEMA_TO_PYTHON_TYPE_MAP = {
     "number": "float",
     "string": "str",
     "boolean": "bool",
-    "array": "List",
-    "object": "Dict",
+    "array": "list",
+    "object": "dict",
     "function": "Callable",
     "void": "None",
 }
@@ -15,10 +15,13 @@ PYTHON_TO_JSONSCHEMA_TYPE_MAP = {
     "float": "number",
     "str": "string",
     "bool": "boolean",
-    "List": "array",
-    "Dict": "object",
+    "list": "array",
+    "dict": "object",
     "Callable": "function",
     "None": "void",
+    # Keep uppercase aliases for backwards compatibility
+    "List": "array",
+    "Dict": "object",
 }
 
 BASIC_PYTHON_TYPES = set(PYTHON_TO_JSONSCHEMA_TYPE_MAP.keys())
