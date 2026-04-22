@@ -123,8 +123,8 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
     prev_was_type_def = False
 
     for node in ast.iter_child_nodes(tree):
-        start = node.lineno - 1
-        end = node.end_lineno or start + 1
+        start = getattr(node, 'lineno', 1) - 1
+        end = getattr(node, 'end_lineno', None) or start + 1
 
         is_type_import = False
         is_type_def = False
@@ -183,7 +183,7 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
             if isinstance(target, ast.Name) and target.id not in module_scope_names:
                 if _rhs_is_type_construct(node.value):
                     start = node.lineno - 1
-                    end = node.end_lineno or start + 1
+                    end = getattr(node, 'end_lineno', None) or start + 1
                     for i in range(start, end):
                         type_def_lines.add(i)
                     module_scope_names.add(target.id)
