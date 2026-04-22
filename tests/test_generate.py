@@ -115,7 +115,7 @@ class T(unittest.TestCase):
 
     def test_render_spec_no_function_data(self):
         """Test that render_spec handles specs with no function data gracefully"""
-        func_str, func_type_defs = render_spec(NO_TYPES_SPEC)
+        _, func_str, func_type_defs = render_spec(NO_TYPES_SPEC)
         
         # Should generate a function even without function data
         self.assertIsNotNone(func_str)
@@ -125,7 +125,7 @@ class T(unittest.TestCase):
 
     def test_render_spec_minimal_function_data(self):
         """Test that render_spec handles specs with minimal function data"""
-        func_str, func_type_defs = render_spec(MINIMAL_FUNCTION_SPEC)
+        _, func_str, func_type_defs = render_spec(MINIMAL_FUNCTION_SPEC)
         
         # Should generate a function with fallback types
         self.assertIsNotNone(func_str)
