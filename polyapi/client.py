@@ -105,9 +105,12 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
     # must also be at module scope
     module_scope_names: set[str] = set(class_names)
 
-    # Get all module-level assigned symbol names for reference (imports count as assigned)
+    # Get all module-level defined symbol names for reference.
+    # is_assigned() covers normal assignments; is_imported() covers import statements
+    # (symtable tracks these separately via DEF_IMPORT vs DEF_LOCAL flags).
     module_level_symbols: set[str] = {
-        sym.get_name() for sym in st.get_symbols() if sym.is_assigned()
+        sym.get_name() for sym in st.get_symbols()
+        if sym.is_assigned() or sym.is_imported()
     }
 
     # AST-level deps from base classes and decorators: symtable misses these
