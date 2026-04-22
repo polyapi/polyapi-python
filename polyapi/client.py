@@ -265,7 +265,8 @@ def _wrap_code_in_try_except(function_name: str, code: str) -> Tuple[str, str]:
         f"'{function_name}', function unavailable: \" + str(e))"
     )
 
-    indented = '\n    '.join(runtime_code.split('\n'))
+    body = runtime_code if runtime_code.strip() else 'pass'
+    indented = '\n    '.join(body.split('\n'))
     wrapped = prefix + indented + suffix
 
     return module_scope, wrapped
