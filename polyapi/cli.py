@@ -1,4 +1,5 @@
 import os
+# import tempfile
 import argparse
 
 from polyapi.utils import print_green, print_red
@@ -23,6 +24,13 @@ def _get_version_string():
 
 
 def execute_from_cli():
+    # Redirect __pycache__ out of generated dirs to avoid window file-locking
+    # failures when rmtree dels on generate.
+    if 'PYTHONPYCACHEPREFIX' not in os.environ:
+        cache_dir = os.path.join(tempfile.gettempdir(), 'polyapi_pycache')
+        os.makedirs(cache_dir, exist_ok=True)
+        os.environ['PYTHONPYCACHEPREFIX'] = cache_dir
+
     # First we setup all our argument parsing logic
     # Then we parse the arguments (waaay at the bottom)
     parser = argparse.ArgumentParser(

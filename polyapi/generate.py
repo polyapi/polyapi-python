@@ -4,6 +4,7 @@ import uuid
 import shutil
 import logging
 import tempfile
+import stat
 
 from copy import deepcopy
 from typing import Any, List, Optional, Tuple, cast
@@ -209,23 +210,33 @@ def get_tables(specs: List[SpecificationDto]) -> List[TableSpecDto]:
     return [cast(TableSpecDto, spec) for spec in specs if spec["type"] == "table"]
 
 
+def _rmtree_readonly_handler(func, path, exc):
+    # Windows marks __pycache__ .pyc files read-only; clear the bit and retry.
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
+def _rmtree(path):
+    shutil.rmtree(path, onerror=_rmtree_readonly_handler)
+
+
 def remove_old_library():
     currdir = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(currdir, "poly")
     if os.path.exists(path):
-        shutil.rmtree(path)
+        _rmtree(path)
 
     path = os.path.join(currdir, "vari")
     if os.path.exists(path):
-        shutil.rmtree(path)
+        _rmtree(path)
 
     path = os.path.join(currdir, "schemas")
     if os.path.exists(path):
-        shutil.rmtree(path)
+        _rmtree(path)
 
     path = os.path.join(currdir, "tabi")
     if os.path.exists(path):
-        shutil.rmtree(path)
+        _rmtree(path)
 
 
 def create_empty_schemas_module():
