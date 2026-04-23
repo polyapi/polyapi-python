@@ -14,9 +14,32 @@ from polyapi.schema import (
 )
 
 
+class DotDict(dict):
+    """Dict with recursive dot-notation attribute access.
+
+    Supports both dict-style (d["key"]) and attribute-style (d.key) access.
+    Nested dicts are automatically wrapped on access.
+    """
+    def __getattr__(self, key: str):
+        try:
+            val = self[key]
+            return DotDict(val) if isinstance(val, dict) else val
+        except KeyError:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
+
+    def __setattr__(self, key: str, value):
+        self[key] = value
+
+    def __delattr__(self, key: str):
+        try:
+            del self[key]
+        except KeyError:
+            raise AttributeError(key)
+
+
 # this string should be in every __init__ file.
 # it contains all the imports needed for the function or variable code to run
-CODE_IMPORTS = "from typing import List, Dict, Any, Optional, Callable\nfrom typing_extensions import TypedDict, NotRequired\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url, get_direct_execute_config\nfrom polyapi.execute import execute, execute_async, execute_post, execute_post_async, variable_get, variable_get_async, variable_update, variable_update_async, direct_execute, direct_execute_async\n\n"
+CODE_IMPORTS = "from typing import List, Dict, Any, Optional, Callable\nfrom typing_extensions import TypedDict, NotRequired\nimport json\nimport logging\nimport requests\nimport socketio  # type: ignore\nfrom polyapi.config import get_api_key_and_url, get_direct_execute_config\nfrom polyapi.execute import execute, execute_async, execute_post, execute_post_async, variable_get, variable_get_async, variable_update, variable_update_async, direct_execute, direct_execute_async\nfrom polyapi.utils import DotDict\n\n"
 
 
 def init_the_init(full_path: str, code_imports: Optional[str] = None) -> None:
