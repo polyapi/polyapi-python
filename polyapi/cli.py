@@ -1,5 +1,5 @@
 import os
-# import tempfile
+import tempfile
 import argparse
 
 from polyapi.utils import print_green, print_red
