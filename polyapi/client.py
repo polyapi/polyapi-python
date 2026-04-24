@@ -41,14 +41,32 @@ _TYPING_SUBSCRIPT_NAMES = frozenset({
 _TYPING_FUNCTIONAL_NAMES = frozenset({
     'TypedDict', 'NamedTuple', 'NewType',
     'TypeVar', 'ParamSpec', 'TypeVarTuple',
-    'TypeAliasType',
+    'TypeAliasType', 'ForwardRef',
 })
+
+_TYPING_MODULES = frozenset({'typing', 'typing_extensions'})
 
 # Names that are unambiguously types when they appear as leaves in X | Y expressions.
 # This anchors the union heuristic so that flag constants (READ | WRITE) are rejected.
 _BUILTIN_TYPE_NAMES = frozenset({
-    'str', 'int', 'float', 'bool', 'bytes', 'complex', 'object', 'bytearray',
+    'str', 'int', 'float', 'bool', 'bytes', 'complex', 'object', 'bytearray', 'None',
 }) | _TYPING_SUBSCRIPT_NAMES
+
+
+def _collect_free_names(table: symtable_mod.SymbolTable) -> set[str]:
+    """Recursively collect all module-scope-referenced names from a symtable tree.
+
+    A flat get_symbols() only sees the direct class body. Nested classes (Inner
+    inside Outer) have their own child tables — their free/global references would
+    be missed without this recursive walk.
+    """
+    names: set[str] = set()
+    for sym in table.get_symbols():
+        if sym.is_free() or (sym.is_global() and sym.is_referenced()):
+            names.add(sym.get_name())
+    for child in table.get_children():
+        names.update(_collect_free_names(child))
+    return names
 
 
 def _import_bound_names(node: ast.stmt) -> set:
@@ -75,22 +93,34 @@ def _is_safe_import(node: ast.stmt) -> bool:
 
 
 def _is_type_union_leaf(node: ast.expr) -> bool:
-    """Return True if node is a valid leaf in latest type union op (X | Y | None).
+    """Return True if node is a valid leaf in a new-style type union (X | Y | None).
 
-    Rejects non-type leaves like integer/string constants so that bitwise OR
-    expressions (FLAGS = 1 | 2) are not misidentified as type aliases.
+    Every leaf must be an unambiguous type — we reject anything that could
+    plausibly be a runtime value (flag constant, arbitrary subscript, etc.).
     """
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
         return _is_type_union_leaf(node.left) and _is_type_union_leaf(node.right)
+    # Name: only known typing / builtin type names (rejects READ, WRITE, etc.)
     if isinstance(node, ast.Name):
-        return True  # str, int, MyClass, None (as a name), ...
+        return node.id in _BUILTIN_TYPE_NAMES
+    # Attribute: only from typing / typing_extensions (rejects os.O_RDONLY, etc.)
     if isinstance(node, ast.Attribute):
-        return True  # typing.Optional, module.MyClass, ...
+        return isinstance(node.value, ast.Name) and node.value.id in _TYPING_MODULES
+    # Subscript: head must itself be a known typing name (rejects my_list[0], etc.)
     if isinstance(node, ast.Subscript):
-        return True  # Optional[int], List[str], ...
+        val = node.value
+        if isinstance(val, ast.Name):
+            return val.id in _TYPING_SUBSCRIPT_NAMES
+        if isinstance(val, ast.Attribute):
+            return (
+                isinstance(val.value, ast.Name)
+                and val.value.id in _TYPING_MODULES
+                and val.attr in _TYPING_SUBSCRIPT_NAMES
+            )
+        return False
     if isinstance(node, ast.Constant) and node.value is None:
-        return True  # literal None in  X | None
-    return False     # int/str/bytes/... constants → bitwise OR, not a union
+        return True  # None in X | None
+    return False
 
 
 def _union_has_type_anchor(node: ast.expr) -> bool:
@@ -126,9 +156,14 @@ def _rhs_is_type_construct(node: ast.expr) -> bool:
         if isinstance(val, ast.Name):
             return val.id in _TYPING_SUBSCRIPT_NAMES
         if isinstance(val, ast.Attribute):
-            return val.attr in _TYPING_SUBSCRIPT_NAMES
-    # X = str | int | None — new-style union; validate leaves to reject FLAGS = 1 | 2
-    # Also require a type anchor so named flag constants (READ | WRITE) are rejected.
+            return (
+                isinstance(val.value, ast.Name)
+                and val.value.id in _TYPING_MODULES
+                and val.attr in _TYPING_SUBSCRIPT_NAMES
+            )
+    # X = str | int | None — new-style union.
+    # _is_type_union_leaf validates every leaf strictly, so FLAGS = 1 | 2 and
+    # READ | WRITE are both rejected without a separate anchor check.
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
         return _is_type_union_leaf(node) and _union_has_type_anchor(node)
     # X = TypedDict("X", {...}), T = TypeVar("T"), P = ParamSpec("P"), ...
@@ -138,7 +173,11 @@ def _rhs_is_type_construct(node: ast.expr) -> bool:
         if isinstance(func, ast.Name):
             return func.id in _TYPING_FUNCTIONAL_NAMES
         if isinstance(func, ast.Attribute):
-            return func.attr in _TYPING_FUNCTIONAL_NAMES
+            return (
+                isinstance(func.value, ast.Name)
+                and func.value.id in _TYPING_MODULES
+                and func.attr in _TYPING_FUNCTIONAL_NAMES
+            )
     return False
 
 
@@ -151,6 +190,8 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
     Returns:
         (type_imports_code, type_defs_code, runtime_code)
     """
+    code = code.replace('\r\n', '\n').replace('\r', '\n')
+
     try:
         tree = ast.parse(code)
         st = symtable_mod.symtable(code, '<client_fn>', 'exec')
@@ -209,14 +250,13 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
     queue = list(class_names)
     while queue:
         name = queue.pop()
-        # deps from class body via symtable
+        # deps from class body via symtable — recursive so nested classes
+        # (Inner inside Outer) contribute their free/global refs too
         if name in child_tables:
-            for sym in child_tables[name].get_symbols():
-                if sym.is_free() or (sym.is_global() and sym.is_referenced()):
-                    dep = sym.get_name()
-                    if dep in module_level_symbols and dep not in module_scope_names:
-                        module_scope_names.add(dep)
-                        queue.append(dep)
+            for dep in _collect_free_names(child_tables[name]):
+                if dep in module_level_symbols and dep not in module_scope_names:
+                    module_scope_names.add(dep)
+                    queue.append(dep)
         # deps from base classes and decorators (not visible in class body symtable)
         for dep in class_outer_deps.get(name, set()):
             if dep in module_level_symbols and dep not in module_scope_names:
@@ -252,10 +292,13 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         elif hasattr(ast, 'TypeAlias') and isinstance(node, ast.TypeAlias):
             is_type_def = True
 
-        # Assignments: check if target is in our module_scope_names set
-        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
-            if isinstance(node.targets[0], ast.Name):
-                is_type_def = node.targets[0].id in module_scope_names
+        # Assignments: check if any target is in our module_scope_names set.
+        # Handles both single (X = ...) and chained (X = Y = ...) assignments.
+        elif isinstance(node, ast.Assign):
+            is_type_def = any(
+                isinstance(t, ast.Name) and t.id in module_scope_names
+                for t in node.targets
+            )
 
         # Annotated assignments with value
         elif isinstance(node, ast.AnnAssign) and node.value is not None:
@@ -280,7 +323,13 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
             for i in range(start, end):
                 type_def_lines.add(i)
 
-        prev_was_type_def = is_type_def or is_type_import
+        # Expr nodes (bare strings) don't propagate the chain — only real
+        # type defs / imports do. This prevents consecutive bare strings after
+        # a class from all being hoisted.
+        if isinstance(node, ast.Expr):
+            prev_was_type_def = False
+        else:
+            prev_was_type_def = is_type_def or is_type_import
 
     # Phase 5: Also promote assignments that LOOK like type aliases
     # even if no class references them yet.
@@ -289,15 +338,18 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
     # so this is the ONE remaining heuristic — but scoped narrowly to
     # assignments whose RHS is a typing construct (Subscript/BinOp with |)
     for node in ast.iter_child_nodes(tree):
-        if isinstance(node, ast.Assign) and len(node.targets) == 1:
-            target = node.targets[0]
-            if isinstance(target, ast.Name) and target.id not in module_scope_names:
-                if _rhs_is_type_construct(node.value):
-                    start = node.lineno - 1
-                    end = getattr(node, 'end_lineno', None) or start + 1
-                    for i in range(start, end):
-                        type_def_lines.add(i)
-                    module_scope_names.add(target.id)
+        if not isinstance(node, ast.Assign):
+            continue
+        new_names = [
+            t.id for t in node.targets
+            if isinstance(t, ast.Name) and t.id not in module_scope_names
+        ]
+        if new_names and _rhs_is_type_construct(node.value):
+            start = node.lineno - 1
+            end = getattr(node, 'end_lineno', None) or start + 1
+            for i in range(start, end):
+                type_def_lines.add(i)
+            module_scope_names.update(new_names)
 
     # Build output
     imports_out: list[str] = []

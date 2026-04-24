@@ -45,9 +45,7 @@ class TestImportBoundNames(unittest.TestCase):
         self.assertEqual(_import_bound_names(_parse_stmt("x = 555555")), set())
 
 
-# 
 # _is_safe_import
-# 
 
 class TestIsSafeImport(unittest.TestCase):
     def test_typing_is_safe(self):
@@ -69,9 +67,7 @@ class TestIsSafeImport(unittest.TestCase):
         self.assertFalse(_is_safe_import(_parse_stmt("x = 666")))
 
 
-# 
 # _rhs_is_type_construct
-# 
 
 class TestRhsIsTypeConstruct(unittest.TestCase):
     def _rhs(self, src: str) -> ast.expr:
@@ -120,7 +116,7 @@ class TestRhsIsTypeConstruct(unittest.TestCase):
     def test_new_type_call(self):
         self.assertTrue(_rhs_is_type_construct(self._rhs('NewType("UserId", int)')))
 
-    #  plain values that must not match 
+    #  plain values that must not match
     def test_string_literal_not_a_type(self):
         self.assertFalse(_rhs_is_type_construct(self._rhs('"yelloooo"')))
 
@@ -129,6 +125,233 @@ class TestRhsIsTypeConstruct(unittest.TestCase):
 
     def test_integer_not_a_type(self):
         self.assertFalse(_rhs_is_type_construct(self._rhs("42")))
+
+    # attribute-qualified subscripts (typing.X[...]) 
+    # node.value is ast.Attribute, not ast.Name — the Name guard silently
+    # rejects these, so fully-qualified generics are never hoisted to module scope.
+
+    def test_attribute_optional_is_type(self):
+        # typing.Optional[int] — value is Attribute, currently returns False
+        self.assertTrue(_rhs_is_type_construct(self._rhs("typing.Optional[int]")))
+
+    def test_attribute_dict_is_type(self):
+        # typing.Dict[str, Any] — same miss
+        self.assertTrue(_rhs_is_type_construct(self._rhs("typing.Dict[str, Any]")))
+
+    def test_attribute_union_is_type(self):
+        # typing.Union[str, int]
+        self.assertTrue(_rhs_is_type_construct(self._rhs("typing.Union[str, int]")))
+
+    # TypeVar / ParamSpec / TypeVarTuple functional forms
+    # These are missing from the ('TypedDict', 'NamedTuple', 'NewType') allowlist,
+    # so TypeVar assignments are treated as runtime values and never hoisted.
+
+    def test_typevar_call_is_type(self):
+        # T = TypeVar("T") — currently returns False
+        self.assertTrue(_rhs_is_type_construct(self._rhs('TypeVar("T")')))
+
+    def test_typevar_with_bound_is_type(self):
+        # T = TypeVar("T", bound=str)
+        self.assertTrue(_rhs_is_type_construct(self._rhs('TypeVar("T", bound=str)')))
+
+    def test_paramspec_call_is_type(self):
+        # P = ParamSpec("P") — currently returns False
+        self.assertTrue(_rhs_is_type_construct(self._rhs('ParamSpec("P")')))
+
+    def test_typevartuple_call_is_type(self):
+        # Ts = TypeVarTuple("Ts") — currently returns False
+        self.assertTrue(_rhs_is_type_construct(self._rhs('TypeVarTuple("Ts")')))
+
+    # attribute-qualified functional forms (typing.TypedDict / typing.NewType)
+    # node.func is ast.Attribute — the isinstance(node.func, ast.Name) guard rejects these.
+
+    def test_attribute_typed_dict_call_is_type(self):
+        # typing.TypedDict("X", {"a": int}) — func is Attribute, currently False
+        self.assertTrue(_rhs_is_type_construct(self._rhs('typing.TypedDict("X", {"a": int})')))
+
+    def test_attribute_new_type_call_is_type(self):
+        # typing.NewType("UserId", int) — same miss
+        self.assertTrue(_rhs_is_type_construct(self._rhs('typing.NewType("UserId", int)')))
+
+
+# Exhaustive parametric coverage of _rhs_is_type_construct
+
+_TRUE_CASES = [
+    # Subscript — bare name (original set)
+    ('Literal["a"]',              ast.Subscript),
+    ('Dict[str, Any]',            ast.Subscript),
+    ('Optional[int]',             ast.Subscript),
+    ('list[int]',                 ast.Subscript),
+    ('Union[str, int]',           ast.Subscript),
+    # Subscript — qualified name (typing_extensions.X[...])
+    ('typing_extensions.Optional[int]',   ast.Subscript),
+    ('typing_extensions.Dict[str, Any]',  ast.Subscript),
+    ('typing_extensions.Union[str, int]', ast.Subscript),
+    # Subscript — full typing_extensions.__all__ subscriptable names
+    ('ClassVar[int]',             ast.Subscript),
+    ('Final[int]',                ast.Subscript),
+    ('Annotated[int, ...]',       ast.Subscript),
+    ('Required[int]',             ast.Subscript),
+    ('NotRequired[int]',          ast.Subscript),
+    ('ReadOnly[int]',             ast.Subscript),
+    ('Type[int]',                 ast.Subscript),
+    ('Concatenate[int, ...]',     ast.Subscript),
+    ('Unpack[Ts]',                ast.Subscript),
+    ('TypeGuard[int]',            ast.Subscript),
+    ('TypeIs[int]',               ast.Subscript),
+    ('LiteralString[str]',        ast.Subscript),  # used as annotation
+    ('Self[int]',                 ast.Subscript),
+    ('Never[int]',                ast.Subscript),
+    ('NoReturn[int]',             ast.Subscript),
+    ('Callable[[int], str]',      ast.Subscript),
+    ('Awaitable[int]',            ast.Subscript),
+    ('Coroutine[int, int, int]',  ast.Subscript),
+    ('AsyncIterable[int]',        ast.Subscript),
+    ('AsyncIterator[int]',        ast.Subscript),
+    ('AsyncGenerator[int, int]',  ast.Subscript),
+    ('AsyncContextManager[int]',  ast.Subscript),
+    ('Iterable[int]',             ast.Subscript),
+    ('Iterator[int]',             ast.Subscript),
+    ('Generator[int, int, int]',  ast.Subscript),
+    ('ContextManager[int]',       ast.Subscript),
+    ('Container[int]',            ast.Subscript),
+    ('Collection[int]',           ast.Subscript),
+    ('Reversible[int]',           ast.Subscript),
+    ('Mapping[str, int]',         ast.Subscript),
+    ('MutableMapping[str, int]',  ast.Subscript),
+    ('MappingView[str]',          ast.Subscript),
+    ('KeysView[str]',             ast.Subscript),
+    ('ItemsView[str, int]',       ast.Subscript),
+    ('ValuesView[int]',           ast.Subscript),
+    ('Sequence[int]',             ast.Subscript),
+    ('MutableSequence[int]',      ast.Subscript),
+    ('MutableSet[int]',           ast.Subscript),
+    ('AbstractSet[int]',          ast.Subscript),
+    ('IO[str]',                   ast.Subscript),
+    ('Match[str]',                ast.Subscript),
+    ('Pattern[str]',              ast.Subscript),
+    ('FrozenSet[int]',            ast.Subscript),
+    ('Tuple[int, str]',           ast.Subscript),
+    ('Set[int]',                  ast.Subscript),
+    ('DefaultDict[str, int]',     ast.Subscript),
+    ('OrderedDict[str, int]',     ast.Subscript),
+    ('Counter[str]',              ast.Subscript),
+    ('Deque[int]',                ast.Subscript),
+    ('ChainMap[str, int]',        ast.Subscript),
+    ('Generic[T]',                ast.Subscript),
+    ('Protocol[T]',               ast.Subscript),
+    ('AnyStr[str]',               ast.Subscript),
+    # BinOp with | — all leaves must be unambiguously type-like
+    ('str | int',                         ast.BinOp),
+    ('str | int | None',                  ast.BinOp),
+    ('Optional[str] | None',              ast.BinOp),
+    ('List[int] | None',                  ast.BinOp),
+    # typing-module attributes are valid union leaves
+    ('typing.Optional | None',            ast.BinOp),
+    ('typing_extensions.Optional | None', ast.BinOp),
+    # typing subscript on either side
+    ('typing.Optional[str] | None',       ast.BinOp),
+    # Call — bare name
+    ('TypedDict("X", {})',           ast.Call),
+    ('NamedTuple("P", [])',          ast.Call),
+    ('NewType("U", int)',            ast.Call),
+    ('TypeVar("T")',                 ast.Call),
+    ('TypeVar("T", bound=str)',      ast.Call),
+    ('ParamSpec("P")',               ast.Call),
+    ('TypeVarTuple("Ts")',           ast.Call),
+    ('TypeAliasType("MyAlias", int)', ast.Call),
+    # Call — qualified name (typing_extensions.X(...))
+    ('typing_extensions.TypedDict("X", {})', ast.Call),
+    ('typing_extensions.NewType("U", int)',  ast.Call),
+    ('typing_extensions.TypeVar("T")',       ast.Call),
+]
+
+_FALSE_CASES = [
+    ('config["key"]',    ast.Subscript),   # dict lookup
+    ('my_list[0]',       ast.Subscript),   # index
+    ('foo()',            ast.Call),         # unknown call
+    ('random_func("X")', ast.Call),        # unknown functional
+    ('"hello"',          ast.Constant),
+    ('42',               ast.Constant),
+    ('x',                ast.Name),
+    ('[1, 2]',           ast.List),
+    ('(1, 2)',           ast.Tuple),
+    ('{1, 2}',           ast.Set),
+    ('x if y else z',    ast.IfExp),
+    ('lambda: None',     ast.Lambda),
+    ('x and y',          ast.BoolOp),
+    ('-x',               ast.UnaryOp),
+    ('x < y',            ast.Compare),
+    ('{1: 2}',           ast.Dict),
+    # bitwise OR on non-type operands must NOT be hoisted as a type alias
+    ('1 | 2',                  ast.BinOp),   # integer literals
+    ('0xFF | 0x01',            ast.BinOp),   # hex literals
+    ('"a" | "b"',              ast.BinOp),   # string literals
+    # non-typing module attributes rejected (FP-1 / FP-5)
+    ('os.O_RDONLY | int',      ast.BinOp),   # stdlib flag + type anchor
+    ('mod.SomeFlag | str',     ast.BinOp),   # arbitrary attribute + type anchor
+    # named constants rejected even when mixed with a primitive (B-1)
+    ('READ | int',             ast.BinOp),   # READ not in _BUILTIN_TYPE_NAMES
+    # runtime subscript in union rejected (B-2)
+    ('my_list[0] | None',      ast.BinOp),   # my_list not a typing name
+    # two arbitrary class names with no known-type leaf (accepted false negative)
+    ('MyClass | OtherClass',   ast.BinOp),
+    ('[x for x in y]',   ast.ListComp),
+    ('{x for x in y}',   ast.SetComp),
+    ('{x: x for x in y}', ast.DictComp),
+    ('(x for x in y)',   ast.GeneratorExp),
+    ('os.path',          ast.Attribute),   # bare attribute access, not a type construct
+]
+
+# Node types that cannot appear as the RHS of a plain assignment statement
+_CANT_BE_RHS = frozenset(filter(None, [
+    ast.Starred,      # *x — only in unpacking targets
+    ast.Slice,        # a[1:2] — slice object, not standalone
+    ast.Await,        # await x — async context only
+    ast.Yield,        # yield x — function body only
+    ast.YieldFrom,    # yield from x — function body only
+    ast.NamedExpr,    # (x := y) — not a sane type alias RHS
+    # f-string / template internals (3.12+)
+    getattr(ast, 'FormattedValue', None),
+    getattr(ast, 'JoinedStr', None),
+    getattr(ast, 'Interpolation', None),
+    getattr(ast, 'TemplateStr', None),
+]))
+
+
+class TestRhsIsTypeConstructExhaustive(unittest.TestCase):
+
+    @staticmethod
+    def _rhs(src: str) -> ast.expr:
+        return ast.parse(src).body[0].value  # type: ignore[attr-defined]
+
+    def test_true_cases(self):
+        for src, expected_type in _TRUE_CASES:
+            with self.subTest(src=src):
+                node = self._rhs(src)
+                self.assertIsInstance(node, expected_type,
+                    f"fixture parses to wrong node type for {src!r}")
+                self.assertTrue(_rhs_is_type_construct(node),
+                    f"expected True for {src!r}")
+
+    def test_false_cases(self):
+        for src, expected_type in _FALSE_CASES:
+            with self.subTest(src=src):
+                node = self._rhs(src)
+                self.assertIsInstance(node, expected_type,
+                    f"fixture parses to wrong node type for {src!r}")
+                self.assertFalse(_rhs_is_type_construct(node),
+                    f"expected False for {src!r}")
+
+    def test_all_expr_subtypes_are_classified(self):
+        """Fail if a new ast.expr subclass appears that has no row in either table."""
+        covered = {type(self._rhs(src)) for src, _ in _TRUE_CASES + _FALSE_CASES}
+        for cls in ast.expr.__subclasses__():
+            if cls in _CANT_BE_RHS:
+                continue
+            with self.subTest(cls=cls.__name__):
+                self.assertIn(cls, covered,
+                    f"{cls.__name__} has no row in _TRUE_CASES or _FALSE_CASES — add one")
 
 
 class TestExtractTypeDefinitions(unittest.TestCase):
@@ -227,7 +450,56 @@ class TestExtractTypeDefinitions(unittest.TestCase):
         self.assertIn("BaseModel", type_imports)
         self.assertNotIn("BaseModel", runtime)
 
-    #  syntax error falls back to returning all code as runtime 
+    #  multi-target chained assignments (X = Y = List[int])
+    def test_chained_assignment_both_targets_hoisted(self):
+        code = "X = Y = List[int]\ndef f(): pass"
+        _, type_defs, runtime = self._extract(code)
+        self.assertIn("X", type_defs)
+        self.assertIn("Y", type_defs)
+        self.assertNotIn("X", runtime)
+        self.assertNotIn("Y", runtime)
+
+    #  nested class free variables are transitively hoisted
+    def test_nested_class_dep_is_hoisted(self):
+        # ENCODER is only referenced inside Inner (nested in Outer).
+        # Without the recursive symtable walk it would be missed.
+        code = (
+            "import json\n"
+            "ENCODER = json.JSONEncoder\n"
+            "class Outer:\n"
+            "    class Inner:\n"
+            "        encoder = ENCODER\n"
+            "def f(): pass\n"
+        )
+        _, type_defs, runtime = self._extract(code)
+        self.assertIn("ENCODER", type_defs)
+        self.assertNotIn("ENCODER", runtime)
+
+    #  FP-4: only the first bare string after a class is hoisted, not a cascade
+    def test_only_first_docstring_after_class_is_hoisted(self):
+        code = (
+            "class Foo:\n"
+            "    pass\n"
+            '"first"\n'
+            '"second"\n'
+            '"third"\n'
+            "def f(): pass\n"
+        )
+        _, type_defs, runtime = self._extract(code)
+        self.assertIn('"first"', type_defs)
+        self.assertNotIn('"second"', type_defs)
+        self.assertNotIn('"third"', type_defs)
+        self.assertIn('"second"', runtime)
+        self.assertIn('"third"', runtime)
+
+    #  FP-5: CRLF line endings must not corrupt indentation
+    def test_crlf_line_endings_normalized(self):
+        code = "import requests\r\nresult = requests.get('http://x')\r\n"
+        type_imports, type_defs, runtime = self._extract(code)
+        for part in (type_imports, type_defs, runtime):
+            self.assertNotIn('\r', part)
+
+    #  syntax error falls back to returning all code as runtime
     def test_syntax_error_returns_all_as_runtime(self):
         bad = "def f(\n  broken syntax!!!"
         type_imports, type_defs, runtime = self._extract(bad)
