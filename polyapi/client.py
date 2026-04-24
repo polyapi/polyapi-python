@@ -13,11 +13,35 @@ from typing import List, Dict, Any, TypedDict
 """
 
 _TYPING_SUBSCRIPT_NAMES = frozenset({
-    'Literal', 'Dict', 'List', 'Set', 'FrozenSet', 'Tuple', 'Type',
-    'Optional', 'Union', 'ClassVar', 'Final', 'Annotated', 'Required',
-    'NotRequired', 'ReadOnly',
-    # lowercase generics (3.9+)
+    # Special forms
+    'ClassVar', 'Final', 'Annotated', 'Required', 'NotRequired', 'ReadOnly',
+    'Optional', 'Union', 'Literal', 'Type',
+    'Concatenate', 'Unpack', 'TypeGuard', 'TypeIs',
+    # Standalone-but-subscriptable specials
+    'LiteralString', 'Self', 'Never', 'NoReturn',
+    # Generic ABCs (collections.abc / contextlib)
+    'Callable', 'Awaitable', 'Coroutine',
+    'AsyncIterable', 'AsyncIterator', 'AsyncGenerator', 'AsyncContextManager',
+    'Iterable', 'Iterator', 'Generator', 'ContextManager',
+    'Container', 'Collection', 'Reversible', 'Sized', 'Hashable',
+    'Mapping', 'MutableMapping', 'MappingView', 'KeysView', 'ItemsView', 'ValuesView',
+    'Sequence', 'MutableSequence', 'MutableSet', 'AbstractSet',
+    'IO', 'BinaryIO', 'TextIO', 'Match', 'Pattern',
+    # Concrete generic aliases
+    'Dict', 'List', 'Set', 'FrozenSet', 'Tuple',
+    'DefaultDict', 'OrderedDict', 'Counter', 'Deque', 'ChainMap',
+    # Base classes used with subscript (Generic[T], Protocol[T])
+    'Generic', 'Protocol',
+    # AnyStr is a TypeVar but appears in subscript position
+    'AnyStr',
+    # lowercase builtins (3.9+)
     'dict', 'list', 'set', 'frozenset', 'tuple', 'type',
+})
+
+_TYPING_FUNCTIONAL_NAMES = frozenset({
+    'TypedDict', 'NamedTuple', 'NewType',
+    'TypeVar', 'ParamSpec', 'TypeVarTuple',
+    'TypeAliasType',
 })
 
 
@@ -44,6 +68,25 @@ def _is_safe_import(node: ast.stmt) -> bool:
     return False
 
 
+def _is_type_union_leaf(node: ast.expr) -> bool:
+    """Return True if node is a valid leaf in latest type union op (X | Y | None).
+
+    Rejects non-type leaves like integer/string constants so that bitwise OR
+    expressions (FLAGS = 1 | 2) are not misidentified as type aliases.
+    """
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        return _is_type_union_leaf(node.left) and _is_type_union_leaf(node.right)
+    if isinstance(node, ast.Name):
+        return True  # str, int, MyClass, None (as a name), ...
+    if isinstance(node, ast.Attribute):
+        return True  # typing.Optional, module.MyClass, ...
+    if isinstance(node, ast.Subscript):
+        return True  # Optional[int], List[str], ...
+    if isinstance(node, ast.Constant) and node.value is None:
+        return True  # literal None in  X | None
+    return False     # int/str/bytes/... constants → bitwise OR, not a union
+
+
 def _rhs_is_type_construct(node: ast.expr) -> bool:
     """Check if an assignment RHS is a typing construct.
 
@@ -53,15 +96,24 @@ def _rhs_is_type_construct(node: ast.expr) -> bool:
     We check the VALUE, not the name — much more reliable than naming conventions.
     """
     # X = Literal[...], X = Dict[str, Any], X = list[Foo], X = Union[...]
-    if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
-        return node.value.id in _TYPING_SUBSCRIPT_NAMES
-    # X = str | int | float new Union
+    # Also handles typing.Optional[int] where node.value is ast.Attribute
+    if isinstance(node, ast.Subscript):
+        val = node.value
+        if isinstance(val, ast.Name):
+            return val.id in _TYPING_SUBSCRIPT_NAMES
+        if isinstance(val, ast.Attribute):
+            return val.attr in _TYPING_SUBSCRIPT_NAMES
+    # X = str | int | None — new-style union; validate leaves to reject FLAGS = 1 | 2
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return True
-    # X = TypedDict("X", {...}) — functional form
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-        if node.func.id in ('TypedDict', 'NamedTuple', 'NewType'):
-            return True
+        return _is_type_union_leaf(node)
+    # X = TypedDict("X", {...}), T = TypeVar("T"), P = ParamSpec("P"), ...
+    # Also handles typing.TypedDict(...) where node.func is ast.Attribute
+    if isinstance(node, ast.Call):
+        func = node.func
+        if isinstance(func, ast.Name):
+            return func.id in _TYPING_FUNCTIONAL_NAMES
+        if isinstance(func, ast.Attribute):
+            return func.attr in _TYPING_FUNCTIONAL_NAMES
     return False
 
 
