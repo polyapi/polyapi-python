@@ -44,6 +44,12 @@ _TYPING_FUNCTIONAL_NAMES = frozenset({
     'TypeAliasType',
 })
 
+# Names that are unambiguously types when they appear as leaves in X | Y expressions.
+# This anchors the union heuristic so that flag constants (READ | WRITE) are rejected.
+_BUILTIN_TYPE_NAMES = frozenset({
+    'str', 'int', 'float', 'bool', 'bytes', 'complex', 'object', 'bytearray',
+}) | _TYPING_SUBSCRIPT_NAMES
+
 
 def _import_bound_names(node: ast.stmt) -> set:
     """Names bound in the local namespace by an import statement."""
@@ -87,6 +93,24 @@ def _is_type_union_leaf(node: ast.expr) -> bool:
     return False     # int/str/bytes/... constants → bitwise OR, not a union
 
 
+def _union_has_type_anchor(node: ast.expr) -> bool:
+    """Return True if the BinOr tree contains at least one vague type leaf.
+
+    Prevents named flag constants (READ | WRITE) from being misidentified as type
+    unions. A 'type anchor' is a leaf that could never plausibly be a flag value:
+    a known primitive/typing name, a None constant, or a subscript expression.
+    """
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        return _union_has_type_anchor(node.left) or _union_has_type_anchor(node.right)
+    if isinstance(node, ast.Constant) and node.value is None:
+        return True
+    if isinstance(node, ast.Name):
+        return node.id in _BUILTIN_TYPE_NAMES
+    if isinstance(node, ast.Subscript):
+        return True
+    return False
+
+
 def _rhs_is_type_construct(node: ast.expr) -> bool:
     """Check if an assignment RHS is a typing construct.
 
@@ -104,8 +128,9 @@ def _rhs_is_type_construct(node: ast.expr) -> bool:
         if isinstance(val, ast.Attribute):
             return val.attr in _TYPING_SUBSCRIPT_NAMES
     # X = str | int | None — new-style union; validate leaves to reject FLAGS = 1 | 2
+    # Also require a type anchor so named flag constants (READ | WRITE) are rejected.
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return _is_type_union_leaf(node)
+        return _is_type_union_leaf(node) and _union_has_type_anchor(node)
     # X = TypedDict("X", {...}), T = TypeVar("T"), P = ParamSpec("P"), ...
     # Also handles typing.TypedDict(...) where node.func is ast.Attribute
     if isinstance(node, ast.Call):
