@@ -570,7 +570,8 @@ def add_function_file(
         # Import the generated type module under a private alias so PascalCase function
         # names do not shadow their own module symbol in __init__.py.
         type_module_alias = to_type_module_alias(function_name)
-        new_init_content = init_content + f"\n\nfrom . import {func_namespace} as {type_module_alias}\n\n{func_str}"
+        type_block = f"\n\n{unique_types}" if unique_types else ""
+        new_init_content = init_content + f"{type_block}\n\nfrom . import {func_namespace} as {type_module_alias}\n\n{func_str}"
         
         # Use temporary files for atomic writes
         # Write to __init__.py atomically
