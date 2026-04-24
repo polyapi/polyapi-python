@@ -1,4 +1,5 @@
 name: Update python pip package
+
 on:
   push:
     paths:
@@ -6,106 +7,217 @@ on:
     branches:
       - develop
       - main
+  pull_request:
+    types: [closed]
+    paths:
+      - "pyproject.toml"
+    branches:
+      - develop
+      - main
+      - eu1
+      - na2
 
 jobs:
-  develop-build:
+  build-distribution:
     name: Build distribution 📦
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/develop' }}
-    environment: dev
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.x"
+      - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build a binary wheel and a source tarball
-      run: python3 -m build
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build tomli twine
 
+      - name: Build a binary wheel and a source tarball
+        run: python -m build
 
-  dev-publish-to-pypi:
-    name: Publish Python 🐍 distribution 📦 to PyPI
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Resolve package version
+        id: pkg
+        shell: bash
+        run: |
+          VERSION=$(python -c "import pathlib, tomli; data = tomli.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8')); print(data['project']['version'])")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved package version: ${VERSION}"
+
+    outputs:
+      package_version: ${{ steps.pkg.outputs.version }}
+
+  publish-develop:
+    name: Publish to PyPI and update develop client-versions
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/develop' }}
-    needs: develop-build
-    environment:
-      name: dev
-      url: https://pypi.org/p/polyapi-python
-
+    needs: build-distribution
+    environment: develop
     permissions:
       id-token: write
-    steps:
-
-    - name: Download all the dists
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution 📦 to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-
-
-  main-build:
-    name: Build distribution 📦
-    runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
-    environment: main
+    if: ${{ github.ref == 'refs/heads/develop' }}
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.x"
+      - name: Download all dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
 
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build a binary wheel and a source tarball
-      run: python3 -m build
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
+      - name: Update backend client-versions
+        env:
+          BASE_URL: https://dev.polyapi.io
+          VERSION: ${{ needs.build-distribution.outputs.package_version }}
+          POLY_SUPER_ADMIN_USER_KEY: ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "${POLY_SUPER_ADMIN_USER_KEY}" ]]; then
+            echo "Missing required secret POLY_SUPER_ADMIN_USER_KEY in environment 'develop'"
+            exit 1
+          fi
 
-  main-publish-to-pypi:
-    name: >-
-      Publish Python 🐍 distribution 📦 to PyPI
-    if: ${{ github.ref == 'refs/heads/main' }}
-    needs:
-    - main-build
+          curl --fail-with-body -X PATCH \
+            "${BASE_URL}/config-variables/SupportedClientVersions" \
+            -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"SupportedClientVersions\",\"value\":{\"python\":\"${VERSION}\"}}"
+
+  publish-na1:
+    name: Publish to PyPI and update na1 BE client-versions
     runs-on: ubuntu-latest
-    environment:
-      name: main
-      url: https://pypi.org/p/polyapi-python
+    needs: build-distribution
+    environment: na1
     permissions:
       id-token: write
-
+    if: >-
+      ${{
+        github.ref == 'refs/heads/main' ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.merged == true &&
+          github.event.pull_request.head.ref == 'develop' &&
+          github.event.pull_request.base.ref == 'main'
+        )
+      }}
 
     steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution 📦 to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Download all dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Update backend client-versions
+        env:
+          BASE_URL: https://na1.polyapi.io
+          VERSION: ${{ needs.build-distribution.outputs.package_version }}
+          POLY_SUPER_ADMIN_USER_KEY: ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "${POLY_SUPER_ADMIN_USER_KEY}" ]]; then
+            echo "Missing required secret POLY_SUPER_ADMIN_USER_KEY in environment 'na1'"
+            exit 1
+          fi
+
+          curl --fail-with-body -X PATCH \
+            "${BASE_URL}/config-variables/SupportedClientVersions" \
+            -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"SupportedClientVersions\",\"value\":{\"python\":\"${VERSION}\"}}"
+
+  publish-na2:
+    name: Publish to PyPI and update na2 client-versions
+    runs-on: ubuntu-latest
+    needs: build-distribution
+    environment: na2
+    permissions:
+      id-token: write
+    if: >-
+      ${{
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.head.ref == 'main' &&
+        github.event.pull_request.base.ref == 'na2'
+      }}
+
+    steps:
+      - name: Download all dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Update backend client-versions
+        env:
+          BASE_URL: https://na2.polyapi.io
+          VERSION: ${{ needs.build-distribution.outputs.package_version }}
+          POLY_SUPER_ADMIN_USER_KEY: ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "${POLY_SUPER_ADMIN_USER_KEY}" ]]; then
+            echo "Missing required secret POLY_SUPER_ADMIN_USER_KEY in environment 'na2'"
+            exit 1
+          fi
+
+          curl --fail-with-body -X PATCH \
+            "${BASE_URL}/config-variables/SupportedClientVersions" \
+            -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"SupportedClientVersions\",\"value\":{\"python\":\"${VERSION}\"}}"
+
+  publish-eu1:
+    name: Publish to PyPI and update eu1 BE client-versions
+    runs-on: ubuntu-latest
+    needs: build-distribution
+    environment: eu1
+    permissions:
+      id-token: write
+    if: >-
+      ${{
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.head.ref == 'main' &&
+        github.event.pull_request.base.ref == 'eu1'
+      }}
+
+    steps:
+      - name: Download all dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Update backend client-versions
+        env:
+          BASE_URL: https://eu1.polyapi.io
+          VERSION: ${{ needs.build-distribution.outputs.package_version }}
+          POLY_SUPER_ADMIN_USER_KEY: ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "${POLY_SUPER_ADMIN_USER_KEY}" ]]; then
+            echo "Missing required secret POLY_SUPER_ADMIN_USER_KEY in environment 'eu1'"
+            exit 1
+          fi
+
+          curl --fail-with-body -X PATCH \
+            "${BASE_URL}/config-variables/SupportedClientVersions" \
+            -H "Authorization: Bearer ${POLY_SUPER_ADMIN_USER_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"SupportedClientVersions\",\"value\":{\"python\":\"${VERSION}\"}}"
