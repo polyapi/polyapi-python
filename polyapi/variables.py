@@ -1,4 +1,6 @@
 import os
+import re
+import keyword
 import logging
 import tempfile
 import shutil
@@ -27,12 +29,12 @@ GET_PARSED_TEMPLATE = """
     @staticmethod
     def get_parsed() -> "{parsed_type}":
         resp = variable_get("{variable_id}")
-        return {parsed_type}(**json.loads(resp.text))
+        return {parsed_type}.from_dict(json.loads(resp.text))
 
     @staticmethod
     async def get_parsed_async() -> "{parsed_type}":
         resp = await variable_get_async("{variable_id}")
-        return {parsed_type}(**json.loads(resp.text))
+        return {parsed_type}.from_dict(json.loads(resp.text))
 """
 
 
@@ -110,6 +112,17 @@ def generate_variables(variables: List[VariableSpecDto]):
             logging.warning(f"  - {failed_var}")
 
 
+def _sanitize_field_name(name: str) -> str:
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    if sanitized and sanitized[0].isdigit():
+        sanitized = '_' + sanitized
+    if not sanitized:
+        sanitized = 'field_'
+    if keyword.iskeyword(sanitized):
+        sanitized += '_'
+    return sanitized
+
+
 def _schema_to_dataclass(variable_name: str, schema: dict) -> tuple:
     """Generate a @dataclass from a variable's JSON schema properties.
 
@@ -124,18 +137,31 @@ def _schema_to_dataclass(variable_name: str, schema: dict) -> tuple:
 
     _TYPE_MAP = {"string": "str", "integer": "int", "number": "float", "boolean": "bool", "object": "Dict", "array": "List"}
     req_fields, opt_fields = [], []
+    # (json_key, python_field_name) pairs for from_dict
+    field_map = []
     for prop, prop_schema in properties.items():
         py_type = _TYPE_MAP.get(prop_schema.get("type", "string"), "Any")
+        safe = _sanitize_field_name(prop)
+        field_map.append((prop, safe))
         if prop in required:
-            req_fields.append(f"    {prop}: {py_type}")
+            req_fields.append(f"    {safe}: {py_type}")
         else:
-            opt_fields.append(f"    {prop}: Optional[{py_type}] = field(default=None)")
+            opt_fields.append(f"    {safe}: Optional[{py_type}] = field(default=None)")
+
+    from_dict_args = ", ".join(f'{safe}=d.get("{key}")' for key, safe in field_map)
+    from_dict_lines = [
+        "",
+        "    @classmethod",
+        "    def from_dict(cls, d):",
+        f"        return cls({from_dict_args})",
+    ]
 
     lines = ["from dataclasses import dataclass, field", "", "@dataclass", f"class {class_name}:"]
     lines.extend(req_fields)
     lines.extend(opt_fields)
     if not req_fields and not opt_fields:
         lines.append("    pass")
+    lines.extend(from_dict_lines)
     return class_name, "\n".join(lines)
 
 
