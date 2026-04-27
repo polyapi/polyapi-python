@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import argparse
 
@@ -29,7 +30,10 @@ def execute_from_cli():
     if 'PYTHONPYCACHEPREFIX' not in os.environ:
         cache_dir = os.path.join(tempfile.gettempdir(), 'polyapi_pycache')
         os.makedirs(cache_dir, exist_ok=True)
+        # here for children just in case
         os.environ['PYTHONPYCACHEPREFIX'] = cache_dir
+        # For the startup py_initialize issue 
+        sys.pycache_prefix = cache_dir
 
     # First we setup all our argument parsing logic
     # Then we parse the arguments (waaay at the bottom)
