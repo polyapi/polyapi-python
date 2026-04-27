@@ -7,7 +7,16 @@ from concurrent.futures import ThreadPoolExecutor
 def _reload_polyapi():
     sys.modules.pop("polyapi", None)
     sys.modules.pop("polyapi.cli", None)
-    return importlib.import_module("polyapi")
+    polyapi = importlib.import_module("polyapi")
+
+    for module_name, module in list(sys.modules.items()):
+        if not module_name.startswith("polyapi.") or module_name == "polyapi.cli":
+            continue
+        submodule_name = module_name.removeprefix("polyapi.")
+        if "." not in submodule_name:
+            setattr(polyapi, submodule_name, module)
+
+    return polyapi
 
 
 def test_import_polyapi_does_not_import_cli():
@@ -22,6 +31,14 @@ def test_cli_constants_shared_between_runtime_and_cli():
     cli_module = importlib.import_module("polyapi.cli")
 
     assert tuple(cli_module.CLI_COMMANDS) == cli_constants.CLI_COMMANDS
+
+
+def test_reload_preserves_existing_submodule_bindings():
+    rendered_spec = importlib.import_module("polyapi.rendered_spec")
+
+    polyapi = _reload_polyapi()
+
+    assert polyapi.rendered_spec is rendered_spec
 
 
 def test_poly_custom_nested_scopes_restore_previous_state():
