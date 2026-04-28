@@ -287,6 +287,28 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
                 module_scope_names.add(dep)
                 queue.append(dep)
 
+    # Phase 3b: Prune module_scope_names — remove names bound by non-safe imports,
+    # then cascade: any class that depends on a pruned name can't safely sit at module
+    # scope either (its base class / decorator would be undefined if the dep is missing).
+    unsafe_import_names: set[str] = set()
+    for _node in ast.iter_child_nodes(tree):
+        if isinstance(_node, (ast.Import, ast.ImportFrom)) and not _is_safe_import(_node):
+            unsafe_import_names.update(_import_bound_names(_node) & module_scope_names)
+
+    if unsafe_import_names:
+        to_remove: set[str] = set(unsafe_import_names)
+        prune_queue = list(unsafe_import_names)
+        while prune_queue:
+            unsafe_name = prune_queue.pop()
+            for cls_name in list(module_scope_names - to_remove):
+                if cls_name not in child_tables:
+                    continue
+                deps = _collect_free_names(child_tables[cls_name]) | class_outer_deps.get(cls_name, set())
+                if unsafe_name in deps:
+                    to_remove.add(cls_name)
+                    prune_queue.append(cls_name)
+        module_scope_names -= to_remove
+
     # Phase 4: Classify each AST node using the symtable results
     type_import_lines: set[int] = set()
     type_def_lines: set[int] = set()
@@ -300,13 +322,11 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         is_type_import = False
         is_type_def = False
 
-        # Imports: safe typing/stdlib imports go to module scope;
-        # also promote any import that binds a name required by a module-scope class.
+        # Imports: only safe (stdlib/typing) imports go to module scope.
+        # Non-safe imports stay in try/except — hoisting them risks crashing the whole
+        # generated module if the dependency is missing (before the guard can fire).
         if isinstance(node, (ast.Import, ast.ImportFrom)):
-            is_type_import = (
-                _is_safe_import(node)
-                or bool(_import_bound_names(node) & module_scope_names)
-            )
+            is_type_import = _is_safe_import(node)
 
         # Class definitions: symtable confirmed these are classes
         elif isinstance(node, ast.ClassDef):
