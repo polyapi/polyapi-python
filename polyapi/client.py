@@ -1,4 +1,6 @@
 import ast
+import copy
+import re
 import symtable as symtable_mod
 from typing import Any, Dict, List, Tuple
 
@@ -141,6 +143,29 @@ def _union_has_type_anchor(node: ast.expr) -> bool:
     return False
 
 
+def _collect_local_shadows(tree: ast.Module) -> frozenset[str]:
+    """Typing-set names that are redefined at module scope (assignments or defs).
+
+    If `List = get_runtime_list()` or `def TypeVar(...):` appears in the file,
+    those names must not be trusted as typing constructs in Phase 5 even though
+    they appear in the static whitelist.
+    """
+    all_typing = _TYPING_SUBSCRIPT_NAMES | _TYPING_FUNCTIONAL_NAMES
+    shadowed: set[str] = set()
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name) and t.id in all_typing:
+                    shadowed.add(t.id)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name in all_typing:
+                shadowed.add(node.name)
+        elif isinstance(node, ast.ClassDef):
+            if node.name in all_typing:
+                shadowed.add(node.name)
+    return frozenset(shadowed)
+
+
 def _collect_typing_bound_names(tree: ast.Module) -> frozenset[str]:
     """Names actually imported from typing/typing_extensions in this module.
 
@@ -158,31 +183,64 @@ def _collect_typing_bound_names(tree: ast.Module) -> frozenset[str]:
     return frozenset(bound)
 
 
-def _rhs_is_type_construct(node: ast.expr, typing_bound: frozenset[str] = frozenset()) -> bool:
+def _quote_unresolved_names(node: ast.expr, all_known: set[str]) -> ast.expr:
+    """Return a deep copy of node with unresolved Name refs replaced by string literals.
+
+    Produces forward references like Union["UnknownType", KnownType] so the
+    hoisted assignment is valid Python even when the name is defined later
+    (same-file) or in another module (cross-context).
+    """
+    node = copy.deepcopy(node)
+    for parent in ast.walk(node):
+        for field, val in ast.iter_fields(parent):
+            if isinstance(val, ast.Name) and val.id not in all_known:
+                setattr(parent, field, ast.Constant(value=val.id))
+            elif isinstance(val, list):
+                for i, item in enumerate(val):
+                    if isinstance(item, ast.Name) and item.id not in all_known:
+                        val[i] = ast.Constant(value=item.id)
+    return node
+
+
+def _rhs_is_type_construct(
+    node: ast.expr,
+    typing_bound: frozenset[str] = frozenset(),
+    local_shadows: frozenset[str] = frozenset(),
+) -> bool:
     """Check if an assignment RHS is a typing construct.
 
     This is the ONE narrow heuristic we still need because symtable
     can't distinguish `X = Literal["a"]` (type alias) from `x = foo()` (runtime).
 
     We check the VALUE, not the name. `typing_bound` extends the static sets with
-    names actually imported from typing/typing_extensions in the current file,
-    so provenance is verified rather than just string-matched.
+    names actually imported from typing/typing_extensions in the current file.
+    `local_shadows` removes names from the static sets that were redefined at module
+    scope (e.g. `List = []` or `def TypeVar(...)`), preventing wrong hoists.
     """
-    all_subscript = _TYPING_SUBSCRIPT_NAMES | typing_bound
-    all_functional = _TYPING_FUNCTIONAL_NAMES | typing_bound
+    all_subscript = (_TYPING_SUBSCRIPT_NAMES | typing_bound) - local_shadows
+    all_functional = (_TYPING_FUNCTIONAL_NAMES | typing_bound) - local_shadows
 
     # X = Literal[...], X = Dict[str, Any], X = list[Foo], X = Union[...]
     # Also handles typing.Optional[int] where node.value is ast.Attribute
     if isinstance(node, ast.Subscript):
         val = node.value
+        head_ok = False
         if isinstance(val, ast.Name):
-            return val.id in all_subscript
-        if isinstance(val, ast.Attribute):
-            return (
+            head_ok = val.id in all_subscript
+        elif isinstance(val, ast.Attribute):
+            head_ok = (
                 isinstance(val.value, ast.Name)
                 and val.value.id in _TYPING_MODULES
                 and val.attr in all_subscript
             )
+        if head_ok:
+            # Reject dynamic subscripts like Literal[*runtime_list] — the slice
+            # contains a starred unpack whose value is a runtime variable, not a
+            # static type expression. Hoisting this would produce a NameError.
+            if any(isinstance(n, ast.Starred) for n in ast.walk(node.slice)):
+                return False
+            return True
+        return False
     # X = str | int | None — new-style union.
     # _is_type_union_leaf validates every leaf strictly, so FLAGS = 1 | 2 and
     # READ | WRITE are both rejected without a separate anchor check.
@@ -221,6 +279,7 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         return "", "", code
 
     typing_bound = _collect_typing_bound_names(tree)
+    local_shadows = _collect_local_shadows(tree)
 
     lines = code.split('\n')
 
@@ -309,9 +368,37 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
                     prune_queue.append(cls_name)
         module_scope_names -= to_remove
 
+    # Phase 3c: Prune module_scope_names — remove assignment targets whose RHS
+    # contains a starred subscript (e.g. Literal[*runtime_list]).  These are
+    # dynamic type expressions that require a runtime value not available at
+    # module scope; hoisting them produces a NameError or used-before-def.
+    # Cascade using the same logic as Phase 3b.
+    dynamic_names: set[str] = set()
+    for _node in ast.iter_child_nodes(tree):
+        if isinstance(_node, ast.Assign):
+            if any(isinstance(n, ast.Starred) for n in ast.walk(_node.value)):
+                for t in _node.targets:
+                    if isinstance(t, ast.Name) and t.id in module_scope_names:
+                        dynamic_names.add(t.id)
+
+    if dynamic_names:
+        dyn_remove: set[str] = set(dynamic_names)
+        dyn_queue = list(dynamic_names)
+        while dyn_queue:
+            dyn_name = dyn_queue.pop()
+            for cls_name in list(module_scope_names - dyn_remove):
+                if cls_name not in child_tables:
+                    continue
+                deps = _collect_free_names(child_tables[cls_name]) | class_outer_deps.get(cls_name, set())
+                if dyn_name in deps:
+                    dyn_remove.add(cls_name)
+                    dyn_queue.append(cls_name)
+        module_scope_names -= dyn_remove
+
     # Phase 4: Classify each AST node using the symtable results
     type_import_lines: set[int] = set()
     type_def_lines: set[int] = set()
+    modified_type_lines: dict[int, str] = {}  # line index -> replacement source
 
     prev_was_type_def = False
 
@@ -377,10 +464,14 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
 
     # Phase 5: Also promote assignments that LOOK like type aliases
     # even if no class references them yet.
-    # This catches stuff like: DatadogStatus = Literal[...] when only used by functions
-    # symtable can't distinguish type aliases from variables,
-    # so this is the ONE remaining heuristic — but scoped narrowly to
-    # assignments whose RHS is a typing construct (Subscript/BinOp with |)
+    # This catches stuff like: DatadogStatus = Literal[...] when only used by functions.
+    # symtable can't distinguish type aliases from variables, so this is the ONE
+    # remaining heuristic — scoped narrowly to typing-construct RHS shapes.
+    #
+    # Unresolved names (defined later in the same file or in another module) are
+    # replaced with string forward references via _quote_unresolved_names so the
+    # hoisted line is always valid Python and mypy can resolve same-file refs.
+    all_known_names = _BUILTIN_TYPE_NAMES | typing_bound | module_scope_names
     for node in ast.iter_child_nodes(tree):
         if not isinstance(node, ast.Assign):
             continue
@@ -388,12 +479,32 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
             t.id for t in node.targets
             if isinstance(t, ast.Name) and t.id not in module_scope_names
         ]
-        if new_names and _rhs_is_type_construct(node.value, typing_bound):
-            start = node.lineno - 1
-            end = getattr(node, 'end_lineno', None) or start + 1
-            for i in range(start, end):
-                type_def_lines.add(i)
-            module_scope_names.update(new_names)
+        if not new_names or not _rhs_is_type_construct(node.value, typing_bound, local_shadows):
+            continue
+
+        start = node.lineno - 1
+        end = getattr(node, 'end_lineno', None) or start + 1
+
+        unresolved = {
+            n.id for n in ast.walk(node.value)
+            if isinstance(n, ast.Name) and n.id not in all_known_names
+        }
+        if unresolved:
+            # Hoist with string-quoted forward refs for unknown names.
+            # Union["UnknownType", KnownType] is valid at runtime and mypy resolves
+            # same-file forward refs; cross-file refs degrade silently (unknown type).
+            quoted_rhs = _quote_unresolved_names(node.value, all_known_names)
+            target_src = ' = '.join(
+                t.id for t in node.targets if isinstance(t, ast.Name)
+            )
+            modified_type_lines[start] = f"{target_src} = {ast.unparse(quoted_rhs)}"
+            for i in range(start + 1, end):
+                modified_type_lines[i] = ''  # suppress continuation lines
+
+        for i in range(start, end):
+            type_def_lines.add(i)
+        module_scope_names.update(new_names)
+        all_known_names = all_known_names | set(new_names)
 
     # Build output
     imports_out: list[str] = []
@@ -403,7 +514,12 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         if i in type_import_lines:
             imports_out.append(line)
         elif i in type_def_lines:
-            types_out.append(line)
+            if i in modified_type_lines:
+                replacement = modified_type_lines[i]
+                if replacement:  # empty string = suppressed continuation line
+                    types_out.append(replacement)
+            else:
+                types_out.append(line)
         else:
             runtime_out.append(line)
 
@@ -442,6 +558,11 @@ def _wrap_code_in_try_except(function_name: str, code: str) -> Tuple[str, str]:
     )
 
     body = runtime_code if runtime_code.strip() else 'pass'
+
+    # polyConfig is re-declared in every client function's try block within the same
+    # __init__.py. Suppress the mypy no-redef error on that line in generated output.
+    body = re.sub(r'^(\s*polyConfig\s*:.*)', r'\1  # type: ignore[no-redef]', body, flags=re.MULTILINE)
+
     indented = '\n    '.join(body.split('\n'))
     wrapped = prefix + indented + suffix
 

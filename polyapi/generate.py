@@ -24,7 +24,7 @@ from . import http_client
 from .config import get_api_key_and_url, get_direct_execute_config, get_cached_generate_args
 
 # Track emitted type definitions per __init__.py for deduplication
-# Maps: directory_path -> {type_name -> source_code}
+# Maps: directory_path -> {type_name -> source_text}
 _emitted_types: dict[str, dict[str, str]] = {}
 
 
