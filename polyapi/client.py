@@ -141,25 +141,47 @@ def _union_has_type_anchor(node: ast.expr) -> bool:
     return False
 
 
-def _rhs_is_type_construct(node: ast.expr) -> bool:
+def _collect_typing_bound_names(tree: ast.Module) -> frozenset[str]:
+    """Names actually imported from typing/typing_extensions in this module.
+
+    Used to validate RHS names by provenance rather than a static whitelist,
+    so `X = MyAlias[str]` is only hoisted if MyAlias came from a typing import
+    in this file — not just because the name string happens to look typing-ish.
+    """
+    bound: set[str] = set()
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.ImportFrom):
+            module = node.module or ''
+            if module.split('.')[0] in _TYPING_MODULES:
+                for alias in node.names:
+                    bound.add(alias.asname or alias.name)
+    return frozenset(bound)
+
+
+def _rhs_is_type_construct(node: ast.expr, typing_bound: frozenset[str] = frozenset()) -> bool:
     """Check if an assignment RHS is a typing construct.
 
     This is the ONE narrow heuristic we still need because symtable
     can't distinguish `X = Literal["a"]` (type alias) from `x = foo()` (runtime).
 
-    We check the VALUE, not the name — much more reliable than naming conventions.
+    We check the VALUE, not the name. `typing_bound` extends the static sets with
+    names actually imported from typing/typing_extensions in the current file,
+    so provenance is verified rather than just string-matched.
     """
+    all_subscript = _TYPING_SUBSCRIPT_NAMES | typing_bound
+    all_functional = _TYPING_FUNCTIONAL_NAMES | typing_bound
+
     # X = Literal[...], X = Dict[str, Any], X = list[Foo], X = Union[...]
     # Also handles typing.Optional[int] where node.value is ast.Attribute
     if isinstance(node, ast.Subscript):
         val = node.value
         if isinstance(val, ast.Name):
-            return val.id in _TYPING_SUBSCRIPT_NAMES
+            return val.id in all_subscript
         if isinstance(val, ast.Attribute):
             return (
                 isinstance(val.value, ast.Name)
                 and val.value.id in _TYPING_MODULES
-                and val.attr in _TYPING_SUBSCRIPT_NAMES
+                and val.attr in all_subscript
             )
     # X = str | int | None — new-style union.
     # _is_type_union_leaf validates every leaf strictly, so FLAGS = 1 | 2 and
@@ -171,12 +193,12 @@ def _rhs_is_type_construct(node: ast.expr) -> bool:
     if isinstance(node, ast.Call):
         func = node.func
         if isinstance(func, ast.Name):
-            return func.id in _TYPING_FUNCTIONAL_NAMES
+            return func.id in all_functional
         if isinstance(func, ast.Attribute):
             return (
                 isinstance(func.value, ast.Name)
                 and func.value.id in _TYPING_MODULES
-                and func.attr in _TYPING_FUNCTIONAL_NAMES
+                and func.attr in all_functional
             )
     return False
 
@@ -197,6 +219,8 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         st = symtable_mod.symtable(code, '<client_fn>', 'exec')
     except SyntaxError:
         return "", "", code
+
+    typing_bound = _collect_typing_bound_names(tree)
 
     lines = code.split('\n')
 
@@ -344,7 +368,7 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
             t.id for t in node.targets
             if isinstance(t, ast.Name) and t.id not in module_scope_names
         ]
-        if new_names and _rhs_is_type_construct(node.value):
+        if new_names and _rhs_is_type_construct(node.value, typing_bound):
             start = node.lineno - 1
             end = getattr(node, 'end_lineno', None) or start + 1
             for i in range(start, end):
