@@ -94,30 +94,38 @@ def _is_safe_import(node: ast.stmt) -> bool:
     return False
 
 
-def _is_type_union_leaf(node: ast.expr) -> bool:
+def _is_type_union_leaf(
+    node: ast.expr,
+    local_shadows: frozenset[str] = frozenset(),
+) -> bool:
     """Return True if node is a valid leaf in a new-style type union (X | Y | None).
 
     Every leaf must be an unambiguous type — we reject anything that could
     plausibly be a runtime value (flag constant, arbitrary subscript, etc.).
+    local_shadows removes whitelisted names that were redefined at module scope
+    (e.g. `Optional = []`), so they are not trusted as typing constructs.
     """
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return _is_type_union_leaf(node.left) and _is_type_union_leaf(node.right)
-    # Name: only known typing / builtin type names (rejects READ, WRITE, etc.)
+        return (
+            _is_type_union_leaf(node.left, local_shadows)
+            and _is_type_union_leaf(node.right, local_shadows)
+        )
+    # Name: only known typing / builtin type names, minus any local shadows.
     if isinstance(node, ast.Name):
-        return node.id in _BUILTIN_TYPE_NAMES
+        return node.id in (_BUILTIN_TYPE_NAMES - local_shadows)
     # Attribute: only from typing / typing_extensions (rejects os.O_RDONLY, etc.)
     if isinstance(node, ast.Attribute):
         return isinstance(node.value, ast.Name) and node.value.id in _TYPING_MODULES
-    # Subscript: head must itself be a known typing name (rejects my_list[0], etc.)
+    # Subscript: head must itself be a known typing name, minus any local shadows.
     if isinstance(node, ast.Subscript):
         val = node.value
         if isinstance(val, ast.Name):
-            return val.id in _TYPING_SUBSCRIPT_NAMES
+            return val.id in (_TYPING_SUBSCRIPT_NAMES - local_shadows)
         if isinstance(val, ast.Attribute):
             return (
                 isinstance(val.value, ast.Name)
                 and val.value.id in _TYPING_MODULES
-                and val.attr in _TYPING_SUBSCRIPT_NAMES
+                and val.attr in (_TYPING_SUBSCRIPT_NAMES - local_shadows)
             )
         return False
     if isinstance(node, ast.Constant) and node.value is None:
@@ -202,7 +210,7 @@ def _collect_typing_bound_names(tree: ast.Module) -> frozenset[str]:
     return frozenset(bound)
 
 
-def _quote_unresolved_names(node: ast.expr, all_known: set[str]) -> ast.expr:
+def _quote_unresolved_names(node: ast.expr, all_known: set[str] | frozenset[str]) -> ast.expr:
     """Return a deep copy of node with unresolved Name refs replaced by string literals.
 
     Produces forward references like Union["UnknownType", KnownType] so the
@@ -267,7 +275,7 @@ def _rhs_is_type_construct(
     # _is_type_union_leaf validates every leaf strictly, so FLAGS = 1 | 2 and
     # READ | WRITE are both rejected without a separate anchor check.
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return _is_type_union_leaf(node) and _union_has_type_anchor(node)
+        return _is_type_union_leaf(node, local_shadows) and _union_has_type_anchor(node)
     # X = TypedDict("X", {...}), T = TypeVar("T"), P = ParamSpec("P"), ...
     # Also handles typing.TypedDict(...) where node.func is ast.Attribute
     if isinstance(node, ast.Call):
