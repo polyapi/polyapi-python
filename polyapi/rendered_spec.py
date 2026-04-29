@@ -9,7 +9,7 @@ from polyapi.typedefs import SpecificationDto
 
 def update_rendered_spec(spec: SpecificationDto):
     print("Updating rendered spec...")
-    func_str, type_defs = render_spec(spec)
+    _, func_str, type_defs = render_spec(spec)
     data = {
         "language": "python",
         "signature": func_str,
