@@ -417,9 +417,17 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
                     dyn_queue.append(cls_name)
         module_scope_names -= dyn_remove
 
-    # Names available at module scope: builtins, typing module names, and anything
-    # that survived the Phase 3b/3c prune. Used to guard Phase 4 assignment hoisting.
-    module_scope_available = _BUILTIN_TYPE_NAMES | _TYPING_MODULES | module_scope_names
+    # Names available at module scope: builtins, typing module names, anything that
+    # survived Phase 3b/3c, and names bound by safe imports (hoisted by Phase 4).
+    # Used to guard Phase 4 assignment hoisting — if a RHS name isn't in this set
+    # it won't be defined when the hoisted assignment runs.
+    safe_import_bound: set[str] = set()
+    for _node in ast.iter_child_nodes(tree):
+        if isinstance(_node, (ast.Import, ast.ImportFrom)) and _is_safe_import(_node):
+            safe_import_bound.update(_import_bound_names(_node))
+    module_scope_available = (
+        _BUILTIN_TYPE_NAMES | _TYPING_MODULES | module_scope_names | safe_import_bound
+    )
 
     # Phase 4: Classify each AST node using the symtable results
     type_import_lines: set[int] = set()
