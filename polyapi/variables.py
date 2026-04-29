@@ -156,12 +156,30 @@ def _schema_to_dataclass(variable_name: str, schema: dict) -> tuple:
         f"        return cls({from_dict_args})",
     ]
 
+    # Support dict-style access (parsed["key"] and parsed["first-name"] → parsed.first_name)
+    # so schema-backed Varis keep the same fallback contract as DotDict.
+    key_map_entries = ", ".join(f'"{key}": "{safe}"' for key, safe in field_map if key != safe)
+    if key_map_entries:
+        getitem_lines = [
+            "",
+            "    def __getitem__(self, key):",
+            f"        _key_map = {{{key_map_entries}}}",
+            "        return getattr(self, _key_map.get(key, key))",
+        ]
+    else:
+        getitem_lines = [
+            "",
+            "    def __getitem__(self, key):",
+            "        return getattr(self, key)",
+        ]
+
     lines = ["from dataclasses import dataclass, field", "", "@dataclass", f"class {class_name}:"]
     lines.extend(req_fields)
     lines.extend(opt_fields)
     if not req_fields and not opt_fields:
         lines.append("    pass")
     lines.extend(from_dict_lines)
+    lines.extend(getitem_lines)
     return class_name, "\n".join(lines)
 
 
