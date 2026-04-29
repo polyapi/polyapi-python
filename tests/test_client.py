@@ -427,7 +427,9 @@ class TestExtractTypeDefinitions(unittest.TestCase):
         self.assertIn("Outer", type_defs)
 
     #  third-party import needed by a class is hoisted (pydantic fix) 
-    def test_third_party_base_class_import_is_hoisted(self):
+    def test_third_party_base_class_stays_in_runtime(self):
+        # Third-party imports are not safe to hoist (missing dep crashes the module).
+        # The class and its import both stay in the try/except runtime block.
         code = (
             "import pydantic\n"
             "class MyModel(pydantic.BaseModel):\n"
@@ -435,11 +437,13 @@ class TestExtractTypeDefinitions(unittest.TestCase):
             "def f(): pass"
         )
         type_imports, type_defs, runtime = self._extract(code)
-        self.assertIn("pydantic", type_imports)
-        self.assertNotIn("import pydantic", runtime)
-        self.assertIn("MyModel", type_defs)
+        self.assertNotIn("pydantic", type_imports)
+        self.assertIn("pydantic", runtime)
+        self.assertNotIn("MyModel", type_defs)
+        self.assertIn("MyModel", runtime)
 
-    def test_from_import_base_class_is_hoisted(self):
+    def test_from_import_base_class_stays_in_runtime(self):
+        # Same as above for from-import style.
         code = (
             "from pydantic import BaseModel\n"
             "class MyModel(BaseModel):\n"
@@ -447,8 +451,8 @@ class TestExtractTypeDefinitions(unittest.TestCase):
             "def f(): pass"
         )
         type_imports, type_defs, runtime = self._extract(code)
-        self.assertIn("BaseModel", type_imports)
-        self.assertNotIn("BaseModel", runtime)
+        self.assertNotIn("BaseModel", type_imports)
+        self.assertIn("BaseModel", runtime)
 
     #  multi-target chained assignments (X = Y = List[int])
     def test_chained_assignment_both_targets_hoisted(self):
@@ -582,7 +586,9 @@ class TestRenderClientFunction(unittest.TestCase):
         self.assertIsInstance(func_type_defs, str)
         self.assertGreater(len(func_type_defs), 0)
 
-    def test_pydantic_model_import_hoisted_to_module_scope(self):
+    def test_pydantic_model_stays_in_try_block(self):
+        # Third-party imports are not safe to hoist — pydantic and Item both stay
+        # inside the try/except so a missing dep only silences that function.
         code = (
             "import pydantic\n"
             "class Item(pydantic.BaseModel):\n"
@@ -591,9 +597,9 @@ class TestRenderClientFunction(unittest.TestCase):
             "    return Item(name='x')\n"
         )
         module_scope, wrapped, _ = render_client_function("execute", code, [], {"kind": "object"})
-        self.assertIn("pydantic", module_scope)
-        self.assertIn("Item", module_scope)
-        self.assertNotIn("class Item", wrapped)
+        self.assertNotIn("pydantic", module_scope)
+        self.assertNotIn("Item", module_scope)
+        self.assertIn("class Item", wrapped)
 
     def test_type_only_code_produces_pass_in_try(self):
         code = (
