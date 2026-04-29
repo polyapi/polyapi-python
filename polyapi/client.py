@@ -417,6 +417,10 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
                     dyn_queue.append(cls_name)
         module_scope_names -= dyn_remove
 
+    # Names available at module scope: builtins, typing module names, and anything
+    # that survived the Phase 3b/3c prune. Used to guard Phase 4 assignment hoisting.
+    module_scope_available = _BUILTIN_TYPE_NAMES | _TYPING_MODULES | module_scope_names
+
     # Phase 4: Classify each AST node using the symtable results
     type_import_lines: set[int] = set()
     type_def_lines: set[int] = set()
@@ -449,18 +453,32 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
                 and node.name.id in module_scope_names
             )
 
-        # Assignments: check if any target is in our module_scope_names set.
-        # Handles both single (X = ...) and chained (X = Y = ...) assignments.
+        # Assignments: check if any target is in our module_scope_names set,
+        # AND that all RHS names are available at module scope. The Phase 3b
+        # cascade only follows class symtable deps — a non-class alias like
+        # STATUS = SomeType can land in module_scope_names via BFS without
+        # SomeType being checked, causing a NameError when hoisted.
         elif isinstance(node, ast.Assign):
-            is_type_def = any(
+            target_in_scope = any(
                 isinstance(t, ast.Name) and t.id in module_scope_names
                 for t in node.targets
             )
+            rhs_names_available = all(
+                n.id in module_scope_available
+                for n in ast.walk(node.value)
+                if isinstance(n, ast.Name)
+            )
+            is_type_def = target_in_scope and rhs_names_available
 
         # Annotated assignments with value
         elif isinstance(node, ast.AnnAssign) and node.value is not None:
             if isinstance(node.target, ast.Name):
-                is_type_def = node.target.id in module_scope_names
+                rhs_names_available = all(
+                    n.id in module_scope_available
+                    for n in ast.walk(node.value)
+                    if isinstance(n, ast.Name)
+                )
+                is_type_def = node.target.id in module_scope_names and rhs_names_available
 
         # Function definitions: NEVER module scope (these are runtime)
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
