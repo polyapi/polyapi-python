@@ -1,8 +1,9 @@
 import os
+import re
 import logging
 import tempfile
 import shutil
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from polyapi.schema import wrapped_generate_schema_types
 from polyapi.utils import add_import_to_init, init_the_init, to_func_namespace
@@ -23,7 +24,7 @@ FALLBACK_SPEC_TEMPLATE = """class {name}(TypedDict, total=False):
 """
 
 
-def generate_schemas(specs: List[SchemaSpecDto], limit_ids: List[str] = None):
+def generate_schemas(specs: List[SchemaSpecDto], limit_ids: Optional[List[str]] = None):
     failed_schemas = []
     successful_schemas = []
     if limit_ids:
@@ -209,6 +210,44 @@ def add_schema_to_init(full_path: str, spec: SchemaSpecDto):
         f.write(render_poly_schema(spec) + "\n\n")
 
 
+def _fix_typed_dict_imports(code: str) -> str:
+    """Move TypedDict/NotRequired from `typing` to `typing_extensions` in generated code.
+
+    jsonschema_gentypes spits out `from typing import ..., TypedDict, ...` which makes
+    typing._TypedDictMeta instances. The deploy validator wants typing_extensions.TypedDict,
+    so let's rewrite the imports here before writing schema files to disk.
+    """
+    lines = code.split('\n')
+    new_lines = []
+    has_te_import = False
+
+    for line in lines:
+        if re.match(r'from\s+typing_extensions\s+import', line):
+            has_te_import = True
+            # Ensure TypedDict and NotRequired are in the existing typing_extensions line
+            name_set = {n.strip() for n in line.split('import', 1)[1].split(',')}
+            name_set |= {'TypedDict', 'NotRequired'}
+            new_lines.append(f"from typing_extensions import {', '.join(sorted(name_set))}")
+            continue
+
+        if re.match(r'from\s+typing\s+import', line):
+            # Strip TypedDict and NotRequired from the typing import
+            names_str = line.split('import', 1)[1]
+            names: list[str] = [n.strip() for n in names_str.split(',')]
+            names = [n for n in names if n not in ('TypedDict', 'NotRequired', '')]
+            if names:
+                new_lines.append(f"from typing import {', '.join(names)}")
+            # drop the line entirely if nothing is left
+            continue
+
+        new_lines.append(line)
+
+    result = '\n'.join(new_lines)
+    if not has_te_import:
+        result = 'from typing_extensions import NotRequired, TypedDict\n' + result
+    return result
+
+
 def render_poly_schema(spec: SchemaSpecDto) -> str:
     definition = spec["definition"]
     if not definition.get("type"):
@@ -216,5 +255,5 @@ def render_poly_schema(spec: SchemaSpecDto) -> str:
     root, schema_types = wrapped_generate_schema_types(
         definition, root=spec["name"], fallback_type=Dict
     )
-    return schema_types
+    return _fix_typed_dict_imports(schema_types)
     # return FALLBACK_SPEC_TEMPLATE.format(name=spec["name"])

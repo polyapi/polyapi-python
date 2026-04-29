@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polyapi-python"
-version = "0.3.18.dev3"
+version = "0.3.18.dev6"
 description = "The Python Client for PolyAPI, the IPaaS by Developers for Developers"
 authors = [{ name = "PolyAPI", email = "support@polyapi.io" }]
 dependencies = [
@@ -12,7 +12,7 @@ dependencies = [
     "typing_extensions==4.12.2",
     "jsonschema-gentypes==2.10.0",
     "pydantic==2.8.0",
-    "stdlib_list==0.10.0",
+    "stdlib_list==0.11.1",
     "colorama==0.4.4",
     "python-socketio[asyncio_client]==5.11.1",
     "truststore==0.8.0",
