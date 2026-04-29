@@ -80,7 +80,34 @@ class T(unittest.TestCase):
         self.assertIn("hello: str", variable_str)
         self.assertIn("count: Optional[int]", variable_str)
         self.assertIn("-> \"DictVari\"", variable_str)
-        self.assertIn("return DictVari(**json.loads(resp.text))", variable_str)
+        self.assertIn("return DictVari._from_json(json.loads(resp.text))", variable_str)
+        self.assertIn("def __getitem__", variable_str)
+
+    def test_render_object_variable_with_schema_sanitizes_invalid_field_names(self):
+        schema_example = {**OBJECT_EXAMPLE}
+        schema_example["variable"] = {
+            **OBJECT_EXAMPLE["variable"],
+            "valueType": {
+                "kind": "object",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "first-name": {"type": "string"},
+                        "class": {"type": "string"},
+                        "valid_field": {"type": "integer"},
+                    },
+                    "required": ["first-name"],
+                }
+            }
+        }
+        variable_str = render_variable(schema_example)
+        self.assertIn("first_name: str", variable_str)
+        self.assertIn("class_: Optional[str]", variable_str)
+        self.assertIn("valid_field: Optional[int]", variable_str)
+        self.assertNotIn("first-name:", variable_str)
+        self.assertNotIn("class:", variable_str)
+        self.assertIn("'first-name': 'first_name'", variable_str)
+        self.assertIn("'class': 'class_'", variable_str)
 
     def test_render_string_variable_has_no_get_parsed(self):
         variable_str = render_variable(EXAMPLE)
