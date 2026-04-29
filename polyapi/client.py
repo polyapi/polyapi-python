@@ -157,12 +157,31 @@ def _collect_local_shadows(tree: ast.Module) -> frozenset[str]:
             for t in node.targets:
                 if isinstance(t, ast.Name) and t.id in all_typing:
                     shadowed.add(t.id)
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id in all_typing:
+                shadowed.add(node.target.id)
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.name in all_typing:
                 shadowed.add(node.name)
         elif isinstance(node, ast.ClassDef):
             if node.name in all_typing:
                 shadowed.add(node.name)
+        elif isinstance(node, ast.ImportFrom):
+            # A non-typing import that binds a typing-looking name shadows it.
+            # Phase 5 would otherwise trust the static whitelist and hoist
+            # X = Optional[str] even when Optional came from a third-party module
+            # whose import stays in the try block — producing a NameError.
+            module = node.module or ''
+            if module.split('.')[0] not in _TYPING_MODULES:
+                for alias in node.names:
+                    bound = alias.asname or alias.name
+                    if bound in all_typing:
+                        shadowed.add(bound)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                bound = alias.asname or alias.name.split('.')[0]
+                if bound in all_typing:
+                    shadowed.add(bound)
     return frozenset(shadowed)
 
 
@@ -218,7 +237,10 @@ def _rhs_is_type_construct(
     scope (e.g. `List = []` or `def TypeVar(...)`), preventing wrong hoists.
     """
     all_subscript = (_TYPING_SUBSCRIPT_NAMES | typing_bound) - local_shadows
-    all_functional = (_TYPING_FUNCTIONAL_NAMES | typing_bound) - local_shadows
+    # Don't extend all_functional with typing_bound — typing_bound includes utilities
+    # like cast/overload/get_type_hints which are not type constructors. The static
+    # list covers all legitimate functional type forms (TypeVar, TypedDict, NewType...).
+    all_functional = _TYPING_FUNCTIONAL_NAMES - local_shadows
 
     # X = Literal[...], X = Dict[str, Any], X = list[Foo], X = Union[...]
     # Also handles typing.Optional[int] where node.value is ast.Attribute
@@ -415,13 +437,17 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             is_type_import = _is_safe_import(node)
 
-        # Class definitions: symtable confirmed these are classes
+        # Class definitions: use module_scope_names not class_names so that
+        # Phase 3b pruning (unsafe-import cascade) is respected here too.
         elif isinstance(node, ast.ClassDef):
-            is_type_def = node.name in class_names  # always True, but explicit
+            is_type_def = node.name in module_scope_names
 
         # type aliases (Python 3.12+): type X = ...
         elif hasattr(ast, 'TypeAlias') and isinstance(node, ast.TypeAlias):
-            is_type_def = True
+            is_type_def = (
+                isinstance(node.name, ast.Name)
+                and node.name.id in module_scope_names
+            )
 
         # Assignments: check if any target is in our module_scope_names set.
         # Handles both single (X = ...) and chained (X = Y = ...) assignments.
@@ -485,15 +511,19 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         start = node.lineno - 1
         end = getattr(node, 'end_lineno', None) or start + 1
 
+        # _TYPING_MODULES are module names (typing, typing_extensions), not bound names —
+        # they're never in all_known_names but must not be quoted or the generated
+        # expression becomes invalid Python (e.g. "typing".Optional[int]).
+        quotable_known = all_known_names | _TYPING_MODULES
         unresolved = {
             n.id for n in ast.walk(node.value)
-            if isinstance(n, ast.Name) and n.id not in all_known_names
+            if isinstance(n, ast.Name) and n.id not in quotable_known
         }
         if unresolved:
             # Hoist with string-quoted forward refs for unknown names.
             # Union["UnknownType", KnownType] is valid at runtime and mypy resolves
             # same-file forward refs; cross-file refs degrade silently (unknown type).
-            quoted_rhs = _quote_unresolved_names(node.value, all_known_names)
+            quoted_rhs = _quote_unresolved_names(node.value, quotable_known)
             target_src = ' = '.join(
                 t.id for t in node.targets if isinstance(t, ast.Name)
             )
