@@ -5,5 +5,5 @@ pydantic==2.8.0
 stdlib_list==0.11.1
 colorama==0.4.4
 python-socketio[asyncio_client]==5.11.1
-truststore==0.8.0
+truststore==0.9.1
 httpx==0.28.1
