@@ -1,5 +1,6 @@
 import ast
 import copy
+import importlib
 import re
 import symtable as symtable_mod
 from typing import Any, Dict, List, Tuple
@@ -71,6 +72,24 @@ def _collect_free_names(table: symtable_mod.SymbolTable) -> set[str]:
     return names
 
 
+def _collect_class_body_names(table: symtable_mod.SymbolTable) -> set[str]:
+    """Collect module-referenced names evaluated at class definition time only.
+
+    Unlike _collect_free_names, this does NOT descend into function/method
+    scopes — method bodies run at call time, not when the class is defined.
+    Nested class scopes ARE descended because their bodies run at the enclosing
+    class's definition time.
+    """
+    names: set[str] = set()
+    for sym in table.get_symbols():
+        if sym.is_free() or (sym.is_global() and sym.is_referenced()):
+            names.add(sym.get_name())
+    for child in table.get_children():
+        if child.get_type() == 'class':
+            names.update(_collect_class_body_names(child))
+    return names
+
+
 def _import_bound_names(node: ast.stmt) -> set:
     """Names bound in the local namespace by an import statement."""
     if isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -90,7 +109,19 @@ def _is_safe_import(node: ast.stmt) -> bool:
         )
     if isinstance(node, ast.ImportFrom):
         module = node.module or ''
-        return module.split('.')[0] in SAFE_IMPORT_MODULES
+        if module.split('.')[0] not in SAFE_IMPORT_MODULES:
+            return False
+        # The root module is safe, but a specific name may not exist 
+        # Verify each imported name is actually there so we don't hoist a from-import 
+        # Doing that would raise ImportError at module scope.
+        try:
+            mod = importlib.import_module(module)
+            return all(
+                alias.name == '*' or hasattr(mod, alias.name)
+                for alias in node.names
+            )
+        except ImportError:
+            return False
     return False
 
 
@@ -163,8 +194,10 @@ def _collect_local_shadows(tree: ast.Module) -> frozenset[str]:
     for node in ast.iter_child_nodes(tree):
         if isinstance(node, ast.Assign):
             for t in node.targets:
-                if isinstance(t, ast.Name) and t.id in all_typing:
-                    shadowed.add(t.id)
+                # Walk the target so destructuring like `Optional, other = ...` caught — the outer target is a Tuple, not a plain Name.
+                for name_node in ast.walk(t):
+                    if isinstance(name_node, ast.Name) and name_node.id in all_typing:
+                        shadowed.add(name_node.id)
         elif isinstance(node, ast.AnnAssign):
             if isinstance(node.target, ast.Name) and node.target.id in all_typing:
                 shadowed.add(node.target.id)
@@ -210,6 +243,45 @@ def _collect_typing_bound_names(tree: ast.Module) -> frozenset[str]:
     return frozenset(bound)
 
 
+def _dotted_name_info(node: ast.expr) -> tuple[str, str] | None:
+    """If node is a pure dotted name (a.b.c), return (root_name, full_dotted_str). Else None."""
+    parts: list[str] = []
+    n: ast.expr = node
+    while isinstance(n, ast.Attribute):
+        parts.append(n.attr)
+        n = n.value
+    if isinstance(n, ast.Name):
+        parts.append(n.id)
+        return n.id, '.'.join(reversed(parts))
+    return None
+
+
+def _quote_expr(node: ast.expr, all_known: set[str] | frozenset[str]) -> ast.expr:
+    """Recursively replace unresolved names with string constants.
+
+    Attribute chains (foo.Bar.Baz) whose root is unresolved are replaced with a
+    single string constant ("foo.Bar.Baz") rather than quoting only the base Name,
+    which would produce "foo".Bar.Baz — a string attribute lookup that raises at
+    module scope before the per-function import guard can fire.
+    """
+    if isinstance(node, ast.Name):
+        return ast.Constant(value=node.id) if node.id not in all_known else node
+    if isinstance(node, ast.Attribute):
+        info = _dotted_name_info(node)
+        if info is not None and info[0] not in all_known:
+            return ast.Constant(value=info[1])
+        node.value = _quote_expr(node.value, all_known)
+        return node
+    for field, val in ast.iter_fields(node):
+        if isinstance(val, ast.expr):
+            setattr(node, field, _quote_expr(val, all_known))
+        elif isinstance(val, list):
+            for i, item in enumerate(val):
+                if isinstance(item, ast.expr):
+                    val[i] = _quote_expr(item, all_known)
+    return node
+
+
 def _quote_unresolved_names(node: ast.expr, all_known: set[str] | frozenset[str]) -> ast.expr:
     """Return a deep copy of node with unresolved Name refs replaced by string literals.
 
@@ -217,16 +289,7 @@ def _quote_unresolved_names(node: ast.expr, all_known: set[str] | frozenset[str]
     hoisted assignment is valid Python even when the name is defined later
     (same-file) or in another module (cross-context).
     """
-    node = copy.deepcopy(node)
-    for parent in ast.walk(node):
-        for field, val in ast.iter_fields(parent):
-            if isinstance(val, ast.Name) and val.id not in all_known:
-                setattr(parent, field, ast.Constant(value=val.id))
-            elif isinstance(val, list):
-                for i, item in enumerate(val):
-                    if isinstance(item, ast.Name) and item.id not in all_known:
-                        val[i] = ast.Constant(value=item.id)
-    return node
+    return _quote_expr(copy.deepcopy(node), all_known)
 
 
 def _rhs_is_type_construct(
@@ -425,8 +488,40 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
                     dyn_queue.append(cls_name)
         module_scope_names -= dyn_remove
 
+    # Phase 3d: Prune classes that depend on module-level functions at class-definition
+    # time. Functions are never hoisted (always runtime_out). If the class BODY
+    # (excluding method bodies, which only run at call time) references a local
+    # function, hoisting the class would crash at import time before the guard fires.
+    # We use _collect_class_body_names (non-recursive into function scopes) rather
+    # than _collect_free_names so that method-body refs to local functions don't
+    # cause unnecessary pruning.
+    local_function_names: set[str] = {
+        name for name, typ in child_types.items() if typ == 'function'
+    }
+    if local_function_names:
+        fn_remove: set[str] = set()
+        for cls_name in list(module_scope_names):
+            if cls_name not in child_tables:
+                continue
+            class_body_deps = _collect_class_body_names(child_tables[cls_name])
+            outer_deps = class_outer_deps.get(cls_name, set())
+            if (class_body_deps | outer_deps) & local_function_names:
+                fn_remove.add(cls_name)
+        # Cascade: classes that depended on just-removed classes also can't be hoisted
+        fn_queue = list(fn_remove)
+        while fn_queue:
+            removed = fn_queue.pop()
+            for cls_name in list(module_scope_names - fn_remove):
+                if cls_name not in child_tables:
+                    continue
+                deps = _collect_free_names(child_tables[cls_name]) | class_outer_deps.get(cls_name, set())
+                if removed in deps:
+                    fn_remove.add(cls_name)
+                    fn_queue.append(cls_name)
+        module_scope_names -= fn_remove
+
     # Names available at module scope: builtins, typing module names, anything that
-    # survived Phase 3b/3c, and names bound by safe imports (hoisted by Phase 4).
+    # survived Phase 3b/3c/3d, and names bound by safe imports (hoisted by Phase 4).
     # Used to guard Phase 4 assignment hoisting — if a RHS name isn't in this set
     # it won't be defined when the hoisted assignment runs.
     safe_import_bound: set[str] = set()
@@ -435,7 +530,7 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
             safe_import_bound.update(_import_bound_names(_node))
     module_scope_available = (
         _BUILTIN_TYPE_NAMES | _TYPING_MODULES | module_scope_names | safe_import_bound
-    )
+    ) - local_shadows
 
     # Phase 4: Classify each AST node using the symtable results
     type_import_lines: set[int] = set()
@@ -461,6 +556,12 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         # Phase 3b pruning (unsafe-import cascade) is respected here too.
         elif isinstance(node, ast.ClassDef):
             is_type_def = node.name in module_scope_names
+            if is_type_def and node.decorator_list:
+                # node.lineno is the 'class' keyword line; decorators sit above it.
+                # Extend start backwards so the decorator lines are hoisted with the
+                # class — otherwise a dangling decorator stays in runtime_out and
+                # silently decorates the next generated function.
+                start = node.decorator_list[0].lineno - 1
 
         # type aliases (Python 3.12+): type X = ...
         elif hasattr(ast, 'TypeAlias') and isinstance(node, ast.TypeAlias):
@@ -475,7 +576,9 @@ def _extract_type_definitions(code: str) -> Tuple[str, str, str]:
         # STATUS = SomeType can land in module_scope_names via BFS without
         # SomeType being checked, causing a NameError when hoisted.
         elif isinstance(node, ast.Assign):
-            target_in_scope = any(
+            # Require ALL targets to be in scope: a chained `a = b = expr` would
+            # drag non-scope targets to module scope if we used `any()` here.
+            target_in_scope = bool(node.targets) and all(
                 isinstance(t, ast.Name) and t.id in module_scope_names
                 for t in node.targets
             )
@@ -621,7 +724,13 @@ def _wrap_code_in_try_except(function_name: str, code: str) -> Tuple[str, str]:
         f"'{function_name}', function unavailable: \" + str(e))"
     )
 
-    body = runtime_code if runtime_code.strip() else 'pass'
+    # A comment-only runtime block is syntactically empty — `try:` with nothing
+    # but comments raises IndentationError. Check for at least one real statement.
+    has_code = any(
+        l.strip() and not l.strip().startswith('#')
+        for l in runtime_code.split('\n')
+    )
+    body = runtime_code if has_code else 'pass'
 
     # polyConfig is re-declared in every client function's try block within the same
     # __init__.py. Suppress the mypy no-redef error on that line in generated output.
