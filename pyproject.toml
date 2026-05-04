@@ -8,7 +8,7 @@ version = "0.3.18.dev7"
 description = "The Python Client for PolyAPI, the IPaaS by Developers for Developers"
 authors = [{ name = "PolyAPI", email = "support@polyapi.io" }]
 dependencies = [
-    "requests==2.32.3",
+    "requests==2.33.0",
     "typing_extensions==4.12.2",
     "jsonschema-gentypes==2.10.0",
     "pydantic==2.8.0",
