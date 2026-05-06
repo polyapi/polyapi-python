@@ -522,6 +522,8 @@ def _deduplicate_types(full_path: str, module_scope_types: str) -> str:
             continue
         
         start = getattr(node, 'lineno', 1) - 1
+        if isinstance(node, ast.ClassDef) and node.decorator_list:
+            start = node.decorator_list[0].lineno - 1
         end = getattr(node, 'end_lineno', None) or start + 1
         source = '\n'.join(lines[start:end])
         
