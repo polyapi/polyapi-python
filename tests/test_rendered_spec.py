@@ -1,5 +1,5 @@
 import unittest
-from mock import patch, Mock
+from unittest.mock import patch, Mock
 
 from polyapi.rendered_spec import get_and_update_rendered_spec
 
