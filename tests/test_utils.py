@@ -1,5 +1,5 @@
 import unittest
-from polyapi.utils import add_type_import_path, get_type_and_def, rewrite_reserved
+from polyapi.utils import add_type_import_path, get_type_and_def, rewrite_reserved, DotDict
 
 OPENAPI_FUNCTION = {
     "kind": "function",
@@ -107,3 +107,36 @@ class T(unittest.TestCase):
     def test_add_type_import_path_keeps_array_union_primitives_valid(self):
         arg_type = add_type_import_path("fooFunc", "Promise<string[] | null>")
         self.assertEqual(arg_type, "List[str] | None")
+
+
+class TestDotDict(unittest.TestCase):
+    def test_dot_access(self):
+        d = DotDict({"bye": "world"})
+        self.assertEqual(d.bye, "world")
+
+    def test_dict_access_still_works(self):
+        d = DotDict({"hello": "world"})
+        self.assertEqual(d["hello"], "world")
+
+    def test_nested_dot_access(self):
+        d = DotDict({"spider": {"bit": "man"}})
+        self.assertEqual(d.spider.bit, "man")
+
+    def test_nested_dict_access_still_works(self):
+        d = DotDict({"spider": {"bit": "man"}})
+        self.assertEqual(d["spider"]["bit"], "man")
+
+    def test_missing_key_raises_attribute_error(self):
+        d = DotDict({"hello": "world"})
+        with self.assertRaises(AttributeError):
+            _ = d.missing
+
+    def test_set_via_attribute(self):
+        d = DotDict({})
+        d.foo = "bar"
+        self.assertEqual(d["foo"], "bar")
+
+    def test_non_dict_values_returned_as_is(self):
+        d = DotDict({"count": 42, "tags": [1, 2, 3]})
+        self.assertEqual(d.count, 42)
+        self.assertEqual(d.tags, [1, 2, 3])

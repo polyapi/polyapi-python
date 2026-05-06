@@ -1,3 +1,5 @@
+import keyword
+import re
 import os
 import logging
 import tempfile
@@ -22,10 +24,37 @@ GET_TEMPLATE = """
         return resp.text
 """
 
+# Appended to GET_TEMPLATE for object variables with no schema; dict + dot access via DotDict
+GET_PARSED_TEMPLATE = """
+    @staticmethod
+    def get_parsed() -> "DotDict":
+        resp = variable_get("{variable_id}")
+        return DotDict(json.loads(resp.text))
+
+    @staticmethod
+    async def get_parsed_async() -> "DotDict":
+        resp = await variable_get_async("{variable_id}")
+        return DotDict(json.loads(resp.text))
+"""
+
+# Appended to GET_TEMPLATE for schema-backed object variables; uses _from_json to handle
+# field name sanitization and provides both dot and dict access via __getitem__
+GET_PARSED_SCHEMA_TEMPLATE = """
+    @staticmethod
+    def get_parsed() -> "{parsed_type}":
+        resp = variable_get("{variable_id}")
+        return {parsed_type}._from_json(json.loads(resp.text))
+
+    @staticmethod
+    async def get_parsed_async() -> "{parsed_type}":
+        resp = await variable_get_async("{variable_id}")
+        return {parsed_type}._from_json(json.loads(resp.text))
+"""
+
 
 TEMPLATE = """
 from polyapi.poly.client_id import client_id
-
+{type_class}
 
 class {variable_name}:{get_method}
     variable_id = "{variable_id}"
@@ -97,21 +126,90 @@ def generate_variables(variables: List[VariableSpecDto]):
             logging.warning(f"  - {failed_var}")
 
 
+def _sanitize_field_name(name: str) -> str:
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    if sanitized and sanitized[0].isdigit():
+        sanitized = '_' + sanitized
+    if keyword.iskeyword(sanitized):
+        sanitized = sanitized + '_'
+    return sanitized or '_field'
+
+
+def _schema_to_dataclass(variable_name: str, schema: dict) -> tuple:
+    """Generate a @dataclass from a variable's JSON schema properties.
+
+    Returns (class_name, class_code), or (None, None) if schema has no properties.
+    """
+    properties = schema.get("properties", {})
+    if not properties:
+        return None, None
+
+    required = set(schema.get("required", []))
+    class_name = "".join(w.capitalize() for w in variable_name.replace("-", "_").split("_"))
+
+    _TYPE_MAP = {"string": "str", "integer": "int", "number": "float", "boolean": "bool", "object": "Dict", "array": "List"}
+
+    # Map each JSON key to a valid Python identifier; track remapped keys for runtime use
+    all_names = {prop: _sanitize_field_name(prop) for prop in properties}
+    field_map = {orig: san for orig, san in all_names.items() if orig != san}
+
+    req_fields, opt_fields = [], []
+    for prop, prop_schema in properties.items():
+        py_type = _TYPE_MAP.get(prop_schema.get("type", "string"), "Any")
+        py_attr = all_names[prop]
+        if prop in required:
+            req_fields.append(f"    {py_attr}: {py_type}")
+        else:
+            opt_fields.append(f"    {py_attr}: Optional[{py_type}] = field(default=None)")
+
+    lines = ["from dataclasses import dataclass, field", "", "@dataclass", f"class {class_name}:"]
+    lines.extend(req_fields)
+    lines.extend(opt_fields)
+    if not req_fields and not opt_fields:
+        lines.append("    pass")
+
+    map_repr = repr(field_map)
+    lines.extend([
+        "",
+        "    @classmethod",
+        f"    def _from_json(cls, data: dict) -> \"{class_name}\":",
+        f"        _map = {map_repr}",
+        "        return cls(**{_map.get(k, k): v for k, v in data.items()})",
+        "",
+        "    def __getitem__(self, key: str):",
+        f"        _map = {map_repr}",
+        "        return getattr(self, _map.get(key, key))",
+    ])
+
+    return class_name, "\n".join(lines)
+
+
 def render_variable(variable: VariableSpecDto):
     variable_type = _get_variable_type(variable["variable"]["valueType"])
-    # Only include get() method if secrecy is not SECRET
-    get_method = (
-        ""
-        if variable["variable"]["secrecy"] == "SECRET"
-        else GET_TEMPLATE.format(
-            variable_id=variable["id"], variable_type=variable_type
-        )
-    )
+    is_secret = variable["variable"]["secrecy"] == "SECRET"
+    is_object = variable_type in ("Dict", "Any")
+
+    schema = variable["variable"]["valueType"].get("schema", {})
+    class_name, type_class_code = _schema_to_dataclass(variable["name"], schema) if schema else (None, None)
+    parsed_type = class_name or "DotDict"
+    type_class = f"\n{type_class_code}\n" if type_class_code else ""
+
+    if is_secret:
+        get_method = ""
+    else:
+        get_method = GET_TEMPLATE.format(variable_id=variable["id"], variable_type=variable_type)
+        if is_object:
+            if class_name:
+                get_method += GET_PARSED_SCHEMA_TEMPLATE.format(variable_id=variable["id"], parsed_type=parsed_type)
+            else:
+                get_method += GET_PARSED_TEMPLATE.format(variable_id=variable["id"])
+
     return TEMPLATE.format(
         variable_name=variable["name"],
         variable_id=variable["id"],
         variable_type=variable_type,
         get_method=get_method,
+        type_class=type_class,
     )
 
 
