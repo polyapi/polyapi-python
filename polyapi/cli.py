@@ -1,4 +1,6 @@
 import os
+import sys
+import tempfile
 import argparse
 
 from polyapi.utils import print_green, print_red
@@ -23,6 +25,16 @@ def _get_version_string():
 
 
 def execute_from_cli():
+    # Redirect __pycache__ out of generated dirs to avoid window file-locking
+    # failures when rmtree dels on generate.
+    if 'PYTHONPYCACHEPREFIX' not in os.environ:
+        cache_dir = os.path.join(tempfile.gettempdir(), 'polyapi_pycache')
+        os.makedirs(cache_dir, exist_ok=True)
+        # here for children just in case
+        os.environ['PYTHONPYCACHEPREFIX'] = cache_dir
+        # For the startup py_initialize issue 
+        sys.pycache_prefix = cache_dir
+
     # First we setup all our argument parsing logic
     # Then we parse the arguments (waaay at the bottom)
     parser = argparse.ArgumentParser(
@@ -114,7 +126,7 @@ def execute_from_cli():
     fn_add_parser.add_argument("--client", action="store_true", help="Marks the function as a client function")
     fn_add_parser.add_argument("--logs", choices=["enabled", "disabled"], default=None, help="Enable or disable logs for the function.")
     fn_add_parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
-    fn_add_parser.add_argument("--disable-ai", "--skip-generate", action="store_true", help="Pass --disable-ai skip AI generation of missing descriptions")
+    fn_add_parser.add_argument("--skip-generate", action="store_true", help="Skip running generate after function add command, especially useful if you are deploying a bunch of functions at once. Run generate manually at the end!")
     fn_add_parser.add_argument("--generate-contexts", type=str, help="Server function only – only include certain contexts to speed up function execution")
     fn_add_parser.add_argument("--visibility", type=str, default="environment", help="Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive")
 
@@ -147,7 +159,7 @@ def execute_from_cli():
             client=args.client,
             server=args.server,
             logs_enabled=logs_enabled,
-            generate=not args.disable_ai,
+            generate=not args.skip_generate,
             execution_api_key=args.execution_api_key,
             generate_contexts=args.generate_contexts,
             visibility=visibility

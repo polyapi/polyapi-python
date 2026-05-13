@@ -4,6 +4,7 @@ import uuid
 import shutil
 import logging
 import tempfile
+import stat
 
 from copy import deepcopy
 from typing import Any, List, Optional, Tuple, cast
@@ -209,23 +210,33 @@ def get_tables(specs: List[SpecificationDto]) -> List[TableSpecDto]:
     return [cast(TableSpecDto, spec) for spec in specs if spec["type"] == "table"]
 
 
+def _rmtree_readonly_handler(func, path, exc):
+    # Windows marks __pycache__ .pyc files read-only; clear the bit and retry.
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
+def _rmtree(path):
+    shutil.rmtree(path, onerror=_rmtree_readonly_handler)
+
+
 def remove_old_library():
     currdir = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(currdir, "poly")
     if os.path.exists(path):
-        shutil.rmtree(path)
+        _rmtree(path)
 
     path = os.path.join(currdir, "vari")
     if os.path.exists(path):
-        shutil.rmtree(path)
+        _rmtree(path)
 
     path = os.path.join(currdir, "schemas")
     if os.path.exists(path):
-        shutil.rmtree(path)
+        _rmtree(path)
 
     path = os.path.join(currdir, "tabi")
     if os.path.exists(path):
-        shutil.rmtree(path)
+        _rmtree(path)
 
 
 def create_empty_schemas_module():
@@ -399,7 +410,21 @@ def clear() -> None:
 
 def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
     function_type = spec["type"]
-    function_description = spec["description"]
+    raw_description = spec.get("description", "")
+    def _flatten_description(value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            flat: List[str] = []
+            for item in value:
+                flat.extend(_flatten_description(item))
+            return flat
+        return [str(value)]
+
+    if isinstance(raw_description, str):
+        function_description = raw_description
+    else:
+        function_description = "\n".join(_flatten_description(raw_description))
     function_name = spec["name"]
     function_context = spec["context"]
     function_id = spec["id"]

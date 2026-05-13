@@ -71,6 +71,43 @@ def print_red(s: str):
     print(Fore.RED + s + Style.RESET_ALL)
 
 
+def normalize_cross_language_type(type_name: str) -> str:
+    value = (type_name or "").strip()
+    if not value:
+        return "Any"
+
+    primitive_map = {
+        "string": "str",
+        "number": "float",
+        "integer": "int",
+        "boolean": "bool",
+        "null": "None",
+        "void": "None",
+        "any": "Any",
+        "object": "Dict",
+    }
+
+    if value.startswith("Promise<") and value.endswith(">"):
+        return normalize_cross_language_type(value[len("Promise<"):-1])
+
+    if value.startswith("Awaited<") and value.endswith(">"):
+        return normalize_cross_language_type(value[len("Awaited<"):-1])
+
+    if value.endswith("[]"):
+        item_type = normalize_cross_language_type(value[:-2])
+        return f"List[{item_type}]"
+
+    if "|" in value:
+        parts = [p.strip() for p in value.split("|") if p.strip()]
+        normalized = [normalize_cross_language_type(part) for part in parts]
+        return " | ".join(normalized) if normalized else "Any"
+
+    if value == "ReturnType" or value.startswith("ReturnType<") or "typeof" in value:
+        return "Any"
+
+    return primitive_map.get(value, value)
+
+
 def to_type_module_alias(function_name: str) -> str:
     """Return the internal alias used for a function's generated type module."""
     return f"_{to_func_namespace(function_name)}_types"
@@ -81,6 +118,14 @@ def add_type_import_path(function_name: str, arg: str) -> str:
     # from now, we start qualifying non-basic types :)) 
     # e.g. Callable[[EmailAddress, Dict, Dict, Dict], None]
         # becomes Callable[[Set_profile_email.EmailAddress, Dict, Dict, Dict], None]
+    arg = normalize_cross_language_type(arg)
+
+    if "|" in arg:
+        return " | ".join(
+            add_type_import_path(function_name, token.strip())
+            for token in arg.split("|")
+            if token.strip()
+        )
     type_module_alias = to_type_module_alias(function_name)
     
     if arg.startswith("Callable"):
@@ -96,7 +141,7 @@ def add_type_import_path(function_name: str, arg: str) -> str:
         return "Callable[" + ",".join(qualified) + "]"
         # return arg
 
-    if arg in BASIC_PYTHON_TYPES:
+    if arg == "Any" or arg in BASIC_PYTHON_TYPES:
         return arg
 
     if arg.startswith("List["):
@@ -127,14 +172,23 @@ def get_type_and_def(
         return "Any", ""
     
     if type_spec["kind"] == "plain":
-        value = type_spec.get("value", "")
+        value = normalize_cross_language_type(type_spec.get("value", ""))
+
+        if "|" in value or value in BASIC_PYTHON_TYPES:
+            return value, ""
+
         if value.endswith("[]"):
-            primitive = map_primitive_types(value[:-2])
+            primitive = normalize_cross_language_type(value[:-2])
+            if primitive not in BASIC_PYTHON_TYPES:
+                primitive = map_primitive_types(primitive)
             return f"List[{primitive}]", ""
         else:
             return map_primitive_types(value), ""
     elif type_spec["kind"] == "primitive":
-        return map_primitive_types(type_spec.get("type", "any")), ""
+        primitive = normalize_cross_language_type(type_spec.get("type", "any"))
+        if primitive in BASIC_PYTHON_TYPES:
+            return primitive, ""
+        return map_primitive_types(primitive), ""
     elif type_spec["kind"] == "array":
         if type_spec.get("items"):
             items = type_spec["items"]

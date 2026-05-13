@@ -1,5 +1,5 @@
 import unittest
-from polyapi.utils import get_type_and_def, rewrite_reserved
+from polyapi.utils import add_type_import_path, get_type_and_def, rewrite_reserved
 
 OPENAPI_FUNCTION = {
     "kind": "function",
@@ -84,3 +84,26 @@ class T(unittest.TestCase):
     def test_rewrite_reserved(self):
         rv = rewrite_reserved("from")
         self.assertEqual(rv, "_from")
+
+    def test_plain_return_type_utility_normalizes_to_any(self):
+        arg_type, arg_def = get_type_and_def({"kind": "plain", "value": "ReturnType<typeof fooFunc>"})
+        self.assertEqual(arg_type, "Any")
+        self.assertEqual(arg_def, "")
+
+    def test_plain_promise_union_normalizes_to_python_union(self):
+        arg_type, arg_def = get_type_and_def({"kind": "plain", "value": "Promise<string | null>"})
+        self.assertEqual(arg_type, "str | None")
+        self.assertEqual(arg_def, "")
+
+    def test_add_type_import_path_never_qualifies_return_type_utility(self):
+        arg_type = add_type_import_path("fooFunc", "ReturnType<typeof fooFunc>")
+        self.assertEqual(arg_type, "Any")
+
+    def test_plain_promise_array_union_normalizes_to_python_union(self):
+        arg_type, arg_def = get_type_and_def({"kind": "plain", "value": "Promise<string[] | null>"})
+        self.assertEqual(arg_type, "List[str] | None")
+        self.assertEqual(arg_def, "")
+
+    def test_add_type_import_path_keeps_array_union_primitives_valid(self):
+        arg_type = add_type_import_path("fooFunc", "Promise<string[] | null>")
+        self.assertEqual(arg_type, "List[str] | None")
