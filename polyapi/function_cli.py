@@ -49,6 +49,10 @@ def function_add_or_update(
     if logs_enabled is None:
         logs_enabled = parsed["config"].get("logs_enabled", None)
 
+    toolkit = parsed["config"].get("toolkit", None)
+    # not actually handled right now
+    toolkitBuild = parsed["config"].get("toolkit_rebuild", False)
+
     data = {
         "context": context or parsed["context"],
         "name": name,
@@ -59,6 +63,8 @@ def function_add_or_update(
         "returnType": get_jsonschema_type(return_type),
         "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])} for p in parsed["types"]["params"]],
         "logsEnabled": logs_enabled,
+        "toolkit": toolkit,
+        "toolkitBuild": toolkitBuild,
     }
 
     if generate_contexts:
