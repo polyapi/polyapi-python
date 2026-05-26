@@ -26,7 +26,8 @@ def function_add_or_update(
     generate_contexts: Optional[str],
     visibility: Optional[str],
     generate: bool = True,
-    execution_api_key: str = ""
+    execution_api_key: str = "",
+    skip_toolkit_build: bool = False,
 ):
     verb = "Updating" if _func_already_exists(context, name) else "Adding"
     ftype = "server" if server else "client"
@@ -39,19 +40,16 @@ def function_add_or_update(
     parsed = parse_function_code(code, name, context)
     return_type = parsed["types"]["returns"]["type"]
 
+    if "dependencies" not in parsed:
+        parsed["dependencies"] = []
+
     if not return_type:
         print_red("ERROR")
-        print(
-            f"Function {name} not found as top-level function in {name}"
-        )
+        print(f"Function {name} not found as top-level function in {name}")
         sys.exit(1)
 
     if logs_enabled is None:
         logs_enabled = parsed["config"].get("logs_enabled", None)
-
-    toolkit = parsed["config"].get("toolkit", None)
-    # not actually handled right now
-    toolkitBuild = parsed["config"].get("toolkit_rebuild", False)
 
     data = {
         "context": context or parsed["context"],
@@ -61,10 +59,12 @@ def function_add_or_update(
         "language": "python",
         "visibility": visibility or "ENVIRONMENT",
         "returnType": get_jsonschema_type(return_type),
-        "arguments": [{**p, "key": p["name"], "type": get_jsonschema_type(p["type"])} for p in parsed["types"]["params"]],
+        "arguments": [
+            {**p, "key": p["name"], "type": get_jsonschema_type(p["type"])}
+            for p in parsed["types"]["params"]
+        ],
         "logsEnabled": logs_enabled,
-        "toolkit": toolkit,
-        "toolkitBuild": toolkitBuild,
+        "skipToolkitBuild": skip_toolkit_build,
     }
 
     if generate_contexts:
@@ -100,6 +100,7 @@ def function_add_or_update(
         if generate:
             # Use cached generate arguments when regenerating after function deployment
             from polyapi.generate import generate_from_cache
+
             generate_from_cache()
     else:
         print("Error adding function.")
