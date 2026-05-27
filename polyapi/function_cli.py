@@ -63,12 +63,14 @@ def function_add_or_update(
             {**p, "key": p["name"], "type": get_jsonschema_type(p["type"])}
             for p in parsed["types"]["params"]
         ],
-        "logsEnabled": logs_enabled,
-        "skipToolkitBuild": skip_toolkit_build,
+        "logsEnabled": logs_enabled
     }
 
     if generate_contexts:
         data["generateContexts"] = generate_contexts.split(",")
+
+    if server:
+        data["skipToolkitBuild"] = skip_toolkit_build
 
     if server and parsed["dependencies"]:
         print_yellow(
