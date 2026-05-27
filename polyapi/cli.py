@@ -45,8 +45,8 @@ def execute_from_cli():
     
     # Add global --version/-v flag
     parser.add_argument('-v', '--version', action='version', 
-                       version=_get_version_string(),
-                       help="Show version information")
+                        version=_get_version_string(),
+                        help="Show version information")
 
     subparsers = parser.add_subparsers(help="Available commands")
 
@@ -95,7 +95,7 @@ def execute_from_cli():
         # overwrite all cached values with the values passed in from the command line
         final_contexts = contexts
         final_names = names
-        final_ids = ids
+        # final_ids = ids
         final_no_types = no_types
         
         # cache the values used for this explicit generate command
@@ -127,6 +127,7 @@ def execute_from_cli():
     fn_add_parser.add_argument("--logs", choices=["enabled", "disabled"], default=None, help="Enable or disable logs for the function.")
     fn_add_parser.add_argument("--execution-api-key", required=False, default="", help="API key for execution (for server functions only).")
     fn_add_parser.add_argument("--skip-generate", action="store_true", help="Skip running generate after function add command, especially useful if you are deploying a bunch of functions at once. Run generate manually at the end!")
+    fn_add_parser.add_argument("--skip-toolkit-build", action="store_true", help="Skip rebuilding the toolkit after adding/updating the function")
     fn_add_parser.add_argument("--generate-contexts", type=str, help="Server function only – only include certain contexts to speed up function execution")
     fn_add_parser.add_argument("--visibility", type=str, default="environment", help="Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive")
 
@@ -162,7 +163,8 @@ def execute_from_cli():
             generate=not args.skip_generate,
             execution_api_key=args.execution_api_key,
             generate_contexts=args.generate_contexts,
-            visibility=visibility
+            visibility=visibility,
+            skip_toolkit_build=args.skip_toolkit_build
         )
 
     fn_add_parser.set_defaults(command=add_function)
