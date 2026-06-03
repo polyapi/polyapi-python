@@ -16,5 +16,4 @@ fi
 	polyapi/generate.py \
 	polyapi/http_client.py \
 	polyapi/schema.py \
-	polyapi/schemas/__init__.py \
 	polyapi/utils.py
