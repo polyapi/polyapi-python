@@ -2,7 +2,11 @@ import unittest
 
 from polyapi.utils import to_type_module_alias
 
-from .test_api import TWILIO
+try:
+    from .test_api import TWILIO
+except ImportError:
+    # Supports `python -m unittest discover tests` where modules are imported top-level.
+    from test_api import TWILIO
 from polyapi.server import render_server_function
 
 GET_PRODUCTS_COUNT = {
