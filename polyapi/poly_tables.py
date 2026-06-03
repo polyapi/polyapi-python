@@ -130,11 +130,11 @@ def _transform_keys(obj: Any) -> Any:
 
 
 def transform_query(query: dict) -> dict:
-    if query["where"] or query["order_by"]:
+    if query.get("where") or query.get("order_by"):
         return {
             **query,
-            "where": _transform_keys(query["where"]) if query["where"] else None,
-            "orderBy": query["order_by"] if query["order_by"] else None,
+            "where": _transform_keys(query["where"]) if query.get("where") else None,
+            "orderBy": query["order_by"] if query.get("order_by") else None,
         }
 
     return query
