@@ -158,7 +158,7 @@ def add_type_import_path(function_name: str, arg: str) -> str:
     return f"{type_module_alias}.{camelCase(arg)}"
 
 
-def get_type_and_def(
+def get_type_and_def(  # noqa: C901
     type_spec: PropertyType, title_fallback: str = ""
 ) -> Tuple[str, str]:
     """ returns type and type definition for a given PropertyType
