@@ -8,6 +8,8 @@ else
 	PYTHON_BIN="python3"
 fi
 
+pip install -r requirements.txt
+
 "${PYTHON_BIN}" -m mypy \
 	--follow-imports=skip \
 	--install-types \
