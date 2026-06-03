@@ -11,6 +11,7 @@ fi
 "${PYTHON_BIN}" -m mypy \
 	--follow-imports=skip \
 	--install-types \
+	--non-interactive \
 	polyapi/config.py \
 	polyapi/execute.py \
 	polyapi/generate.py \
