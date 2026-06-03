@@ -190,7 +190,7 @@ def get_type_and_def(
             return primitive, ""
         return map_primitive_types(primitive), ""
     elif type_spec["kind"] == "array":
-        if type_spec.get("items"):
+        if "items" in type_spec and isinstance(type_spec["items"], dict):
             items = type_spec["items"]
             if items.get("$ref"):
                 # For no-types mode, avoid complex schema generation
@@ -208,7 +208,7 @@ def get_type_and_def(
     elif type_spec["kind"] == "void":
         return "None", ""
     elif type_spec["kind"] == "object":
-        if type_spec.get("schema"):
+        if "schema" in type_spec and isinstance(type_spec["schema"], dict):
             schema = type_spec["schema"]
             title = schema.get("title", schema.get("name", title_fallback))
             if title and schema.get("type") == "array":
