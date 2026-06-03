@@ -2,7 +2,7 @@ import keyword
 import re
 import os
 from urllib.parse import urlparse
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, cast
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
 from polyapi.typedefs import PropertySpecification, PropertyType
@@ -210,7 +210,10 @@ def get_type_and_def(  # noqa: C901
     elif type_spec["kind"] == "object":
         if "schema" in type_spec and isinstance(type_spec["schema"], dict):
             schema = type_spec["schema"]
-            title = schema.get("title", schema.get("name", title_fallback))
+            title = cast(str, schema.get("title", schema.get("name", title_fallback)))
+            if not isinstance(title, str):
+                raise ValueError("Title must be a string, this should never happen due to the fallback, but got: {}".format(title))
+
             if title and schema.get("type") == "array":
                 # TODO fix me
                 # we don't use ReturnType as name for the list type here, we use _ReturnTypeItem

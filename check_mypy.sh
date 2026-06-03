@@ -8,7 +8,7 @@ else
 	PYTHON_BIN="python3"
 fi
 
-pip install -r requirements.txt
+"${PYTHON_BIN}" -m pip install -q -r requirements.txt >/dev/null
 
 "${PYTHON_BIN}" -m mypy \
 	--follow-imports=skip \
