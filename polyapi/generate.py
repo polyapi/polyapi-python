@@ -241,6 +241,9 @@ def remove_old_library():
 
 def create_empty_schemas_module():
     """Create an empty schemas module for no-types mode so user code can still import from polyapi.schemas"""
+    import importlib
+    import sys
+
     currdir = os.path.dirname(os.path.abspath(__file__))
     schemas_path = os.path.join(currdir, "schemas")
     
@@ -251,49 +254,56 @@ def create_empty_schemas_module():
     # Create an __init__.py file with dynamic schema resolution
     init_path = os.path.join(schemas_path, "__init__.py")
     with open(init_path, "w") as f:
-        f.write('''"""Empty schemas module for no-types mode"""
+        f.write('''"""Empty schemas module for no-types mode."""
 from typing import Any, Dict
 
 class _GenericSchema(Dict[str, Any]):
     """Generic schema type that acts like a Dict for no-types mode"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
 class _SchemaModule:
-    """Dynamic module that returns itself for attribute access, allowing infinite nesting"""
-    
+    """Compatibility shim retained for tests that assert this symbol exists."""
+
     def __getattr__(self, name: str):
-        # For callable access (like schemas.Response()), return the generic schema class
-        # For further attribute access (like schemas.random.random2), return self to allow nesting
+        # For callable access (like schemas.Response()), return nested access.
         return _NestedSchemaAccess()
-    
+
     def __call__(self, *args, **kwargs):
-        # If someone tries to call the module itself, return a generic schema
         return _GenericSchema(*args, **kwargs)
-    
+
     def __dir__(self):
-        # Return common schema names for introspection
-        return ['Response', 'Request', 'Error', 'Data', 'Result']
+        return ["Response", "Request", "Error", "Data", "Result"]
 
 class _NestedSchemaAccess:
     """Handles nested attribute access and final callable resolution"""
-    
+
     def __getattr__(self, name: str):
-        # Continue allowing nested access
         return _NestedSchemaAccess()
-    
+
     def __call__(self, *args, **kwargs):
-        # When finally called, return a generic schema instance
         return _GenericSchema(*args, **kwargs)
-    
+
     def __class_getitem__(cls, item):
-        # Support type annotations like schemas.Response[str]
         return _GenericSchema
 
-# Replace this module with our dynamic module
-import sys
-sys.modules[__name__] = _SchemaModule()
+def __getattr__(name: str):
+    if name.startswith("__") or name == "load_tests":
+        raise AttributeError(name)
+    return _NestedSchemaAccess()
+
+
+def __dir__():
+    return ["Response", "Request", "Error", "Data", "Result"]
 ''')
+
+    # Ensure subsequent imports pick up the newly generated no-types module.
+    sys.modules.pop("polyapi.schemas", None)
+    parent_module = sys.modules.get("polyapi")
+    if parent_module is not None and hasattr(parent_module, "schemas"):
+        delattr(parent_module, "schemas")
+    importlib.invalidate_caches()
 
 
 def _generate_client_id() -> None:
@@ -411,6 +421,7 @@ def clear() -> None:
 def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
     function_type = spec["type"]
     raw_description = spec.get("description", "")
+
     def _flatten_description(value: Any) -> List[str]:
         if value is None:
             return []

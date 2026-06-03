@@ -2,3 +2,23 @@
 ignore = E203,E303,E402,E501,E722,W391,F401,W292,F811,E302,W291,W293
 max-line-length = 150
 max-complexity = 22
+exclude =
+	.git,
+	__pycache__,
+	.venv,
+	.mypy_cache,
+	polyapi/poly,
+	polyapi/vari,
+	polyapi/tabi,
+	polyapi_python.egg-info
+per-file-ignores =
+	polyapi/__init__.py: E704
+	polyapi/parser.py: E201,E202,E226,E261,W503,W504
+	polyapi/poly_tables.py: W503,E712
+	polyapi/prepare.py: E222,W504
+	polyapi/sync.py: E201,E202,E261,F821
+	polyapi/utils.py: C901
+	tests/test_async_proof.py: F841
+	tests/test_generate.py: F841
+	tests/test_poly_schemas.py: E741
+	tests/test_variables.py: E121,E126

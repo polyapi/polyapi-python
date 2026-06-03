@@ -115,9 +115,9 @@ def to_type_module_alias(function_name: str) -> str:
 
 def add_type_import_path(function_name: str, arg: str) -> str:
     """if not basic type, coerce to camelCase and add the import path"""
-    # from now, we start qualifying non-basic types :)) 
+    # from now, we start qualifying non-basic types :))
     # e.g. Callable[[EmailAddress, Dict, Dict, Dict], None]
-        # becomes Callable[[Set_profile_email.EmailAddress, Dict, Dict, Dict], None]
+    # becomes Callable[[Set_profile_email.EmailAddress, Dict, Dict, Dict], None]
     arg = normalize_cross_language_type(arg)
 
     if "|" in arg:

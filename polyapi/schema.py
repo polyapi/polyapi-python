@@ -122,6 +122,10 @@ INVALID_ESCAPE_PATTERNS = [
     (re.compile(r'\\([^nrtbfav"\'\\])', re.DOTALL), r'\\\\\1'),
 ]
 
+# jsonschema_gentypes may emit raw triple-quoted docstrings (r"""...""").
+# Normalize these to plain docstrings to keep generated output stable.
+RAW_TRIPLE_QUOTE_PATTERN = re.compile(r'(^\s*)r(["\']{3})', re.MULTILINE)
+
 
 def clean_malformed_examples(example: str) -> str:
     """ there is a bug in the `jsonschmea_gentypes` library where if an example from a jsonchema is an object,
@@ -149,6 +153,8 @@ def clean_malformed_examples(example: str) -> str:
     # Fix invalid escape sequences in docstrings
     for pattern, replacement in INVALID_ESCAPE_PATTERNS:
         cleaned_example = pattern.sub(replacement, cleaned_example)
+
+    cleaned_example = RAW_TRIPLE_QUOTE_PATTERN.sub(r'\1\2', cleaned_example)
     
     return cleaned_example
 
