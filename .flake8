@@ -17,7 +17,6 @@ per-file-ignores =
 	polyapi/poly_tables.py: W503,E712
 	polyapi/prepare.py: E222,W504
 	polyapi/sync.py: E201,E202,E261,F821
-	polyapi/utils.py: C901
 	tests/test_async_proof.py: F841
 	tests/test_generate.py: F841
 	tests/test_poly_schemas.py: E741
