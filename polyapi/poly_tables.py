@@ -85,7 +85,7 @@ def execute_query(table_id, method, query):
 
         auth_key = polyCustom.get("executionApiKey") or api_key
         url = f"{base_url.rstrip('/')}/tables/{table_id}/{method}?clientId={client_id}"
-        headers = {"x-poly-execution-id": polyCustom.get("executionId")}
+        headers = {"x-poly-execution-id": polyCustom.get("executionId") or ""}
         if auth_key:
             headers["Authorization"] = f"Bearer {auth_key}"
         response = http_client.post(url, json=query, headers=headers)
