@@ -25,9 +25,9 @@ def function_add_or_update(
     logs_enabled: Optional[bool],
     generate_contexts: Optional[str],
     visibility: Optional[str],
+    image: Optional[str],
     generate: bool = True,
     execution_api_key: str = "",
-    skip_toolkit_build: bool = False,
 ):
     verb = "Updating" if _func_already_exists(context, name) else "Adding"
     ftype = "server" if server else "client"
@@ -69,8 +69,8 @@ def function_add_or_update(
     if generate_contexts:
         data["generateContexts"] = generate_contexts.split(",")
 
-    if server:
-        data["skipToolkitBuild"] = skip_toolkit_build
+    if server and image:
+        data["image"] = image
 
     if server and parsed["dependencies"]:
         print_yellow(
