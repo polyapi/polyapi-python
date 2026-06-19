@@ -58,7 +58,7 @@ print(poly.polyapi.function.api.list(my_server, my_api_key))
 To add a new server function, please follow the quickstart. Then you can add a server function like so:
 
 ```bash
-python -m polyapi --context mycontext --description mydesc --server function add <function_name> foo.py
+python -m polyapi function add <function_name> foo.py --server --context mycontext --description mydesc
 ```
 
 The code in `foo.py` should contain a single defined function named the same as your `<function_name>` variable.
