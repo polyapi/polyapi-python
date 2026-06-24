@@ -1,0 +1,92 @@
+name: Build Base SFX Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      polyapi_python_version:
+        description: polyapi_python package version
+        required: true
+
+jobs:
+  build-and-push:
+    name: Build and push polyapi_python base image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Install kn func CLI
+        run: |
+          curl -fsSL -o /tmp/func \
+            https://github.com/knative/func/releases/download/knative-v1.15.0/func_linux_amd64
+          chmod +x /tmp/func
+          sudo mv /tmp/func /usr/local/bin/func
+          func version
+
+      - name: Create Python function scaffold
+        run: |
+          set -euo pipefail
+          POLYAPI_PYTHON_VERSION_SAFE="$(printf '%s' "${{ github.event.inputs.polyapi_python_version }}" | tr '.' '-')"
+          FUNC_DIR="${RUNNER_TEMP}/polyapi-py-${POLYAPI_PYTHON_VERSION_SAFE}-base"
+          rm -rf "$FUNC_DIR"
+          mkdir -p "$FUNC_DIR"
+          (
+            cd "$FUNC_DIR"
+            func create -l python
+          )
+          echo "FUNC_DIR=$FUNC_DIR" >> "$GITHUB_ENV"
+
+      - name: Write requirements.txt dependencies
+        run: |
+          set -euo pipefail
+          cat > "${FUNC_DIR}/requirements.txt" <<EOF
+          parliament-functions==0.1.0
+          cloudevents==1.12.1
+          polyapi-python==${{ github.event.inputs.polyapi_python_version }}
+          EOF
+          echo "Final requirements.txt:"
+          cat "${FUNC_DIR}/requirements.txt"
+
+      - name: Normalize func.yaml build settings
+        run: |
+          set -euo pipefail
+          CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > "${FUNC_DIR}/func.yaml" <<EOF
+          specVersion: 0.36.0
+          name: polyapi-py-${{ github.event.inputs.polyapi_python_version }}-base
+          runtime: python
+          created: ${CREATED}
+          build:
+            builderImages:
+              pack: ghcr.io/knative/builder-jammy-base:latest
+            builder: pack
+            buildEnvs:
+              - name: BP_CPYTHON_VERSION
+                value: "3.12.*"
+          EOF
+          echo "Final func.yaml:"
+          cat "${FUNC_DIR}/func.yaml"
+
+      - name: Build and push image with kn func
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/polyapi/polyapi-py-${{ github.event.inputs.polyapi_python_version }}-base:latest"
+          func build --image "$IMAGE" --push=true -p "$FUNC_DIR" --verbose
+
+      - name: Verify pushed image
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/polyapi/polyapi-py-${{ github.event.inputs.polyapi_python_version }}-base:latest"
+          docker pull "$IMAGE"
+          echo "Published image: $IMAGE"
