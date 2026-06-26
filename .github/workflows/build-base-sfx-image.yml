@@ -6,11 +6,25 @@ on:
       polyapi_python_version:
         description: polyapi_python package version
         required: true
+  workflow_run:
+    workflows:
+      - Update python pip package
+    types:
+      - completed
+    branches:
+      - develop
+      - main
 
 jobs:
   build-and-push:
     name: Build and push polyapi_python base image
     runs-on: ubuntu-latest
+    concurrency:
+      group: build-base-sfx-${{ github.event.inputs.polyapi_python_version || github.event.workflow_run.head_sha || github.sha }}
+      cancel-in-progress: false
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     permissions:
       contents: read
       packages: write
@@ -18,6 +32,48 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve polyapi-python version
+        id: resolve-version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.polyapi_python_version }}"
+          else
+            VERSION="$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          fi
+
+          if [ -z "$VERSION" ]; then
+            echo "Could not resolve polyapi-python version" >&2
+            exit 1
+          fi
+
+          echo "polyapi_python_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Using polyapi-python version: $VERSION"
+
+      - name: Wait for polyapi-python release on PyPI
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.resolve-version.outputs.polyapi_python_version }}"
+          MAX_ATTEMPTS=30
+          SLEEP_SECONDS=20
+
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            if curl --silent --fail --head "https://pypi.org/pypi/polyapi-python/${VERSION}/json" >/dev/null; then
+              echo "polyapi-python==$VERSION is available on PyPI"
+              exit 0
+            fi
+
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "Timed out waiting for polyapi-python==$VERSION to appear on PyPI" >&2
+              exit 1
+            fi
+
+            echo "Attempt $attempt/$MAX_ATTEMPTS: polyapi-python==$VERSION not visible yet, retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -26,7 +82,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      - name: Check if base image already exists
+        id: check-image
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.resolve-version.outputs.polyapi_python_version }}"
+          IMAGE="ghcr.io/polyapi/polyapi-py-${VERSION}-base:latest"
+
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "base image already exists, skipping"
+            echo "image_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "base image does not exist, continuing build"
+            echo "image_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install kn func CLI
+        if: steps.check-image.outputs.image_exists != 'true'
         run: |
           curl -fsSL -o /tmp/func \
             https://github.com/knative/func/releases/download/knative-v1.15.0/func_linux_amd64
@@ -35,9 +107,10 @@ jobs:
           func version
 
       - name: Create Python function scaffold
+        if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
-          POLYAPI_PYTHON_VERSION_SAFE="$(printf '%s' "${{ github.event.inputs.polyapi_python_version }}" | tr '.' '-')"
+          POLYAPI_PYTHON_VERSION_SAFE="$(printf '%s' "${{ steps.resolve-version.outputs.polyapi_python_version }}" | tr '.' '-')"
           FUNC_DIR="${RUNNER_TEMP}/polyapi-py-${POLYAPI_PYTHON_VERSION_SAFE}-base"
           rm -rf "$FUNC_DIR"
           mkdir -p "$FUNC_DIR"
@@ -48,23 +121,25 @@ jobs:
           echo "FUNC_DIR=$FUNC_DIR" >> "$GITHUB_ENV"
 
       - name: Write requirements.txt dependencies
+        if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
           cat > "${FUNC_DIR}/requirements.txt" <<EOF
           parliament-functions==0.1.0
           cloudevents==1.12.1
-          polyapi-python==${{ github.event.inputs.polyapi_python_version }}
+          polyapi-python==${{ steps.resolve-version.outputs.polyapi_python_version }}
           EOF
           echo "Final requirements.txt:"
           cat "${FUNC_DIR}/requirements.txt"
 
       - name: Normalize func.yaml build settings
+        if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
           CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           cat > "${FUNC_DIR}/func.yaml" <<EOF
           specVersion: 0.36.0
-          name: polyapi-py-${{ github.event.inputs.polyapi_python_version }}-base
+          name: polyapi-py-${{ steps.resolve-version.outputs.polyapi_python_version }}-base
           runtime: python
           created: ${CREATED}
           build:
@@ -79,14 +154,16 @@ jobs:
           cat "${FUNC_DIR}/func.yaml"
 
       - name: Build and push image with kn func
+        if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
-          IMAGE="ghcr.io/polyapi/polyapi-py-${{ github.event.inputs.polyapi_python_version }}-base:latest"
+          IMAGE="ghcr.io/polyapi/polyapi-py-${{ steps.resolve-version.outputs.polyapi_python_version }}-base:latest"
           func build --image "$IMAGE" --push=true -p "$FUNC_DIR" --verbose
 
       - name: Verify pushed image
+        if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
-          IMAGE="ghcr.io/polyapi/polyapi-py-${{ github.event.inputs.polyapi_python_version }}-base:latest"
+          IMAGE="ghcr.io/polyapi/polyapi-py-${{ steps.resolve-version.outputs.polyapi_python_version }}-base:latest"
           docker pull "$IMAGE"
           echo "Published image: $IMAGE"
