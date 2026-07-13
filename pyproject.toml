@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polyapi-python"
-version = "0.3.19.dev4"
+version = "0.3.19"
 description = "The Python SDK for the integration platform PolyAPI"
 authors = [{ name = "PolyAPI", email = "support@polyapi.io" }]
 dependencies = [
