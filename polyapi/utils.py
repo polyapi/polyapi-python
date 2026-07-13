@@ -2,7 +2,7 @@ import keyword
 import re
 import os
 from urllib.parse import urlparse
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, cast
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
 from polyapi.typedefs import PropertySpecification, PropertyType
@@ -115,9 +115,9 @@ def to_type_module_alias(function_name: str) -> str:
 
 def add_type_import_path(function_name: str, arg: str) -> str:
     """if not basic type, coerce to camelCase and add the import path"""
-    # from now, we start qualifying non-basic types :)) 
+    # from now, we start qualifying non-basic types :))
     # e.g. Callable[[EmailAddress, Dict, Dict, Dict], None]
-        # becomes Callable[[Set_profile_email.EmailAddress, Dict, Dict, Dict], None]
+    # becomes Callable[[Set_profile_email.EmailAddress, Dict, Dict, Dict], None]
     arg = normalize_cross_language_type(arg)
 
     if "|" in arg:
@@ -158,7 +158,7 @@ def add_type_import_path(function_name: str, arg: str) -> str:
     return f"{type_module_alias}.{camelCase(arg)}"
 
 
-def get_type_and_def(
+def get_type_and_def(  # noqa: C901
     type_spec: PropertyType, title_fallback: str = ""
 ) -> Tuple[str, str]:
     """ returns type and type definition for a given PropertyType
@@ -190,7 +190,7 @@ def get_type_and_def(
             return primitive, ""
         return map_primitive_types(primitive), ""
     elif type_spec["kind"] == "array":
-        if type_spec.get("items"):
+        if "items" in type_spec and isinstance(type_spec["items"], dict):
             items = type_spec["items"]
             if items.get("$ref"):
                 # For no-types mode, avoid complex schema generation
@@ -208,9 +208,12 @@ def get_type_and_def(
     elif type_spec["kind"] == "void":
         return "None", ""
     elif type_spec["kind"] == "object":
-        if type_spec.get("schema"):
+        if "schema" in type_spec and isinstance(type_spec["schema"], dict):
             schema = type_spec["schema"]
-            title = schema.get("title", schema.get("name", title_fallback))
+            title = cast(str, schema.get("title", schema.get("name", title_fallback)))
+            if not isinstance(title, str):
+                raise ValueError("Title must be a string, this should never happen due to the fallback, but got: {}".format(title))
+
             if title and schema.get("type") == "array":
                 # TODO fix me
                 # we don't use ReturnType as name for the list type here, we use _ReturnTypeItem

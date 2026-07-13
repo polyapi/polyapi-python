@@ -135,7 +135,6 @@ def clear_config():
 
 def get_mtls_config() -> Tuple[bool, str | None, str | None, str | None]:
     """Return MTLS configuration settings"""
-    global MTLS_CERT_PATH, MTLS_KEY_PATH, MTLS_CA_PATH
     if MTLS_CERT_PATH is None or MTLS_KEY_PATH is None or MTLS_CA_PATH is None:
         # Force a config read if values aren't cached
         get_api_key_and_url()
@@ -144,7 +143,6 @@ def get_mtls_config() -> Tuple[bool, str | None, str | None, str | None]:
 
 def get_direct_execute_config() -> bool:
     """Return whether direct execute is enabled"""
-    global API_FUNCTION_DIRECT_EXECUTE
     if API_FUNCTION_DIRECT_EXECUTE is None:
         # Force a config read if value isn't cached
         get_api_key_and_url()
@@ -153,7 +151,6 @@ def get_direct_execute_config() -> bool:
 
 def get_cached_generate_args() -> Tuple[list | None, list | None, list | None, bool]:
     """Return cached generate command arguments"""
-    global LAST_GENERATE_CONTEXTS, LAST_GENERATE_NAMES, LAST_GENERATE_IDS, LAST_GENERATE_NO_TYPES
     if LAST_GENERATE_CONTEXTS is None and LAST_GENERATE_NAMES is None and LAST_GENERATE_IDS is None and LAST_GENERATE_NO_TYPES is None:
         # Force a config read if values aren't cached
         get_api_key_and_url()

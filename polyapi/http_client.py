@@ -69,7 +69,7 @@ def close():
         _sync_client = None
 
 async def close_async():
-    global _sync_client, _async_client, _async_client_loop
+    global _async_client, _async_client_loop
     close()
     client = _async_client
     client_loop = _async_client_loop

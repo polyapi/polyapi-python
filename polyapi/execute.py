@@ -1,6 +1,7 @@
 import httpx
 import os
 import logging
+from typing import Any
 from polyapi.config import get_api_key_and_url, get_mtls_config
 from polyapi.exceptions import PolyApiException
 from polyapi import http_client
@@ -49,14 +50,10 @@ def _sync_direct_execute(function_type, function_id, data) -> httpx.Response:
     # Direct-execute hits URL that may need custom TLS
     # settings (mTLS certs or disabled verification). httpx Client.request()
     # doesn't accept per-request transport kwargs, so use one-off calls.
-    if has_mtls:
-        resp = httpx.request(
-            url=endpoint_info_data["url"],
-            cert=(cert_path, key_path),
-            verify=ca_path,
-            timeout=None,
-            **request_params
-        )
+    if has_mtls and cert_path and key_path:
+        verify_value: bool | str = ca_path if ca_path else True
+        with httpx.Client(cert=(cert_path, key_path), verify=verify_value, timeout=None) as client:
+            resp = client.request(url=endpoint_info_data["url"], **request_params)
     else:
         resp = httpx.request(
             url=endpoint_info_data["url"],
@@ -83,9 +80,10 @@ async def _async_direct_execute(function_type, function_id, data) -> httpx.Respo
     has_mtls, cert_path, key_path, ca_path = get_mtls_config()
 
     # One-off async client for custom TLS settings on external URLs.
-    if has_mtls:
+    if has_mtls and cert_path and key_path:
+        verify_value: bool | str = ca_path if ca_path else True
         async with httpx.AsyncClient(
-            cert=(cert_path, key_path), verify=ca_path, timeout=None
+            cert=(cert_path, key_path), verify=verify_value, timeout=None
         ) as client:
             resp = await client.request(
                 url=endpoint_info_data["url"], **request_params

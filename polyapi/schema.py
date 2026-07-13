@@ -2,6 +2,7 @@
 """
 import logging
 import contextlib
+import os
 import re
 from typing import Dict
 from jsonschema_gentypes.cli import process_config
@@ -79,9 +80,10 @@ def generate_schema_types(input_data: Dict, root=None):
     """takes in a Dict representing a schema as input then appends the resulting python code to the output file"""
     _cleanup_input_for_gentypes(input_data)
     tmp_input = _temp_store_input_data(input_data)
-    tmp_output = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         mode="w", delete=False, prefix="polyapi_", suffix=".py"
-    ).name
+    ) as tmp_output_file:
+        tmp_output = tmp_output_file.name
 
     config: configuration.Configuration = {
         "python_version": None,  # type: ignore
@@ -95,17 +97,23 @@ def generate_schema_types(input_data: Dict, root=None):
         ],
     }
 
-    # jsonschema_gentypes prints source to stdout
-    # no option to surpress so we do this
-    with contextlib.redirect_stdout(None):
-        process_config(config, [tmp_input])
+    try:
+        # jsonschema_gentypes prints source to stdout
+        # no option to surpress so we do this
+        with contextlib.redirect_stdout(None):
+            process_config(config, [tmp_input])
 
-    with open(tmp_output, encoding='utf-8') as f:
-        output = f.read()
+        with open(tmp_output, encoding='utf-8') as f:
+            output = f.read()
 
-    output = clean_malformed_examples(output)
-
-    return output
+        output = clean_malformed_examples(output)
+        return output
+    finally:
+        for temp_path in (tmp_input, tmp_output):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
 
 # Matches commented example headers emitted by jsonschema-gentypes before a raw
@@ -121,6 +129,10 @@ INVALID_ESCAPE_PATTERNS = [
     # Fix other common invalid escape sequences in docstrings
     (re.compile(r'\\([^nrtbfav"\'\\])', re.DOTALL), r'\\\\\1'),
 ]
+
+# jsonschema_gentypes may emit raw triple-quoted docstrings (r"""...""").
+# Normalize these to plain docstrings to keep generated output stable.
+RAW_TRIPLE_QUOTE_PATTERN = re.compile(r'(^\s*)r(["\']{3})', re.MULTILINE)
 
 
 def clean_malformed_examples(example: str) -> str:
@@ -149,6 +161,8 @@ def clean_malformed_examples(example: str) -> str:
     # Fix invalid escape sequences in docstrings
     for pattern, replacement in INVALID_ESCAPE_PATTERNS:
         cleaned_example = pattern.sub(replacement, cleaned_example)
+
+    cleaned_example = RAW_TRIPLE_QUOTE_PATTERN.sub(r'\1\2', cleaned_example)
     
     return cleaned_example
 

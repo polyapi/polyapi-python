@@ -22,9 +22,27 @@ BASE_REQUIREMENTS = {
     "typing_extensions",
     "jsonschema-gentypes",
     "pydantic",
+    
     "cloudevents",
 }
-all_stdlib_symbols = stdlib_list(".".join([str(v) for v in sys.version_info[0:2]]))
+
+
+def _safe_stdlib_symbols() -> List[str]:
+    major = sys.version_info[0]
+    minor = sys.version_info[1]
+
+    # `stdlib_list` may lag behind the newest Python minor; fall back to the
+    # nearest supported version so importing this module never crashes.
+    while minor >= 0:
+        try:
+            return stdlib_list(f"{major}.{minor}")
+        except ValueError:
+            minor -= 1
+
+    return []
+
+
+all_stdlib_symbols = _safe_stdlib_symbols()
 BASE_REQUIREMENTS.update(
     all_stdlib_symbols
 )  # dont need to pip install stuff in the python standard library
@@ -397,13 +415,16 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             deployable["docStartIndex"] = start_offset
             deployable["docEndIndex"] = end_offset
 
-            try:
-                docstring = ast.get_docstring(node)
-            finally:
-                # Handle case where there is no doc string
-                # Also handle case where docstring exists but is empty
-                if type(docstring) is None or (not docstring and '"""' not in self._lines[start_lineno] and "'''" not in self._lines[start_lineno]):
-                    return None
+            docstring = ast.get_docstring(node)
+
+            # Handle case where there is no doc string.
+            # Also handle case where docstring exists but is empty.
+            if docstring is None or (
+                not docstring
+                and '"""' not in self._lines[start_lineno]
+                and "'''" not in self._lines[start_lineno]
+            ):
+                return None
 
             docstring = cast(str, docstring)
 

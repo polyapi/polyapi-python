@@ -85,7 +85,7 @@ def execute_query(table_id, method, query):
 
         auth_key = polyCustom.get("executionApiKey") or api_key
         url = f"{base_url.rstrip('/')}/tables/{table_id}/{method}?clientId={client_id}"
-        headers = {"x-poly-execution-id": polyCustom.get("executionId")}
+        headers = {"x-poly-execution-id": polyCustom.get("executionId") or ""}
         if auth_key:
             headers["Authorization"] = f"Bearer {auth_key}"
         response = http_client.post(url, json=query, headers=headers)
@@ -130,11 +130,11 @@ def _transform_keys(obj: Any) -> Any:
 
 
 def transform_query(query: dict) -> dict:
-    if query["where"] or query["order_by"]:
+    if query.get("where") or query.get("order_by"):
         return {
             **query,
-            "where": _transform_keys(query["where"]) if query["where"] else None,
-            "orderBy": query["order_by"] if query["order_by"] else None,
+            "where": _transform_keys(query["where"]) if query.get("where") else None,
+            "orderBy": query["order_by"] if query.get("order_by") else None,
         }
 
     return query
