@@ -35,7 +35,7 @@ class SpecificationDto(TypedDict):
     description: str
     # function is none (or function key not present) if this is actually VariableSpecDto
     function: NotRequired[FunctionSpecification | None]
-    type: Literal['apiFunction', 'customFunction', 'serverFunction', 'authFunction', 'webhookHandle', 'serverVariable', 'table']
+    type: Literal['apiFunction', 'customFunction', 'serverFunction', 'authFunction', 'webhookHandle', 'serverVariable', 'table', 'aiFunction']
     code: NotRequired[str]
     language: str
 

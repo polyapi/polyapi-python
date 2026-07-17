@@ -17,6 +17,7 @@ from .webhook import render_webhook_handle
 from .typedefs import PropertySpecification, SchemaSpecDto, SpecificationDto, VariableSpecDto, TableSpecDto
 from .api import render_api_function
 from .server import render_server_function
+from .ai_function import render_ai_function
 from .utils import add_import_to_init, get_auth_headers, init_the_init, print_green, to_func_namespace, to_type_module_alias
 from .variables import generate_variables
 from .poly_tables import generate_tables
@@ -29,6 +30,7 @@ SUPPORTED_FUNCTION_TYPES = {
     "customFunction",  # client function - this is badly named in /specs atm
     "serverFunction",
     "webhookHandle",
+    "aiFunction",
 }
 
 SUPPORTED_TYPES = SUPPORTED_FUNCTION_TYPES | {"serverVariable", "schema", "snippet", "table"}
@@ -98,7 +100,7 @@ def resolve_poly_refs(obj, schema_index):
 def replace_poly_refs_in_functions(specs: List[SpecificationDto], schema_index):
     spec_idxs_to_remove = []
     for idx, spec in enumerate(specs):
-        if spec.get("type") in ("apiFunction", "customFunction", "serverFunction"):
+        if spec.get("type") in ("apiFunction", "customFunction", "serverFunction", "aiFunction"):
             func = spec.get("function")
             if func:
                 try:
@@ -495,6 +497,15 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
         func_str, func_type_defs = render_webhook_handle(
             function_type,
             function_context,
+            function_name,
+            function_id,
+            function_description,
+            arguments,
+            return_type,
+        )
+    elif function_type == "aiFunction":
+        func_str, func_type_defs = render_ai_function(
+            function_type,
             function_name,
             function_id,
             function_description,
