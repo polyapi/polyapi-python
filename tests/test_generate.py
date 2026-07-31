@@ -1,8 +1,12 @@
 import unittest
+import copy
 import os
 import shutil
 import importlib.util
+import subprocess
+import sys
 import tempfile
+from typing import cast
 from unittest.mock import patch, MagicMock
 from polyapi.typedefs import SpecificationDto
 from polyapi.utils import get_type_and_def, rewrite_reserved, to_type_module_alias
@@ -102,6 +106,144 @@ MINIMAL_FUNCTION_SPEC = {
         # Note: no "arguments" or "returnType" fields
     }
 }
+
+MEWS_HEADERS_SPECS = [
+    (
+        {
+            "id": "6979c3e1-4d59-4867-91b7-4d394fe9e34a",
+            "type": "serverFunction",
+            "context": "gha.mews.v1",
+            "name": "generalEvents",
+            "description": "Sanitized Mews headers regression fixture",
+            "language": "javascript",
+            "function": {
+                "arguments": [
+                    {
+                        "name": "headers",
+                        "description": "",
+                        "required": True,
+                        "type": {
+                            "kind": "object",
+                            "schema": {
+                                "$ref": "#/definitions/Gha.Mews.V1.GeneralEvents%24Headers.Argument",
+                                "$schema": "http://json-schema.org/draft-07/schema#",
+                                "definitions": {
+                                    "Gha.Mews.V1.GeneralEvents$Headers.Argument": {
+                                        "type": "object",
+                                        "additionalProperties": {},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                ],
+                "returnType": {"kind": "void"},
+            },
+        },
+        "Headers",
+        "Headers = dict[str, str | int | float | dict[str, Any] | list[Any] | bool | None]",
+    ),
+    (
+        {
+            "id": "d8230ba3-b1da-4d2f-8e47-97114d8a3f37",
+            "type": "serverFunction",
+            "context": "gha.mews.v1",
+            "name": "membersSearch",
+            "description": "Sanitized Mews headers regression fixture",
+            "language": "javascript",
+            "function": {
+                "arguments": [
+                    {
+                        "name": "_headers",
+                        "description": "",
+                        "required": True,
+                        "type": {
+                            "kind": "object",
+                            "schema": {
+                                "$ref": "#/definitions/Gha.Mews.V1.MembersSearch%24Headers.Argument",
+                                "$schema": "http://json-schema.org/draft-07/schema#",
+                                "definitions": {
+                                    "Gha.Mews.V1.MembersSearch$Headers.Argument": {
+                                        "type": "object",
+                                        "additionalProperties": {},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                ],
+                "returnType": {"kind": "void"},
+            },
+        },
+        "_Headers",
+        "_Headers = dict[str, str | int | float | dict[str, Any] | list[Any] | bool | None]",
+    ),
+    (
+        {
+            "id": "3037a373-291f-4b87-9966-b3d125ffee26",
+            "type": "serverFunction",
+            "context": "gha.mews.v1",
+            "name": "membershipsCreate",
+            "description": "Sanitized Mews headers regression fixture",
+            "language": "javascript",
+            "function": {
+                "arguments": [
+                    {
+                        "name": "_headers",
+                        "description": "",
+                        "required": True,
+                        "type": {
+                            "kind": "object",
+                            "schema": {
+                                "$ref": "#/definitions/Gha.Mews.V1.MembershipsCreate%24Headers.Argument",
+                                "$schema": "http://json-schema.org/draft-07/schema#",
+                                "definitions": {
+                                    "Gha.Mews.V1.MembershipsCreate$Headers.Argument": {
+                                        "type": "object",
+                                        "additionalProperties": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                ],
+                "returnType": {"kind": "void"},
+            },
+        },
+        "_Headers",
+        "_Headers = dict[str, str]",
+    ),
+    (
+        {
+            "id": "63c65574-26bf-4b10-a301-06ce02dad548",
+            "type": "serverFunction",
+            "context": "gha.mews.v1",
+            "name": "membershipsList",
+            "description": "Sanitized Mews headers regression fixture",
+            "language": "javascript",
+            "function": {
+                "arguments": [
+                    {
+                        "name": "_headers",
+                        "description": "",
+                        "required": True,
+                        "type": {
+                            "kind": "object",
+                            "schema": {
+                                "$schema": "http://json-schema.org/draft-07/schema#",
+                                "type": "object",
+                                "additionalProperties": {},
+                            },
+                        },
+                    },
+                ],
+                "returnType": {"kind": "void"},
+            },
+        },
+        "_Headers",
+        "_Headers = dict[str, str | int | float | dict[str, Any] | list[Any] | bool | None]",
+    ),
+]
 
 
 class T(unittest.TestCase):
@@ -704,3 +846,54 @@ def test_nested_function() -> schemas.api.v1.user.profile:
                 f"-> {type_module_alias}.{spec['name']}Response",
                 init_content,
             )
+
+    def test_mews_headers_schemas_generate_referenced_type_aliases(self):
+        for fixture, expected_symbol, expected_definition in MEWS_HEADERS_SPECS:
+            with self.subTest(function=fixture["name"]):
+                spec = copy.deepcopy(fixture)
+                func_str, func_type_defs = render_spec(cast(SpecificationDto, spec))
+                type_module_alias = to_type_module_alias(spec["name"])
+
+                self.assertIn(
+                    f"{spec['function']['arguments'][0]['name']}: "
+                    f"{type_module_alias}.{expected_symbol}",
+                    func_str,
+                )
+                self.assertIn(expected_definition, func_type_defs)
+
+    def test_mews_headers_reference_preserves_explicit_definition_title(self):
+        spec = copy.deepcopy(MEWS_HEADERS_SPECS[1][0])
+        schema = spec["function"]["arguments"][0]["type"]["schema"]
+        definition = schema["definitions"]["Gha.Mews.V1.MembersSearch$Headers.Argument"]
+        definition["title"] = "ExistingTitle"
+
+        render_spec(cast(SpecificationDto, spec))
+
+        self.assertEqual(definition["title"], "ExistingTitle")
+
+    def test_mews_headers_generated_package_imports_in_fresh_process(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            package_name = "generated_mews"
+            package_dir = os.path.join(temp_dir, package_name)
+            os.makedirs(package_dir)
+
+            for fixture, _, _ in MEWS_HEADERS_SPECS:
+                spec = copy.deepcopy(fixture)
+                add_function_file(
+                    package_dir,
+                    spec["name"],
+                    cast(SpecificationDto, spec),
+                )
+
+            repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            result = subprocess.run(
+                [sys.executable, "-c", f"import {package_name}"],
+                cwd=temp_dir,
+                env={
+                    "PYTHONPATH": os.pathsep.join([temp_dir, repo_root]),
+                },
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
