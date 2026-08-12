@@ -55,13 +55,11 @@ class TestHttpClientPairing:
     def setup_method(self):
         # Reset singletons so each test starts fresh
         http_client._sync_client = None
-        http_client._async_client = None
-        http_client._async_client_loop = None
+        http_client._async_clients.clear()
 
     def teardown_method(self):
         http_client._sync_client = None
-        http_client._async_client = None
-        http_client._async_client_loop = None
+        http_client._async_clients.clear()
 
     @patch.object(httpx.Client, "post", return_value=_fake_response())
     def test_sync_post_uses_sync_client(self, mock_post):
@@ -70,7 +68,7 @@ class TestHttpClientPairing:
         assert resp.status_code == 200
         # The sync client should have been created
         assert http_client._sync_client is not None
-        assert http_client._async_client is None
+        assert not http_client._async_clients
 
     @patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock, return_value=_fake_response())
     def test_async_post_uses_async_client(self, mock_post):
@@ -80,8 +78,8 @@ class TestHttpClientPairing:
         resp = asyncio.run(_run())
         mock_post.assert_called_once()
         assert resp.status_code == 200
-        assert http_client._async_client is not None
-        assert http_client._async_client_loop is not None
+        # A client was cached for the loop that ran the request.
+        assert len(http_client._async_clients) == 1
 
     def test_async_post_reuses_client_within_same_loop(self):
         first_client = MagicMock()
@@ -99,8 +97,7 @@ class TestHttpClientPairing:
         assert second_response.status_code == 200
         assert mock_async_client.call_count == 1
         assert first_client.post.await_count == 2
-        assert http_client._async_client is first_client
-        assert http_client._async_client_loop is current_loop
+        assert http_client._async_clients.get(current_loop) is first_client
 
     def test_async_post_recreates_client_after_loop_change(self):
         first_client = MagicMock()
@@ -113,8 +110,9 @@ class TestHttpClientPairing:
             side_effect=[first_client, second_client],
         ) as mock_async_client:
             async def _run_once(url: str):
+                loop = asyncio.get_running_loop()
                 response = await http_client.async_post(url, json={})
-                return response, http_client._async_client, asyncio.get_running_loop()
+                return response, http_client._async_clients.get(loop), loop
 
             first_response, first_cached_client, first_loop = asyncio.run(_run_once("https://example.com/first"))
             second_response, second_cached_client, second_loop = asyncio.run(_run_once("https://example.com/second"))
@@ -127,15 +125,15 @@ class TestHttpClientPairing:
         assert first_cached_client is first_client
         assert second_cached_client is second_client
         assert first_loop is not second_loop
-        assert http_client._async_client is second_client
-        assert http_client._async_client_loop is second_loop
+        # The 2nd loop's req swept the first (this one is now dead) loop out.
+        assert http_client._async_clients.get(second_loop) is second_client
+        assert first_loop not in http_client._async_clients
 
     def test_close_async_clears_cached_client_for_current_loop(self):
         async def _run():
             cached_client = MagicMock()
             cached_client.aclose = AsyncMock()
-            http_client._async_client = cached_client
-            http_client._async_client_loop = asyncio.get_running_loop()
+            http_client._async_clients[asyncio.get_running_loop()] = cached_client
 
             await http_client.close_async()
 
@@ -144,16 +142,15 @@ class TestHttpClientPairing:
         cached_client = asyncio.run(_run())
 
         cached_client.aclose.assert_awaited_once()
-        assert http_client._async_client is None
-        assert http_client._async_client_loop is None
+        assert http_client._async_clients == {}
 
     def test_close_async_drops_stale_client_without_cross_loop_close(self):
         stale_client = MagicMock()
         stale_client.aclose = AsyncMock()
 
         async def _seed_stale_client():
-            http_client._async_client = stale_client
-            http_client._async_client_loop = asyncio.get_running_loop()
+            # Cache a client against this loop, which is closed once the run ends.
+            http_client._async_clients[asyncio.get_running_loop()] = stale_client
 
         asyncio.run(_seed_stale_client())
 
@@ -162,9 +159,43 @@ class TestHttpClientPairing:
 
         asyncio.run(_close_on_new_loop())
 
+        # The stale client's loop is closed, so it's dropped and not awaited across loops.
         stale_client.aclose.assert_not_awaited()
-        assert http_client._async_client is None
-        assert http_client._async_client_loop is None
+        assert http_client._async_clients == {}
+
+    def test_concurrent_loops_in_threads_get_isolated_clients(self):
+        """Two loops running at once (in separate threads) should get own client
+        And not evict each other's"""
+        import threading
+
+        seen = {}
+        barrier = threading.Barrier(2)
+
+        def worker(name):
+            async def _run():
+                # Force both loops to overlap 
+                loop = asyncio.get_running_loop()
+                _ = http_client._get_async_client()
+                barrier.wait()
+                await asyncio.sleep(0.05)
+                seen[name] = (loop, http_client._async_clients.get(loop))
+
+            asyncio.run(_run())
+
+        with patch(
+            "polyapi.http_client.httpx.AsyncClient",
+            side_effect=lambda *a, **k: MagicMock(),
+        ):
+            t1 = threading.Thread(target=worker, args=("a",))
+            t2 = threading.Thread(target=worker, args=("b",))
+            t1.start(); t2.start()
+            t1.join(); t2.join()
+
+        (loop_a, client_a), (loop_b, client_b) = seen["a"], seen["b"]
+        assert loop_a is not loop_b
+        # Each loop kept the client it created — no cross-loop eviction.
+        assert client_a is not None and client_b is not None
+        assert client_a is not client_b
 
     @patch.object(httpx.Client, "get", return_value=_fake_response())
     def test_sync_get(self, mock_get):
