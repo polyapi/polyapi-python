@@ -3,7 +3,7 @@ import logging
 import os
 import httpx
 
-logger = logging.getLogger("polyapi.http_client")
+logger = logging.getLogger("poly")
 
 # Connx pool + timeout defaults for the shared clients.
 
@@ -39,21 +39,12 @@ def _retire_async_client(
     try:
         if loop is not None and loop.is_running():
             loop.call_soon_threadsafe(lambda: loop.create_task(client.aclose()))
-            logger.info(
-                "scheduled aclose of async client id=%s pid=%s loop=%s",
-                id(client), os.getpid(), id(loop),
-            )
+            logger.debug(f"Scheduled aclose of async client id={id(client)} pid={os.getpid()} loop={id(loop)}")
         else:
-            logger.info(
-                "dropping async client id=%s pid=%s loop=%s loop_closed=%s",
-                id(client), os.getpid(), id(loop),
-                None if loop is None else loop.is_closed(),
-            )
+            loop_closed = None if loop is None else loop.is_closed()
+            logger.debug(f"Dropping async client id={id(client)} pid={os.getpid()} loop={id(loop)} loop_closed={loop_closed}")
     except Exception:
-        logger.warning(
-            "failed to retire async client id=%s pid=%s loop=%s",
-            id(client), os.getpid(), id(loop), exc_info=True,
-        )
+        logger.warning(f"Failed to retire async client id={id(client)} pid={os.getpid()} loop={id(loop)}", exc_info=True)
 
 
 def _sweep_dead_loops() -> None:
@@ -71,13 +62,11 @@ def _get_async_client() -> httpx.AsyncClient:
         _sweep_dead_loops()
         client = httpx.AsyncClient(limits=DEFAULT_LIMITS, timeout=DEFAULT_TIMEOUT)
         _async_clients[current_loop] = client
-        logger.info(
-            "created async client id=%s pid=%s loop=%s "
-            "max_connections=%s max_keepalive=%s keepalive_expiry=%s",
-            id(client), os.getpid(), id(current_loop),
-            DEFAULT_LIMITS.max_connections,
-            DEFAULT_LIMITS.max_keepalive_connections,
-            DEFAULT_LIMITS.keepalive_expiry,
+        logger.debug(
+            f"Created async client id={id(client)} pid={os.getpid()} loop={id(current_loop)} "
+            f"max_connections={DEFAULT_LIMITS.max_connections} "
+            f"max_keepalive={DEFAULT_LIMITS.max_keepalive_connections} "
+            f"keepalive_expiry={DEFAULT_LIMITS.keepalive_expiry}"
         )
     return client
 
