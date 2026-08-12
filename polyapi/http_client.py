@@ -17,8 +17,8 @@ DEFAULT_LIMITS = httpx.Limits(
 DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=15.0)
 
 _sync_client: httpx.Client | None = None
-_async_client: httpx.AsyncClient | None = None
-_async_client_loop: asyncio.AbstractEventLoop | None = None
+# One async client per event loop. 
+_async_clients: "dict[asyncio.AbstractEventLoop, httpx.AsyncClient]" = {}
 
 
 def _get_sync_client() -> httpx.Client:
@@ -37,44 +37,49 @@ def _retire_async_client(
     if client is None:
         return
     try:
-        if loop is not None and not loop.is_closed():
-            if loop.is_running():
-                # Schedule the close on the client's own loop (may be another thread).
-                loop.call_soon_threadsafe(lambda: loop.create_task(client.aclose()))
-                logger.info(
-                    "retiring async client id=%s pid=%s loop=%s (scheduled aclose)",
-                    id(client), os.getpid(), id(loop),
-                )
-                return
-            loop.run_until_complete(client.aclose())
-        logger.info(
-            "retired async client id=%s pid=%s loop=%s",
-            id(client), os.getpid(), id(loop),
-        )
+        if loop is not None and loop.is_running():
+            loop.call_soon_threadsafe(lambda: loop.create_task(client.aclose()))
+            logger.info(
+                "scheduled aclose of async client id=%s pid=%s loop=%s",
+                id(client), os.getpid(), id(loop),
+            )
+        else:
+            logger.info(
+                "dropping async client id=%s pid=%s loop=%s loop_closed=%s",
+                id(client), os.getpid(), id(loop),
+                None if loop is None else loop.is_closed(),
+            )
     except Exception:
-        # Never let cleanup of a dead client break the caller's request.
         logger.warning(
-            "failed to cleanly retire async client id=%s pid=%s loop=%s",
+            "failed to retire async client id=%s pid=%s loop=%s",
             id(client), os.getpid(), id(loop), exc_info=True,
         )
 
 
+def _sweep_dead_loops() -> None:
+    """Wipe clients whose event loop has been closed.
+    """
+    for loop in list(_async_clients):
+        if loop.is_closed():
+            _retire_async_client(_async_clients.pop(loop, None), loop)
+
+
 def _get_async_client() -> httpx.AsyncClient:
-    global _async_client, _async_client_loop
     current_loop = asyncio.get_running_loop()
-    if _async_client is None or _async_client_loop is not current_loop:
-        _retire_async_client(_async_client, _async_client_loop)
-        _async_client = httpx.AsyncClient(limits=DEFAULT_LIMITS, timeout=DEFAULT_TIMEOUT)
-        _async_client_loop = current_loop
+    client = _async_clients.get(current_loop)
+    if client is None:
+        _sweep_dead_loops()
+        client = httpx.AsyncClient(limits=DEFAULT_LIMITS, timeout=DEFAULT_TIMEOUT)
+        _async_clients[current_loop] = client
         logger.info(
             "created async client id=%s pid=%s loop=%s "
             "max_connections=%s max_keepalive=%s keepalive_expiry=%s",
-            id(_async_client), os.getpid(), id(current_loop),
+            id(client), os.getpid(), id(current_loop),
             DEFAULT_LIMITS.max_connections,
             DEFAULT_LIMITS.max_keepalive_connections,
             DEFAULT_LIMITS.keepalive_expiry,
         )
-    return _async_client
+    return client
 
 
 def post(url, **kwargs) -> httpx.Response:
@@ -124,17 +129,10 @@ def close():
         _sync_client = None
 
 async def close_async():
-    global _async_client, _async_client_loop
     close()
-    client = _async_client
-    client_loop = _async_client_loop
-    _async_client = None
-    _async_client_loop = None
-    if client is None:
-        return
-
     current_loop = asyncio.get_running_loop()
-    if client_loop is current_loop:
+    client = _async_clients.pop(current_loop, None)
+    if client is not None:
         await client.aclose()
-    else:
-        _retire_async_client(client, client_loop)
+    # Nuke clients left behind by dead loops
+    _sweep_dead_loops()
