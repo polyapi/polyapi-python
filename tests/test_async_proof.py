@@ -188,8 +188,10 @@ class TestHttpClientPairing:
         ):
             t1 = threading.Thread(target=worker, args=("a",))
             t2 = threading.Thread(target=worker, args=("b",))
-            t1.start(); t2.start()
-            t1.join(); t2.join()
+            t1.start()
+            t2.start()
+            t1.join()
+            t2.join()
 
         (loop_a, client_a), (loop_b, client_b) = seen["a"], seen["b"]
         assert loop_a is not loop_b
