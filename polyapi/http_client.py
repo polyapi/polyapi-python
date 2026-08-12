@@ -14,7 +14,7 @@ DEFAULT_LIMITS = httpx.Limits(
     max_keepalive_connections=64,
     keepalive_expiry=30.0,
 )
-DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=15.0)
+DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=15.0)
 
 _sync_client: httpx.Client | None = None
 _async_client: httpx.AsyncClient | None = None
