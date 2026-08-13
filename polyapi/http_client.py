@@ -7,16 +7,53 @@ import httpx
 logger = logging.getLogger("poly")
 
 # Connx pool + timeout defaults for the shared clients.
+# All overridable via POLY_HTTP_* env vars so operators can tune limits or
+# opt into timeouts without editing callers. Empty / "none" parses to None (unbounded).
 
 
-DEFAULT_LIMITS = httpx.Limits(
-    max_connections=200,
-    max_keepalive_connections=None,
-    keepalive_expiry=30.0,
-)
-DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=15.0)
-# Retry connection-establishment failures 
-DEFAULT_RETRIES = 1
+def _env_opt_int(name: str, default: "int | None") -> "int | None":
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    raw = raw.strip()
+    return None if raw == "" or raw.lower() in ("none", "null") else int(raw)
+
+
+def _env_opt_float(name: str, default: "float | None") -> "float | None":
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    raw = raw.strip()
+    return None if raw == "" or raw.lower() in ("none", "null") else float(raw)
+
+
+def _build_limits() -> httpx.Limits:
+    return httpx.Limits(
+        max_connections=_env_opt_int("POLY_HTTP_MAX_CONNECTIONS", 200),
+        max_keepalive_connections=_env_opt_int("POLY_HTTP_MAX_KEEPALIVE_CONNECTIONS", None),
+        keepalive_expiry=_env_opt_float("POLY_HTTP_KEEPALIVE_EXPIRY", 30.0),
+    )
+
+
+def _build_timeout() -> httpx.Timeout:
+    # Default to the SDK's original unbounded timeout; bound per-phase only via env.
+    return httpx.Timeout(
+        connect=_env_opt_float("POLY_HTTP_CONNECT_TIMEOUT", None),
+        read=_env_opt_float("POLY_HTTP_READ_TIMEOUT", None),
+        write=_env_opt_float("POLY_HTTP_WRITE_TIMEOUT", None),
+        pool=_env_opt_float("POLY_HTTP_POOL_TIMEOUT", None),
+    )
+
+
+def _build_retries() -> int:
+    # Retry connection-establishment failures.
+    return _env_opt_int("POLY_HTTP_RETRIES", 1) or 0
+
+
+# Import-time snapshot for reference/config surface. Clients re-read env at creation
+DEFAULT_LIMITS = _build_limits()
+DEFAULT_TIMEOUT = _build_timeout()
+DEFAULT_RETRIES = _build_retries()
 # PID that owns the clients below; a fork resets it
 _owner_pid: int = os.getpid()
 _sync_client: httpx.Client | None = None
@@ -26,6 +63,28 @@ _sync_client_lock = threading.Lock()
 _async_clients: "dict[asyncio.AbstractEventLoop, httpx.AsyncClient]" = {}
 # In-flight request count per async client, so close_async can drain before aclose.
 _async_inflight: "dict[httpx.AsyncClient, int]" = {}
+# Event loops whose close() already wrapped
+_hooked_loops: "set[asyncio.AbstractEventLoop]" = set()
+# Loops whose client is being closed by close_async; new requests wait on the Event so
+# they don't race a replacement client into the pool mid-close.
+_closing_loops: "dict[asyncio.AbstractEventLoop, asyncio.Event]" = {}
+
+
+def _after_fork_in_child() -> None:
+    """Reset all shared client state in a forked child
+    """
+    global _owner_pid, _sync_client, _sync_client_lock
+    _sync_client_lock = threading.Lock()
+    _sync_client = None
+    _async_clients.clear()
+    _async_inflight.clear()
+    _hooked_loops.clear()
+    _closing_loops.clear()
+    _owner_pid = os.getpid()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_after_fork_in_child)
 
 
 def _reset_if_forked() -> None:
@@ -36,6 +95,9 @@ def _reset_if_forked() -> None:
     if current_pid != _owner_pid:
         _sync_client = None
         _async_clients.clear()
+        _async_inflight.clear()
+        _hooked_loops.clear()
+        _closing_loops.clear()
         _owner_pid = current_pid
 
 
@@ -46,7 +108,7 @@ def _get_sync_client() -> httpx.Client:
         # Double-checked lock
         with _sync_client_lock:
             if _sync_client is None:
-                _sync_client = httpx.Client(limits=DEFAULT_LIMITS, timeout=DEFAULT_TIMEOUT)
+                _sync_client = httpx.Client(limits=_build_limits(), timeout=_build_timeout())
     return _sync_client
 
 
@@ -77,15 +139,16 @@ def _sweep_dead_loops() -> None:
             _retire_async_client(_async_clients.pop(loop, None), loop)
 
 
-def _register_loop_close_hook(
-    loop: asyncio.AbstractEventLoop, client: httpx.AsyncClient
-) -> None:
-    """aclose the client on loop right before loop torn down
+def _register_loop_close_hook(loop: asyncio.AbstractEventLoop) -> None:
+    """aclose the loop's async client right before the loop is torn down.
     """
+    if loop in _hooked_loops:
+        return
     original_close = loop.close
 
     def _close_with_cleanup(*args, **kwargs):
-        cached = _async_clients.get(loop)
+        _hooked_loops.discard(loop)
+        cached = _async_clients.pop(loop, None)
         if cached is not None and not loop.is_closed():
             try:
                 loop.run_until_complete(cached.aclose())
@@ -97,6 +160,7 @@ def _register_loop_close_hook(
 
     try:
         loop.close = _close_with_cleanup  # type: ignore[method-assign]
+        _hooked_loops.add(loop)
     except (AttributeError, TypeError):
         logger.debug(f"Could not hook loop.close pid={os.getpid()} loop={id(loop)}; relying on sweep")
 
@@ -107,20 +171,26 @@ def _get_async_client() -> httpx.AsyncClient:
     client = _async_clients.get(current_loop)
     if client is None:
         _sweep_dead_loops()
-        transport = httpx.AsyncHTTPTransport(limits=DEFAULT_LIMITS, retries=DEFAULT_RETRIES)
-        client = httpx.AsyncClient(transport=transport, timeout=DEFAULT_TIMEOUT)
+        limits = _build_limits()
+        transport = httpx.AsyncHTTPTransport(limits=limits, retries=_build_retries())
+        client = httpx.AsyncClient(transport=transport, timeout=_build_timeout())
         _async_clients[current_loop] = client
-        _register_loop_close_hook(current_loop, client)
+        _register_loop_close_hook(current_loop)
         logger.debug(
             f"Created async client id={id(client)} pid={os.getpid()} loop={id(current_loop)} "
-            f"max_connections={DEFAULT_LIMITS.max_connections} "
-            f"max_keepalive={DEFAULT_LIMITS.max_keepalive_connections} "
-            f"keepalive_expiry={DEFAULT_LIMITS.keepalive_expiry}"
+            f"max_connections={limits.max_connections} "
+            f"max_keepalive={limits.max_keepalive_connections} "
+            f"keepalive_expiry={limits.keepalive_expiry}"
         )
     return client
 
 
 async def _dispatch_async(method_name: str, *args, **kwargs) -> httpx.Response:
+    # If a shutdown is closing this loop's client, wait !
+    # don't race a replacement into the pool mid-close.
+    closing = _closing_loops.get(asyncio.get_running_loop())
+    if closing is not None:
+        await closing.wait()
     # Track in-flight requests per client so close_async can drain before aclose.
     client = _get_async_client()
     _async_inflight[client] = _async_inflight.get(client, 0) + 1
@@ -192,10 +262,27 @@ def close():
 async def close_async():
     close()
     current_loop = asyncio.get_running_loop()
-    client = _async_clients.pop(current_loop, None)
-    if client is not None:
-        # Drain active requests first so aclose doesn't cause read errors.
+
+    # If a close is already in progress for this loop, just wait for it.
+    existing = _closing_loops.get(current_loop)
+    if existing is not None:
+        await existing.wait()
+        return
+
+    client = _async_clients.get(current_loop)
+    if client is None:
+        _sweep_dead_loops()
+        return
+
+    # Mark the loop as closing BEFORE draining so new requests block 
+    done = asyncio.Event()
+    _closing_loops[current_loop] = done
+    try:
         await _drain_inflight(client)
+        _async_clients.pop(current_loop, None)
         await client.aclose()
+    finally:
+        _closing_loops.pop(current_loop, None)
+        done.set()  # release any requests that arrived during the close
     # Nuke clients left behind by dead loops
     _sweep_dead_loops()
