@@ -56,10 +56,14 @@ class TestHttpClientPairing:
         # Reset singletons so each test starts fresh
         http_client._sync_client = None
         http_client._async_clients.clear()
+        http_client._async_inflight.clear()
+        http_client._owner_pid = http_client.os.getpid()
 
     def teardown_method(self):
         http_client._sync_client = None
         http_client._async_clients.clear()
+        http_client._async_inflight.clear()
+        http_client._owner_pid = http_client.os.getpid()
 
     @patch.object(httpx.Client, "post", return_value=_fake_response())
     def test_sync_post_uses_sync_client(self, mock_post):
@@ -128,6 +132,102 @@ class TestHttpClientPairing:
         # The 2nd loop's req swept the first (this one is now dead) loop out.
         assert http_client._async_clients.get(second_loop) is second_client
         assert first_loop not in http_client._async_clients
+
+    def test_client_aclosed_on_loop_teardown(self):
+        """The loop-close hook must aclose the client while the loop is still alive,
+        so the connection pool is released instead of leaking after the loop closes."""
+        client = MagicMock()
+        client.post = AsyncMock(return_value=_fake_response())
+        client.aclose = AsyncMock()
+
+        with patch("polyapi.http_client.httpx.AsyncClient", return_value=client):
+            async def _run():
+                await http_client.async_post("https://example.com", json={})
+
+            asyncio.run(_run())  # loop teardown should trigger aclose
+
+        client.aclose.assert_awaited_once()
+
+    def test_close_async_drains_inflight_before_closing(self):
+        """close_async must wait for in-flight requests to finish before
+        aclose(), or connections get torn out mid-read."""
+        order = []
+        client = MagicMock()
+
+        async def _slow_post(*a, **k):
+            await asyncio.sleep(0.1)
+            order.append("request_done")
+            return _fake_response()
+
+        async def _aclose():
+            order.append("aclose")
+
+        client.post = AsyncMock(side_effect=_slow_post)
+        client.aclose = AsyncMock(side_effect=_aclose)
+
+        with patch("polyapi.http_client.httpx.AsyncClient", return_value=client):
+            async def _run():
+                task = asyncio.create_task(
+                    http_client.async_post("https://example.com", json={})
+                )
+                await asyncio.sleep(0.01)  # let the request start and register in-flight
+                await http_client.close_async()
+                await task
+
+            asyncio.run(_run())
+
+        # aclose ran only after the in-flight request completed.
+        assert order == ["request_done", "aclose"]
+
+    def test_fork_clears_inherited_async_entry_before_creating_child_client(self):
+        """In forked child, _get_async_client must drop the inherited parent
+        entry before creating the child's own."""
+        parent_loop = MagicMock()
+        parent_client = MagicMock()
+        parent_client.aclose = AsyncMock()
+        http_client._async_clients[parent_loop] = parent_client
+
+        child_client = MagicMock()
+        child_client.post = AsyncMock(return_value=_fake_response())
+        child_client.aclose = AsyncMock()
+
+        child_pid = http_client._owner_pid + 1
+        with patch.object(http_client.os, "getpid", return_value=child_pid), \
+                patch("polyapi.http_client.httpx.AsyncClient", return_value=child_client):
+            async def _run():
+                await http_client.async_post("https://example.com", json={})
+                return dict(http_client._async_clients)
+
+            entries = asyncio.run(_run())
+
+        # Parent's inherited entry was dropped, and its sockets left untouched.
+        assert parent_loop not in entries
+        parent_client.aclose.assert_not_awaited()
+        # Child created exactly one client for itself.
+        assert list(entries.values()) == [child_client]
+
+    def test_reset_if_forked_drops_inherited_clients_without_closing(self):
+        """After a fork (PID change), inherited clients must be dropped, not closed —
+        their sockets belong to the parent process."""
+        inherited_sync = MagicMock()
+        inherited_sync.close = MagicMock()
+        inherited_async = MagicMock()
+        inherited_async.aclose = AsyncMock()
+        fake_loop = MagicMock()
+
+        http_client._sync_client = inherited_sync
+        http_client._async_clients[fake_loop] = inherited_async
+
+        # Simulate running in a forked child: getpid() now differs from _owner_pid.
+        with patch.object(http_client.os, "getpid", return_value=http_client._owner_pid + 1):
+            http_client._reset_if_forked()
+
+        # Inherited references cleared
+        assert http_client._sync_client is None
+        assert http_client._async_clients == {}
+        # never closed (that would tear down the parent's live sockets).
+        inherited_sync.close.assert_not_called()
+        inherited_async.aclose.assert_not_awaited()
 
     def test_close_async_clears_cached_client_for_current_loop(self):
         async def _run():
