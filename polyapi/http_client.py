@@ -8,15 +8,15 @@ logger = logging.getLogger("poly")
 
 # Connx pool + timeout defaults for the shared clients.
 
-# Plz bump lims below if evictions like connect_tcp.started ->> ReadError ClosedResourceError
 
 DEFAULT_LIMITS = httpx.Limits(
     max_connections=200,
-    max_keepalive_connections=64,
+    max_keepalive_connections=None,
     keepalive_expiry=30.0,
 )
 DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=15.0)
-
+# Retry connection-establishment failures 
+DEFAULT_RETRIES = 1
 # PID that owns the clients below; a fork resets it
 _owner_pid: int = os.getpid()
 _sync_client: httpx.Client | None = None
@@ -107,7 +107,8 @@ def _get_async_client() -> httpx.AsyncClient:
     client = _async_clients.get(current_loop)
     if client is None:
         _sweep_dead_loops()
-        client = httpx.AsyncClient(limits=DEFAULT_LIMITS, timeout=DEFAULT_TIMEOUT)
+        transport = httpx.AsyncHTTPTransport(limits=DEFAULT_LIMITS, retries=DEFAULT_RETRIES)
+        client = httpx.AsyncClient(transport=transport, timeout=DEFAULT_TIMEOUT)
         _async_clients[current_loop] = client
         _register_loop_close_hook(current_loop, client)
         logger.debug(
