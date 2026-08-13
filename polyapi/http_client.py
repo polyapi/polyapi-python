@@ -45,37 +45,38 @@ def _build_timeout() -> httpx.Timeout:
     )
 
 
-def _build_retries() -> int:
-    # Retry connection-establishment failures.
-    return _env_opt_int("POLY_HTTP_RETRIES", 1) or 0
-
-
 # Import-time snapshot for reference/config surface. Clients re-read env at creation
 DEFAULT_LIMITS = _build_limits()
 DEFAULT_TIMEOUT = _build_timeout()
-DEFAULT_RETRIES = _build_retries()
 # PID that owns the clients below; a fork resets it
 _owner_pid: int = os.getpid()
 _sync_client: httpx.Client | None = None
-# Guard lazy creation of _sync_client
+# Coordinate lazy creation, active requests, and shutdown of _sync_client.
 _sync_client_lock = threading.Lock()
+_sync_client_condition = threading.Condition(_sync_client_lock)
+_sync_inflight = 0
+_sync_closing = False
 # One async client per event loop.
 _async_clients: "dict[asyncio.AbstractEventLoop, httpx.AsyncClient]" = {}
 # In-flight request count per async client, so close_async can drain before aclose.
 _async_inflight: "dict[httpx.AsyncClient, int]" = {}
 # Event loops whose close() already wrapped
 _hooked_loops: "set[asyncio.AbstractEventLoop]" = set()
-# Loops whose client is being closed by close_async; new requests wait on the Event so
-# they don't race a replacement client into the pool mid-close.
-_closing_loops: "dict[asyncio.AbstractEventLoop, asyncio.Event]" = {}
+# Shared close operation per event loop. New requests wait for it so they do not
+# race a replacement client into the pool mid-close.
+_closing_loops: "dict[asyncio.AbstractEventLoop, asyncio.Task[None]]" = {}
 
 
 def _after_fork_in_child() -> None:
     """Reset all shared client state in a forked child
     """
-    global _owner_pid, _sync_client, _sync_client_lock
+    global _owner_pid, _sync_client, _sync_client_lock, _sync_client_condition
+    global _sync_inflight, _sync_closing
     _sync_client_lock = threading.Lock()
+    _sync_client_condition = threading.Condition(_sync_client_lock)
     _sync_client = None
+    _sync_inflight = 0
+    _sync_closing = False
     _async_clients.clear()
     _async_inflight.clear()
     _hooked_loops.clear()
@@ -90,10 +91,15 @@ if hasattr(os, "register_at_fork"):
 def _reset_if_forked() -> None:
     """Drop clients inherited across os.fork() so childisolated
     Clear not close the inherited refs - child makes its own."""
-    global _owner_pid, _sync_client
+    global _owner_pid, _sync_client, _sync_client_lock, _sync_client_condition
+    global _sync_inflight, _sync_closing
     current_pid = os.getpid()
     if current_pid != _owner_pid:
+        _sync_client_lock = threading.Lock()
+        _sync_client_condition = threading.Condition(_sync_client_lock)
         _sync_client = None
+        _sync_inflight = 0
+        _sync_closing = False
         _async_clients.clear()
         _async_inflight.clear()
         _hooked_loops.clear()
@@ -101,15 +107,36 @@ def _reset_if_forked() -> None:
         _owner_pid = current_pid
 
 
-def _get_sync_client() -> httpx.Client:
+def _get_or_create_sync_client() -> httpx.Client:
     global _sync_client
-    _reset_if_forked()
     if _sync_client is None:
-        # Double-checked lock
-        with _sync_client_lock:
-            if _sync_client is None:
-                _sync_client = httpx.Client(limits=_build_limits(), timeout=_build_timeout())
+        _sync_client = httpx.Client(limits=_build_limits(), timeout=_build_timeout())
     return _sync_client
+
+
+def _get_sync_client() -> httpx.Client:
+    _reset_if_forked()
+    with _sync_client_condition:
+        while _sync_closing:
+            _sync_client_condition.wait()
+        return _get_or_create_sync_client()
+
+
+def _dispatch_sync(method_name: str, *args, **kwargs) -> httpx.Response:
+    global _sync_inflight
+    _reset_if_forked()
+    with _sync_client_condition:
+        while _sync_closing:
+            _sync_client_condition.wait()
+        client = _get_or_create_sync_client()
+        _sync_inflight += 1
+    try:
+        return getattr(client, method_name)(*args, **kwargs)
+    finally:
+        with _sync_client_condition:
+            _sync_inflight -= 1
+            if _sync_inflight == 0:
+                _sync_client_condition.notify_all()
 
 
 def _retire_async_client(
@@ -162,7 +189,10 @@ def _register_loop_close_hook(loop: asyncio.AbstractEventLoop) -> None:
         loop.close = _close_with_cleanup  # type: ignore[method-assign]
         _hooked_loops.add(loop)
     except (AttributeError, TypeError):
-        logger.debug(f"Could not hook loop.close pid={os.getpid()} loop={id(loop)}; relying on sweep")
+        logger.warning(
+            f"Could not hook loop.close pid={os.getpid()} loop={id(loop)}; "
+            "await close_async() before closing this event loop"
+        )
 
 
 def _get_async_client() -> httpx.AsyncClient:
@@ -172,8 +202,7 @@ def _get_async_client() -> httpx.AsyncClient:
     if client is None:
         _sweep_dead_loops()
         limits = _build_limits()
-        transport = httpx.AsyncHTTPTransport(limits=limits, retries=_build_retries())
-        client = httpx.AsyncClient(transport=transport, timeout=_build_timeout())
+        client = httpx.AsyncClient(limits=limits, timeout=_build_timeout())
         _async_clients[current_loop] = client
         _register_loop_close_hook(current_loop)
         logger.debug(
@@ -186,11 +215,14 @@ def _get_async_client() -> httpx.AsyncClient:
 
 
 async def _dispatch_async(method_name: str, *args, **kwargs) -> httpx.Response:
-    # If a shutdown is closing this loop's client, wait !
-    # don't race a replacement into the pool mid-close.
+    # If a shutdown is closing this loop's client, wait so a replacement is not
+    # published mid-close. The shutdown caller owns any close error.
     closing = _closing_loops.get(asyncio.get_running_loop())
     if closing is not None:
-        await closing.wait()
+        try:
+            await asyncio.shield(closing)
+        except Exception:
+            pass
     # Track in-flight requests per client so close_async can drain before aclose.
     client = _get_async_client()
     _async_inflight[client] = _async_inflight.get(client, 0) + 1
@@ -204,17 +236,51 @@ async def _dispatch_async(method_name: str, *args, **kwargs) -> httpx.Response:
             _async_inflight[client] = remaining
 
 
-async def _drain_inflight(client: httpx.AsyncClient, timeout: float = 30.0) -> None:
-    # Wait for in-flight requests on client to finish before closing it, so we don't
-    # tear connections out from under active callers. Bounded.
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + timeout
-    while _async_inflight.get(client, 0) > 0 and loop.time() < deadline:
+async def _drain_inflight(client: httpx.AsyncClient) -> None:
+    # Preserve the SDK's unbounded request behavior during shutdown. The shared
+    # close operation retains ownership until every active request finishes.
+    while _async_inflight.get(client, 0) > 0:
         await asyncio.sleep(0.05)
 
 
+async def _wait_for_close_task(close_task: "asyncio.Task[None]") -> None:
+    """Wait for shared cleanup before propagating caller cancellation."""
+    caller_cancelled = False
+    while not close_task.done():
+        try:
+            await asyncio.shield(close_task)
+        except asyncio.CancelledError:
+            caller_cancelled = True
+    close_task.result()
+    if caller_cancelled:
+        raise asyncio.CancelledError()
+
+
+async def _close_clients_for_loop(
+    current_loop: asyncio.AbstractEventLoop,
+) -> None:
+    """Close shared clients while retaining ownership through completion."""
+    try:
+        await asyncio.to_thread(close)
+        client = _async_clients.get(current_loop)
+        if client is None:
+            return
+
+        await _drain_inflight(client)
+        try:
+            await client.aclose()
+        finally:
+            if _async_clients.get(current_loop) is client:
+                _async_clients.pop(current_loop, None)
+            _async_inflight.pop(client, None)
+    finally:
+        if _closing_loops.get(current_loop) is asyncio.current_task():
+            _closing_loops.pop(current_loop, None)
+        _sweep_dead_loops()
+
+
 def post(url, **kwargs) -> httpx.Response:
-    return _get_sync_client().post(url, **kwargs)
+    return _dispatch_sync("post", url, **kwargs)
 
 
 async def async_post(url, **kwargs) -> httpx.Response:
@@ -222,7 +288,7 @@ async def async_post(url, **kwargs) -> httpx.Response:
 
 
 def get(url, **kwargs) -> httpx.Response:
-    return _get_sync_client().get(url, **kwargs)
+    return _dispatch_sync("get", url, **kwargs)
 
 
 async def async_get(url, **kwargs) -> httpx.Response:
@@ -230,7 +296,7 @@ async def async_get(url, **kwargs) -> httpx.Response:
 
 
 def patch(url, **kwargs) -> httpx.Response:
-    return _get_sync_client().patch(url, **kwargs)
+    return _dispatch_sync("patch", url, **kwargs)
 
 
 async def async_patch(url, **kwargs) -> httpx.Response:
@@ -238,7 +304,7 @@ async def async_patch(url, **kwargs) -> httpx.Response:
 
 
 def delete(url, **kwargs) -> httpx.Response:
-    return _get_sync_client().delete(url, **kwargs)
+    return _dispatch_sync("delete", url, **kwargs)
 
 
 async def async_delete(url, **kwargs) -> httpx.Response:
@@ -246,7 +312,7 @@ async def async_delete(url, **kwargs) -> httpx.Response:
 
 
 def request(method, url, **kwargs) -> httpx.Response:
-    return _get_sync_client().request(method, url, **kwargs)
+    return _dispatch_sync("request", method, url, **kwargs)
 
 
 async def async_request(method, url, **kwargs) -> httpx.Response:
@@ -254,35 +320,31 @@ async def async_request(method, url, **kwargs) -> httpx.Response:
 
 
 def close():
-    global _sync_client
-    if _sync_client is not None:
-        _sync_client.close()
-        _sync_client = None
+    global _sync_client, _sync_closing
+    _reset_if_forked()
+    with _sync_client_condition:
+        while _sync_closing:
+            _sync_client_condition.wait()
+        if _sync_client is None:
+            return
+        _sync_closing = True
+        while _sync_inflight > 0:
+            _sync_client_condition.wait()
+        client = _sync_client
+    try:
+        client.close()
+    finally:
+        with _sync_client_condition:
+            if _sync_client is client:
+                _sync_client = None
+            _sync_closing = False
+            _sync_client_condition.notify_all()
+
 
 async def close_async():
-    close()
     current_loop = asyncio.get_running_loop()
-
-    # If a close is already in progress for this loop, just wait for it.
-    existing = _closing_loops.get(current_loop)
-    if existing is not None:
-        await existing.wait()
-        return
-
-    client = _async_clients.get(current_loop)
-    if client is None:
-        _sweep_dead_loops()
-        return
-
-    # Mark the loop as closing BEFORE draining so new requests block 
-    done = asyncio.Event()
-    _closing_loops[current_loop] = done
-    try:
-        await _drain_inflight(client)
-        _async_clients.pop(current_loop, None)
-        await client.aclose()
-    finally:
-        _closing_loops.pop(current_loop, None)
-        done.set()  # release any requests that arrived during the close
-    # Nuke clients left behind by dead loops
-    _sweep_dead_loops()
+    close_task = _closing_loops.get(current_loop)
+    if close_task is None:
+        close_task = asyncio.create_task(_close_clients_for_loop(current_loop))
+        _closing_loops[current_loop] = close_task
+    await _wait_for_close_task(close_task)
