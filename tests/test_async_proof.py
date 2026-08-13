@@ -57,12 +57,16 @@ class TestHttpClientPairing:
         http_client._sync_client = None
         http_client._async_clients.clear()
         http_client._async_inflight.clear()
+        http_client._hooked_loops.clear()
+        http_client._closing_loops.clear()
         http_client._owner_pid = http_client.os.getpid()
 
     def teardown_method(self):
         http_client._sync_client = None
         http_client._async_clients.clear()
         http_client._async_inflight.clear()
+        http_client._hooked_loops.clear()
+        http_client._closing_loops.clear()
         http_client._owner_pid = http_client.os.getpid()
 
     @patch.object(httpx.Client, "post", return_value=_fake_response())
@@ -77,37 +81,44 @@ class TestHttpClientPairing:
     @patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock, return_value=_fake_response())
     def test_async_post_uses_async_client(self, mock_post):
         async def _run():
-            return await http_client.async_post("https://example.com", json={})
+            resp = await http_client.async_post("https://example.com", json={})
+            # Inspect the registry while the loop is alive; teardown pops it.
+            return resp, len(http_client._async_clients)
 
-        resp = asyncio.run(_run())
+        resp, cached_count = asyncio.run(_run())
         mock_post.assert_called_once()
         assert resp.status_code == 200
         # A client was cached for the loop that ran the request.
-        assert len(http_client._async_clients) == 1
+        assert cached_count == 1
 
     def test_async_post_reuses_client_within_same_loop(self):
         first_client = MagicMock()
         first_client.post = AsyncMock(return_value=_fake_response())
+        first_client.aclose = AsyncMock()
 
         with patch("polyapi.http_client.httpx.AsyncClient", return_value=first_client) as mock_async_client:
             async def _run():
                 first_response = await http_client.async_post("https://example.com/first", json={})
                 second_response = await http_client.async_post("https://example.com/second", json={})
-                return first_response, second_response, asyncio.get_running_loop()
+                loop = asyncio.get_running_loop()
+                # Capture the cached client while the loop is alive (teardown pops it).
+                return first_response, second_response, http_client._async_clients.get(loop)
 
-            first_response, second_response, current_loop = asyncio.run(_run())
+            first_response, second_response, cached = asyncio.run(_run())
 
         assert first_response.status_code == 200
         assert second_response.status_code == 200
         assert mock_async_client.call_count == 1
         assert first_client.post.await_count == 2
-        assert http_client._async_clients.get(current_loop) is first_client
+        assert cached is first_client
 
     def test_async_post_recreates_client_after_loop_change(self):
         first_client = MagicMock()
         first_client.post = AsyncMock(return_value=_fake_response())
+        first_client.aclose = AsyncMock()
         second_client = MagicMock()
         second_client.post = AsyncMock(return_value=_fake_response())
+        second_client.aclose = AsyncMock()
 
         with patch(
             "polyapi.http_client.httpx.AsyncClient",
@@ -116,6 +127,7 @@ class TestHttpClientPairing:
             async def _run_once(url: str):
                 loop = asyncio.get_running_loop()
                 response = await http_client.async_post(url, json={})
+                # Capture the cached client while the loop is alive (teardown pops it).
                 return response, http_client._async_clients.get(loop), loop
 
             first_response, first_cached_client, first_loop = asyncio.run(_run_once("https://example.com/first"))
@@ -126,12 +138,12 @@ class TestHttpClientPairing:
         assert mock_async_client.call_count == 2
         assert first_client.post.await_count == 1
         assert second_client.post.await_count == 1
+        # Each loop got its own client while it was alive.
         assert first_cached_client is first_client
         assert second_cached_client is second_client
         assert first_loop is not second_loop
-        # The 2nd loop's req swept the first (this one is now dead) loop out.
-        assert http_client._async_clients.get(second_loop) is second_client
-        assert first_loop not in http_client._async_clients
+        # Each loop's teardown hook popped its own client, so the registry is empty.
+        assert http_client._async_clients == {}
 
     def test_client_aclosed_on_loop_teardown(self):
         """The loop-close hook must aclose the client while the loop is still alive,
@@ -147,6 +159,50 @@ class TestHttpClientPairing:
             asyncio.run(_run())  # loop teardown should trigger aclose
 
         client.aclose.assert_awaited_once()
+
+    def test_loop_close_hook_not_stacked_on_client_recreation(self):
+        """recreating clients on the same loop must install only one loop.close
+        wrapper, so the final client is aclosed exactly once — not once per recreation."""
+        clients = [MagicMock() for _ in range(4)]
+        for c in clients:
+            c.post = AsyncMock(return_value=_fake_response())
+            c.aclose = AsyncMock()
+
+        with patch("polyapi.http_client.httpx.AsyncClient", side_effect=clients):
+            async def _run():
+                loop = asyncio.get_running_loop()
+                for i in range(4):
+                    await http_client.async_post("https://example.com", json={})
+                    if i < 3:
+                        # simulate a close/recreate cycle on the SAME loop
+                        http_client._async_clients.pop(loop, None)
+                        http_client._async_inflight.clear()
+
+            asyncio.run(_run())
+
+        # Only the last client is live at teardown; the single hook aclos it once.
+        assert clients[-1].aclose.await_count == 1
+        # Earlier clients were popped without closing here (no stacked wrappers).
+        assert all(c.aclose.await_count == 0 for c in clients[:-1])
+
+    def test_default_timeout_is_unbounded_and_env_configurable(self):
+        """Default timeout is unbounded behavior; env vars override
+        """
+        # Default: every phase is None 
+        assert http_client._env_opt_float("POLY_HTTP_READ_TIMEOUT", None) is None
+        default_timeout = httpx.Timeout(
+            connect=http_client._env_opt_float("POLY_HTTP_CONNECT_TIMEOUT", None),
+            read=http_client._env_opt_float("POLY_HTTP_READ_TIMEOUT", None),
+            write=http_client._env_opt_float("POLY_HTTP_WRITE_TIMEOUT", None),
+            pool=http_client._env_opt_float("POLY_HTTP_POOL_TIMEOUT", None),
+        )
+        assert default_timeout == httpx.Timeout(None)
+
+        # Env override is respected; "none" parses back to None.
+        with patch.dict("os.environ", {"POLY_HTTP_READ_TIMEOUT": "90"}):
+            assert http_client._env_opt_float("POLY_HTTP_READ_TIMEOUT", None) == 90.0
+        with patch.dict("os.environ", {"POLY_HTTP_MAX_KEEPALIVE_CONNECTIONS": "none"}):
+            assert http_client._env_opt_int("POLY_HTTP_MAX_KEEPALIVE_CONNECTIONS", 64) is None
 
     def test_close_async_drains_inflight_before_closing(self):
         """close_async must wait for in-flight requests to finish before
@@ -179,6 +235,46 @@ class TestHttpClientPairing:
         # aclose ran only after the in-flight request completed.
         assert order == ["request_done", "aclose"]
 
+    def test_close_async_blocks_new_requests_until_close_finishes(self):
+        """a request arriving mid-close must NOT create a replacement
+        client that shutdown never closes. It waits until aclose() finishes, then gets
+        a fresh client."""
+        order = []
+        old_client = MagicMock()
+        new_client = MagicMock()
+
+        async def _slow_post(*a, **k):
+            await asyncio.sleep(0.1)
+            order.append("inflight_done")
+            return _fake_response()
+
+        async def _old_aclose():
+            order.append("old_aclose")
+
+        async def _new_post(*a, **k):
+            order.append("new_post")
+            return _fake_response()
+
+        old_client.post = AsyncMock(side_effect=_slow_post)
+        old_client.aclose = AsyncMock(side_effect=_old_aclose)
+        new_client.post = AsyncMock(side_effect=_new_post)
+        new_client.aclose = AsyncMock()
+
+        with patch("polyapi.http_client.httpx.AsyncClient", side_effect=[old_client, new_client]):
+            async def _run():
+                inflight = asyncio.create_task(http_client.async_post("https://x/1", json={}))
+                await asyncio.sleep(0.01)  # register in-flight on the old client
+                closer = asyncio.create_task(http_client.close_async())
+                await asyncio.sleep(0.01)  # let close mark the loop as closing
+                new_req = asyncio.create_task(http_client.async_post("https://x/2", json={}))
+                await asyncio.gather(inflight, closer, new_req)
+
+            asyncio.run(_run())
+
+        # In-flight drained, old client closed, THEN the new request ran on a fresh client.
+        assert order == ["inflight_done", "old_aclose", "new_post"]
+        assert new_client.post.await_count == 1
+
     def test_fork_clears_inherited_async_entry_before_creating_child_client(self):
         """In forked child, _get_async_client must drop the inherited parent
         entry before creating the child's own."""
@@ -205,6 +301,25 @@ class TestHttpClientPairing:
         parent_client.aclose.assert_not_awaited()
         # Child created exactly one client for itself.
         assert list(entries.values()) == [child_client]
+
+    def test_after_fork_in_child_resets_lock_and_state(self):
+        """after-fork hook must recreate _sync_client_lock (a child could
+        inherit it locked and deadlock) and clear all inherited client state."""
+        old_lock = http_client._sync_client_lock
+        http_client._sync_client = MagicMock()
+        http_client._async_clients[MagicMock()] = MagicMock()
+        http_client._async_inflight[MagicMock()] = 3
+
+        http_client._after_fork_in_child()
+
+        # Fresh, unlocked lock — not the (possibly held) inherited one.
+        assert http_client._sync_client_lock is not old_lock
+        assert not http_client._sync_client_lock.locked()
+        # All inherited state dropped (not closed).
+        assert http_client._sync_client is None
+        assert http_client._async_clients == {}
+        assert http_client._async_inflight == {}
+        assert http_client._owner_pid == http_client.os.getpid()
 
     def test_reset_if_forked_drops_inherited_clients_without_closing(self):
         """After a fork (PID change), inherited clients must be dropped, not closed —
