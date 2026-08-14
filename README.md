@@ -43,6 +43,32 @@ POLY_API_KEY='your_key'
 POLY_API_BASE_URL='your_server'  # e.g. na1.polyapi.io
 ```
 
+### HTTP Client Configuration
+
+The SDK reuses one synchronous HTTP client per process and one asynchronous
+client per event loop. New clients read these optional environment variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `POLY_HTTP_MAX_CONNECTIONS` | `200` | Maximum connections per client |
+| `POLY_HTTP_MAX_KEEPALIVE_CONNECTIONS` | `none` | Maximum idle keep-alive connections per client |
+| `POLY_HTTP_KEEPALIVE_EXPIRY` | `30` | Idle keep-alive expiry in seconds |
+| `POLY_HTTP_CONNECT_TIMEOUT` | `none` | Connection timeout in seconds |
+| `POLY_HTTP_READ_TIMEOUT` | `none` | Read timeout in seconds |
+| `POLY_HTTP_WRITE_TIMEOUT` | `none` | Write timeout in seconds |
+| `POLY_HTTP_POOL_TIMEOUT` | `none` | Connection-pool timeout in seconds |
+
+An empty value, `none`, or `null` means unbounded. Limits are per client, so
+processes with multiple event loops can create one configured pool per loop.
+
+Call `polyapi.http_client.close()` during synchronous shutdown or await
+`polyapi.http_client.close_async()` on each owning event loop during
+asynchronous shutdown. The shutdown functions wait for active SDK requests
+before closing their client. Clients on standard asyncio loops are closed
+automatically when the loop closes. If a custom event-loop implementation
+reports that its close hook could not be installed, explicitly await
+`close_async()` before closing that loop.
+
 ### 3. Test
 
 That's it! Now open up a test file and you can run some code like so:
