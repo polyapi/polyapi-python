@@ -10,7 +10,7 @@ from typing import cast
 from unittest.mock import patch, MagicMock
 from polyapi.typedefs import SpecificationDto
 from polyapi.utils import get_type_and_def, rewrite_reserved, to_type_module_alias
-from polyapi.generate import render_spec, create_empty_schemas_module, generate_functions, create_function, add_function_file
+from polyapi.generate import render_spec, create_empty_schemas_module, generate_functions, create_function, add_function_file, get_specs
 from polyapi.poly_schemas import generate_schemas, create_schema
 from polyapi.variables import generate_variables, create_variable
 
@@ -247,6 +247,26 @@ MEWS_HEADERS_SPECS = [
 
 
 class T(unittest.TestCase):
+    @patch("polyapi.generate.get_direct_execute_config", return_value=False)
+    @patch("polyapi.generate.get_auth_headers", return_value={"Authorization": "Bearer api-key"})
+    @patch("polyapi.generate.get_api_key_and_url", return_value=("api-key", "https://api.example.com"))
+    @patch("polyapi.generate.http_client.get")
+    def test_get_specs_serializes_more_than_twenty_contexts_as_one_parameter(
+        self,
+        mock_get,
+        _mock_api_config,
+        _mock_headers,
+        _mock_direct_execute,
+    ):
+        contexts = [f"context{index}" for index in range(21)]
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = []
+
+        self.assertEqual(get_specs(contexts=contexts), [])
+
+        params = mock_get.call_args.kwargs["params"]
+        self.assertEqual(params["contexts"], ",".join(contexts))
+
     def test_get_type_and_def(self):
         arg_type, arg_def = get_type_and_def(OPENAPI_FUNCTION)
         self.assertEqual(arg_type, "Callable[[List[WebhookEventTypeElement], Dict, Dict, Dict], None]")

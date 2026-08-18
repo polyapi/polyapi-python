@@ -53,7 +53,7 @@ def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] =
     params: Any = {"noTypes": str(no_types).lower()}
 
     if contexts:
-        params["contexts"] = contexts
+        params["contexts"] = ",".join(contexts)
     
     if names:
         params["names"] = names
