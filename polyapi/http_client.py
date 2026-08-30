@@ -45,6 +45,12 @@ def _build_timeout() -> httpx.Timeout:
     )
 
 
+def _close_deadline() -> "float | None":
+    # Bound pool teardown so one wedged socket cannot hang invocation exit.
+    # None (POLY_HTTP_CLOSE_TIMEOUT=none) restores the old unbounded wait.
+    return _env_opt_float("POLY_HTTP_CLOSE_TIMEOUT", 5.0)
+
+
 # Import-time snapshot for reference/config surface. Clients re-read env at creation
 DEFAULT_LIMITS = _build_limits()
 DEFAULT_TIMEOUT = _build_timeout()
@@ -177,8 +183,13 @@ def _register_loop_close_hook(loop: asyncio.AbstractEventLoop) -> None:
         _hooked_loops.discard(loop)
         cached = _async_clients.pop(loop, None)
         if cached is not None and not loop.is_closed():
+            deadline = _close_deadline()
             try:
-                loop.run_until_complete(cached.aclose())
+                loop.run_until_complete(asyncio.wait_for(cached.aclose(), timeout=deadline))
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"aclose exceeded {deadline}s deadline; abandoning pool "
+                    f"id={id(cached)} pid={os.getpid()} loop={id(loop)} on teardown")
             except Exception:
                 logger.warning(
                     f"Failed to aclose async client id={id(cached)} pid={os.getpid()} "
@@ -267,8 +278,15 @@ async def _close_clients_for_loop(
             return
 
         await _drain_inflight(client)
+        deadline = _close_deadline()
         try:
-            await client.aclose()
+            await asyncio.wait_for(client.aclose(), timeout=deadline)
+        except asyncio.TimeoutError:
+            # Only the hang is swallowed. Real aclose errors still propagate to
+            # the close_async caller
+            logger.warning(
+                f"aclose exceeded {deadline}s deadline; abandoning pool "
+                f"id={id(client)} pid={os.getpid()} loop={id(current_loop)}")
         finally:
             if _async_clients.get(current_loop) is client:
                 _async_clients.pop(current_loop, None)
