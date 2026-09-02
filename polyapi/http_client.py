@@ -45,6 +45,12 @@ def _build_timeout() -> httpx.Timeout:
     )
 
 
+def _close_deadline() -> "float | None":
+    # Bound pool teardown so one wedged socket cannot hang invocation exit.
+    # None (POLY_HTTP_CLOSE_TIMEOUT=none) restores the old unbounded wait.
+    return _env_opt_float("POLY_HTTP_CLOSE_TIMEOUT", 5.0)
+
+
 # Import-time snapshot for reference/config surface. Clients re-read env at creation
 DEFAULT_LIMITS = _build_limits()
 DEFAULT_TIMEOUT = _build_timeout()
@@ -166,6 +172,48 @@ def _sweep_dead_loops() -> None:
             _retire_async_client(_async_clients.pop(loop, None), loop)
 
 
+def _abandon_close_task(
+    close_task: "asyncio.Future[None]",
+    client: httpx.AsyncClient,
+    loop: asyncio.AbstractEventLoop,
+    deadline: "float | None",
+    context: str = "",
+) -> None:
+    """Detach a pool close that blew its deadline.
+
+    The task is cancelled and dropped from asyncio's task registry rather than
+    awaited. asyncio.run() tears a loop down by cancelling every registered
+    task and then gathering them, so a pool that ignores cancellation would
+    stall loop shutdown even though close_async() already returned on time.
+    Unregistering keeps the deadline a hard bound; whatever stays open is
+    released when the coroutine is collected, and by the OS at exit.
+    """
+    def _swallow(finished: "asyncio.Future[None]") -> None:
+        # Retrieve the result so a late failure is not reported as an
+        # unretrieved task exception.
+        if finished.cancelled():
+            return
+        error = finished.exception()
+        if error is not None:
+            logger.debug(
+                f"Abandoned aclose later failed with {error!r} id={id(client)} "
+                f"pid={os.getpid()} loop={id(loop)}")
+
+    close_task.add_done_callback(_swallow)
+    close_task.cancel()
+    unregister = getattr(asyncio.tasks, "_unregister_task", None)
+    if unregister is not None:
+        try:
+            unregister(close_task)
+        except Exception:
+            logger.debug(
+                f"Could not unregister abandoned close id={id(client)} "
+                f"pid={os.getpid()} loop={id(loop)}", exc_info=True)
+    logger.warning(
+        f"aclose exceeded {deadline}s deadline; abandoning pool "
+        f"id={id(client)} pid={os.getpid()} loop={id(loop)}{context}")
+
+
 def _register_loop_close_hook(loop: asyncio.AbstractEventLoop) -> None:
     """aclose the loop's async client right before the loop is torn down.
     """
@@ -177,8 +225,21 @@ def _register_loop_close_hook(loop: asyncio.AbstractEventLoop) -> None:
         _hooked_loops.discard(loop)
         cached = _async_clients.pop(loop, None)
         if cached is not None and not loop.is_closed():
+            deadline = _close_deadline()
             try:
-                loop.run_until_complete(cached.aclose())
+                # asyncio.wait returns at the deadline without cancelling, so
+                # loop.close() proceeds even if the pool ignores cancellation.
+                close_task = loop.create_task(cached.aclose())
+                loop.run_until_complete(
+                    asyncio.wait({close_task}, timeout=deadline))
+                if close_task.done():
+                    # Surface real aclose failures, including a TimeoutError
+                    # raised by aclose itself, rather than treating them as
+                    # our deadline.
+                    close_task.result()
+                else:
+                    _abandon_close_task(
+                        close_task, cached, loop, deadline, " on teardown")
             except Exception:
                 logger.warning(
                     f"Failed to aclose async client id={id(cached)} pid={os.getpid()} "
@@ -267,8 +328,19 @@ async def _close_clients_for_loop(
             return
 
         await _drain_inflight(client)
+        deadline = _close_deadline()
+        close_task = asyncio.ensure_future(client.aclose())
         try:
-            await client.aclose()
+            # asyncio.wait returns at the deadline without cancelling the
+            # close, so the bound holds even when the pool never processes
+            # cancellation. wait_for would block on that unwind instead.
+            await asyncio.wait({close_task}, timeout=deadline)
+            if close_task.done():
+                # Real aclose errors, including a TimeoutError raised by aclose
+                # itself, still propagate to the close_async caller.
+                close_task.result()
+            else:
+                _abandon_close_task(close_task, client, current_loop, deadline)
         finally:
             if _async_clients.get(current_loop) is client:
                 _async_clients.pop(current_loop, None)

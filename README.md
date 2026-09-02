@@ -57,9 +57,16 @@ client per event loop. New clients read these optional environment variables:
 | `POLY_HTTP_READ_TIMEOUT` | `none` | Read timeout in seconds |
 | `POLY_HTTP_WRITE_TIMEOUT` | `none` | Write timeout in seconds |
 | `POLY_HTTP_POOL_TIMEOUT` | `none` | Connection-pool timeout in seconds |
+| `POLY_HTTP_CLOSE_TIMEOUT` | `5` | Deadline in seconds for closing a client's pool |
 
 An empty value, `none`, or `null` means unbounded. Limits are per client, so
 processes with multiple event loops can create one configured pool per loop.
+
+`POLY_HTTP_CLOSE_TIMEOUT` is read at shutdown rather than at client creation.
+It bounds pool teardown so a single unresponsive socket cannot stall shutdown:
+if the deadline passes, the SDK logs a warning, abandons the remaining
+connections to the operating system, and retires the client so it is never
+reused. Set it to `none` to wait indefinitely.
 
 Call `polyapi.http_client.close()` during synchronous shutdown or await
 `polyapi.http_client.close_async()` on each owning event loop during
