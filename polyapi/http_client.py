@@ -181,12 +181,12 @@ def _abandon_close_task(
 ) -> None:
     """Detach a pool close that blew its deadline.
 
-    The task is cancelled and dropped from asyncio's task registry rather than
-    awaited. asyncio.run() tears a loop down by cancelling every registered
-    task and then gathering them, so a pool that ignores cancellation would
-    stall loop shutdown even though close_async() already returned on time.
-    Unregistering keeps the deadline a hard bound; whatever stays open is
-    released when the coroutine is collected, and by the OS at exit.
+    The task is cancelled and dropped rather than awaited: waiting for an
+    unresponsive pool to unwind is the stall the deadline exists to prevent.
+    Cancelling is what keeps loop shutdown bounded too, since asyncio.run()
+    tears down by cancelling every task and gathering them; a cancelled close
+    completes there instead of blocking. Whatever stays open is released when
+    the coroutine is collected, and by the OS at exit.
     """
     def _swallow(finished: "asyncio.Future[None]") -> None:
         # Retrieve the result so a late failure is not reported as an
@@ -201,14 +201,6 @@ def _abandon_close_task(
 
     close_task.add_done_callback(_swallow)
     close_task.cancel()
-    unregister = getattr(asyncio.tasks, "_unregister_task", None)
-    if unregister is not None:
-        try:
-            unregister(close_task)
-        except Exception:
-            logger.debug(
-                f"Could not unregister abandoned close id={id(client)} "
-                f"pid={os.getpid()} loop={id(loop)}", exc_info=True)
     logger.warning(
         f"aclose exceeded {deadline}s deadline; abandoning pool "
         f"id={id(client)} pid={os.getpid()} loop={id(loop)}{context}")
