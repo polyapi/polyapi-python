@@ -1,25 +1,36 @@
 import copy
+import importlib
 import os
-import sys
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional, overload
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, Dict, Literal, Optional, overload
 
 import truststore
 from typing_extensions import TypedDict
-
-from .cli_constants import CLI_COMMANDS
 
 truststore.inject_into_ssl()
 
 __all__ = ["poly"]
 
+if TYPE_CHECKING:
+    poly: ModuleType
 
-if len(sys.argv) > 1 and sys.argv[1] not in CLI_COMMANDS:
+
+def _load_generated_poly() -> ModuleType:
     currdir = os.path.dirname(os.path.abspath(__file__))
     if not os.path.isdir(os.path.join(currdir, "poly")):
-        print("No 'poly' found. Please run 'python3 -m polyapi generate' to generate the 'poly' library for your tenant.")
-        sys.exit(1)
+        raise ModuleNotFoundError(
+            "No 'poly' found. Please run 'python3 -m polyapi generate' "
+            "to generate the 'poly' library for your tenant."
+        )
+    return importlib.import_module(".poly", __name__)
+
+
+def __getattr__(name: str) -> ModuleType:
+    if name == "poly":
+        return _load_generated_poly()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class PolyCustomDict(TypedDict, total=False):

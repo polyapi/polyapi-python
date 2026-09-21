@@ -3,6 +3,7 @@
 .DS_Store
 
 # Pip
+/build/
 dist/
 polyapi_python.egg-info/
 

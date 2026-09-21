@@ -1,7 +1,7 @@
 import keyword
 import re
 import os
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from typing import Tuple, List, Optional, cast
 from colorama import Fore, Style
 from polyapi.constants import BASIC_PYTHON_TYPES
@@ -299,11 +299,29 @@ def _maybe_add_fallback_schema_name(a: PropertySpecification):
     # Handle cases where type might be missing
     if not a.get("type"):
         return
-    
+
     if a["type"].get("kind") == "object" and a["type"].get("schema"):
         schema = a["type"].get("schema", {})
-        if not schema.get("title") and not schema.get("name") and a.get("name"):
-            schema["title"] = a["name"].title()
+        title = schema.get("title") or schema.get("name")
+        if not title and a.get("name"):
+            title = a["name"].title()
+            schema["title"] = title
+
+        reference = schema.get("$ref")
+        definitions = schema.get("definitions")
+        reference_prefix = "#/definitions/"
+        if not isinstance(title, str):
+            return
+        if not isinstance(reference, str) or not reference.startswith(reference_prefix):
+            return
+        if not isinstance(definitions, dict):
+            return
+
+        definition_name = unquote(reference[len(reference_prefix):])
+        definition_name = definition_name.replace("~1", "/").replace("~0", "~")
+        definition = definitions.get(definition_name)
+        if isinstance(definition, dict):
+            definition.setdefault("title", title)
 
 
 def _clean_description(text: str) -> str:
