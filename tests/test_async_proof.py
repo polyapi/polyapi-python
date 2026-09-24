@@ -23,6 +23,7 @@ import threading
 import time
 import unittest
 import warnings
+from typing import cast
 from unittest.mock import patch, MagicMock, AsyncMock
 
 import httpx
@@ -315,7 +316,7 @@ def _run_real_resource_soak():
 
 # 1. http_client sync / async client pairing
 
-class TestHttpClientPairing:
+class TestHttpClientPairing(unittest.TestCase):
     """Verify that the sync helpers call httpx.Client and the async helpers
     call httpx.AsyncClient."""
 
@@ -498,7 +499,7 @@ class TestHttpClientPairing:
                     raise AttributeError("close is read-only")
                 object.__setattr__(self, name, value)
 
-        loop = ReadOnlyCloseLoop()
+        loop = cast(asyncio.AbstractEventLoop, ReadOnlyCloseLoop())
         with self.assertLogs("poly", level=logging.WARNING) as captured:
             http_client._register_loop_close_hook(loop)
 
@@ -587,7 +588,7 @@ class TestHttpClientPairing:
             async def _run():
                 client = http_client._get_async_client()
                 proxy_pools = [
-                    type(transport._pool).__name__
+                    type(getattr(transport, "_pool", None)).__name__
                     for transport in client._mounts.values()
                     if transport is not None
                 ]
