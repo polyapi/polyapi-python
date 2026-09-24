@@ -74,7 +74,12 @@ def scrub_keys(e: Exception) -> Dict[str, Any]:
 
 def execute_query(table_id, method, query):
     from polyapi import polyCustom
-    from polyapi.poly.client_id import client_id
+
+    client_id: Optional[str] = None
+    try:
+        from polyapi.poly.client_id import client_id  # pyright: ignore[reportMissingImports]
+    except ImportError:
+        pass
 
     try:
         api_key, base_url = get_api_key_and_url()
@@ -84,7 +89,9 @@ def execute_query(table_id, method, query):
             )
 
         auth_key = polyCustom.get("executionApiKey") or api_key
-        url = f"{base_url.rstrip('/')}/tables/{table_id}/{method}?clientId={client_id}"
+        url = f"{base_url.rstrip('/')}/tables/{table_id}/{method}"
+        if client_id:
+            url += f"?clientId={client_id}"
         headers = {"x-poly-execution-id": polyCustom.get("executionId") or ""}
         if auth_key:
             headers["Authorization"] = f"Bearer {auth_key}"

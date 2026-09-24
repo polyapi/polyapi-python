@@ -5,13 +5,18 @@ import sys
 import re
 from typing import Dict, List, Mapping, Optional, Tuple, Any, Union
 from typing import _TypedDictMeta as BaseTypedDict  # type: ignore
-from typing_extensions import _TypedDictMeta, cast # type: ignore
+from typing_extensions import TypedDict, _TypedDictMeta, cast # type: ignore
 from stdlib_list import stdlib_list
 from pydantic import TypeAdapter
 from importlib.metadata import packages_distributions
 from polyapi.constants import PYTHON_TO_JSONSCHEMA_TYPE_MAP
 from polyapi.utils import print_red
-from polyapi.deployables import Deployment, DeployableRecord, get_deployable_file_revision
+from polyapi.deployables import (
+    Deployment,
+    DeployableRecord,
+    DeployableTypes,
+    get_deployable_file_revision,
+)
 
 
 # these libraries are already installed in the base docker image
@@ -116,15 +121,53 @@ def _parse_sphinx_docstring(docstring: str) -> Dict[str, Any]:
     }
 
 
-def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
+class _GoogleParamState(TypedDict):
+    name: str
+    type: str
+    description: List[str]
+
+
+class _GoogleReturnsState(TypedDict):
+    type: str
+    description: List[str]
+
+
+class GoogleDocstringParam(TypedDict):
+    name: str
+    type: str
+    typeSchema: Optional[Dict[str, Any]]
+    description: str
+
+
+class GoogleDocstringReturns(TypedDict):
+    type: str
+    typeSchema: Optional[Dict[str, Any]]
+    description: str
+
+
+class GoogleDocstring(TypedDict):
+    description: str
+    params: List[GoogleDocstringParam]
+    returns: GoogleDocstringReturns
+    raises: Dict[str, str]
+
+
+class _GoogleDocstringState(TypedDict):
+    description: List[str]
+    params: Dict[str, _GoogleParamState]
+    returns: _GoogleReturnsState
+    raises: Dict[str, str]
+
+
+def _parse_google_docstring(docstring: str) -> GoogleDocstring:
     import re
     lines = docstring.split('\n')
     mode = None
-    params = {}
-    parsed = {
+    params: Dict[str, _GoogleParamState] = {}
+    parsed: _GoogleDocstringState = {
         'description': [],
-        'params': [],
-        'returns': {'description': []},
+        'params': params,
+        'returns': {'type': '', 'description': []},
         'raises': {}
     }
     current_key = None
@@ -169,12 +212,25 @@ def _parse_google_docstring(docstring: str) -> Dict[str, Any]:
         elif mode is None:
             parsed['description'].append(line.strip())
 
-    # Consolidate descriptions
-    parsed['description'] = ' '.join(parsed['description']).strip()
-    parsed['returns']['description'] = ' '.join(parsed['returns']['description']).strip()
-    parsed['params'] = [{ **v, 'description': ' '.join(v['description']).strip() } for v in params.values()]
+    parsed_result: GoogleDocstring = {
+        'description': ' '.join(parsed['description']).strip(),
+        'params': [
+            {
+                **value,
+                'typeSchema': None,
+                'description': ' '.join(value['description']).strip(),
+            }
+            for value in params.values()
+        ],
+        'returns': {
+            'type': parsed['returns']['type'],
+            'typeSchema': None,
+            'description': ' '.join(parsed['returns']['description']).strip(),
+        },
+        'raises': parsed['raises'],
+    }
 
-    return parsed
+    return parsed_result
 
 
 def _get_schemas(code: str) -> List[Dict]:
@@ -299,12 +355,12 @@ def _parse_deploy_comment(comment: str) -> Optional[Deployment]:
 
     # Local development puts canopy on a different port than the poly-server
     if instance.endswith("localhost:3000"):
-        instance = instance.replace(":3000', ':8000")
+        instance = instance.replace(":3000", ":8000")
 
     return {
         "name": name,
         "context": context,
-        "type": deploy_type,
+        "type": DeployableTypes(deploy_type),
         "id": id,
         "deployed": deployed,
         "fileRevision": file_revision,
@@ -398,9 +454,9 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
             ):
                 # We've found a polyConfig dictionary assignment
                 if node.annotation.id == "PolyServerFunction":
-                    deployable["type"] = "server-function"
+                    deployable["type"] = "server-function" # pyright: ignore[reportGeneralTypeIssues]
                 elif node.annotation.id == "PolyClientFunction":
-                    deployable["type"] = "client-function"
+                    deployable["type"] = "client-function" # pyright: ignore[reportGeneralTypeIssues]
                 else:
                     print_red("ERROR")
                     print(f"Unsupported polyConfig type '${node.annotation.id}'")
@@ -466,7 +522,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
                 if deployment:
                     start = self._line_offsets[i]
                     deployable["deployments"].append(deployment)
-                    deployable["deploymentCommentRanges"].append([start, start + len(line)])
+                    deployable["deploymentCommentRanges"].append((start, start + len(line)))
 
         def visit_Import(self, node: ast.Import):
             # TODO maybe handle `import foo.bar` case?
@@ -539,7 +595,7 @@ def parse_function_code(code: str, name: Optional[str] = "", context: Optional[s
 
         def generic_visit(self, node):
             if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
-                self._current_offset = self._line_offsets[node.lineno - 1] + node.col_offset
+                self._current_offset = self._line_offsets[node.lineno - 1] + node.col_offset # pyright: ignore[reportAttributeAccessIssue]
             super().generic_visit(node)
 
     tree = ast.parse(code)

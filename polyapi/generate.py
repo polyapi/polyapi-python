@@ -7,7 +7,7 @@ import tempfile
 import stat
 
 from copy import deepcopy
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from .auth import render_auth_function
 from .client import render_client_function
@@ -104,7 +104,7 @@ def replace_poly_refs_in_functions(specs: List[SpecificationDto], schema_index):
             func = spec.get("function")
             if func:
                 try:
-                    spec["function"] = resolve_poly_refs(func, schema_index)
+                    spec["function"] = resolve_poly_refs(func, schema_index) # pyright: ignore[reportGeneralTypeIssues]
                 except Exception:
                     # print()
                     # print(f"{spec['context']}.{spec['name']} (id: {spec['id']}) failed to resolve poly refs, skipping!")
@@ -123,7 +123,7 @@ def replace_poly_refs_in_schemas(specs: List[SchemaSpecDto], schema_index):
     spec_idxs_to_remove = []
     for idx, spec in enumerate(specs):
         try:
-            spec["definition"] = resolve_poly_refs(spec["definition"], schema_index)
+            spec["definition"] = cast(Dict[str, Any], resolve_poly_refs(spec["definition"], schema_index))
         except Exception:
             # print()
             print(f"{spec['context']}.{spec['name']} (id: {spec['id']}) failed to resolve poly refs, skipping!")
@@ -445,16 +445,16 @@ def render_spec(spec: SpecificationDto) -> Tuple[str, str]:
     arguments: List[PropertySpecification] = []
     return_type: Any = {}
     if spec.get("function"):
-        assert spec["function"]
+        function_spec = cast(Dict[str, Any], spec["function"]) # pyright: ignore[reportTypedDictNotRequiredAccess]
         # Handle cases where arguments might be missing or None
-        if spec["function"].get("arguments"):
+        if function_spec.get("arguments"):
             arguments = [
-                arg for arg in spec["function"]["arguments"]
+                arg for arg in function_spec["arguments"]
             ]
-        
+
         # Handle cases where returnType might be missing or None
-        if spec["function"].get("returnType"):
-            return_type = spec["function"]["returnType"]
+        if function_spec.get("returnType"):
+            return_type = function_spec["returnType"]
         else:
             # Provide a fallback return type when missing
             return_type = {"kind": "any"}

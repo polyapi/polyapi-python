@@ -41,7 +41,9 @@ def add_import_to_init(full_path: str, next: str, code_imports: Optional[str] = 
             f.write(import_stmt)
 
 
-def get_auth_headers(api_key: str):
+def get_auth_headers(api_key: Optional[str]) -> dict[str, str]:
+    if api_key is None:
+        raise ValueError("An API key is required to build authorization headers")
     return {"Authorization": f"Bearer {api_key}"}
 
 
