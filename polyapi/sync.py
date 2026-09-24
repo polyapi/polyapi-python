@@ -22,7 +22,7 @@ def read_file(file_path: str) -> str:
     with open(file_path, 'r', encoding='utf-8') as file:
         return file.read()
 
-def group_by(items: List[Dict], key: str) -> Dict[str, List[Dict]]:
+def group_by(items: List[DeployableRecord], key: str) -> Dict[str, List[DeployableRecord]]:
     grouped = {}  # type: ignore
     for item in items:
         grouped.setdefault(item[key], []).append(item)
@@ -50,7 +50,7 @@ def remove_deployable(deployable: SyncDeployment) -> bool:
 def sync_function_and_get_id(deployable: SyncDeployment, code: str) -> str:
     api_key, _ = get_api_key_and_url()
     if not api_key:
-        raise Error("Missing api key!")
+        raise Exception("Missing api key!")
     headers = get_auth_headers(api_key)
     url = f'{deployable["instance"]}/functions/{deployable["type"].replace("-function", "")}'
     payload = {

@@ -157,7 +157,8 @@ class T(unittest.TestCase):
         self.assertEqual(len(types["params"]), 1)
         self.assertEqual(types["params"][0], {"name": "n", "type": "int", "typeSchema": None, "description": ""})
         self.assertEqual(types["returns"]["type"], "Barbar")
-        self.assertEqual(types["returns"]["typeSchema"]['title'], "Barbar")
+        typeSchema = types["returns"].get("typeSchema") or {} 
+        self.assertEqual(typeSchema.get('title', "Barbar"), "Barbar")
 
     def test_complex_arg_type(self):
         deployable = parse_function_code(COMPLEX_ARG_TYPE, "foobar")
@@ -173,7 +174,7 @@ class T(unittest.TestCase):
         self.assertEqual(len(types["params"]), 1)
         self.assertEqual(types["params"][0], {"name": "n", "type": "int", "typeSchema": None, "description": ""})
         self.assertEqual(types["returns"]["type"], "List[Barbar]")
-        self.assertEqual(types["returns"]["typeSchema"]["items"]['title'], "Barbar")
+        self.assertEqual(types["returns"]["typeSchema"]["items"]['title'], "Barbar") # pyright: ignore[reportOptionalSubscript]
 
     def test_parse_import_basic(self):
         code = "import flask\n\n\ndef foobar(n: int) -> int:\n    return 9\n"

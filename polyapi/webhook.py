@@ -107,7 +107,8 @@ async def unregister_all():
     # maybe need to reconnect because maybe socketio client disconnected after Ctrl+C?
     # feels like Linux disconnects but Windows stays connected
     try:
-        await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+        if client:
+            await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
     except ConnectionError:
         pass
     await asyncio.gather(*[unregister(handler) for handler in active_handlers])

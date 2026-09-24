@@ -1,4 +1,6 @@
 import unittest
+from typing import cast
+from polyapi.typedefs import VariableSpecDto
 from polyapi.variables import render_variable
 
 EXAMPLE = {
@@ -24,5 +26,5 @@ EXAMPLE = {
 
 class T(unittest.TestCase):
     def test_render_variable(self):
-        variable_str = render_variable(EXAMPLE)
+        variable_str = render_variable(cast(VariableSpecDto, EXAMPLE))
         self.assertIn("class test", variable_str)
