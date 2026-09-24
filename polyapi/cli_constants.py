@@ -4,7 +4,6 @@ CLI_COMMANDS = (
     "function",
     "clear",
     "help",
-    "update_rendered_spec",
     "prepare",
     "sync",
 )
