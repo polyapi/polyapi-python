@@ -64,7 +64,7 @@ class DeployableRecord(ParsedDeployableConfig):
     docEndIndex: int
     dirty: Optional[bool]
 
-class SyncDeployment(TypedDict, total=False):
+class SyncDeployment(TypedDict):
     context: str
     name: str
     description: str
