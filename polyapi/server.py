@@ -75,8 +75,7 @@ def render_server_function(
 
 
 def _normalize_return_type_for_annotation(function_name: str, return_type_name: str) -> str:
-    if return_type_name == "ReturnType":
-        return "ReturnType"
+    # "ReturnType" lives in a separate module, so it must be qualified (e.g. _SFX.ReturnType).
     return add_type_import_path(function_name, return_type_name)
 
 

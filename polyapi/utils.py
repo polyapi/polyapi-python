@@ -102,7 +102,8 @@ def normalize_cross_language_type(type_name: str) -> str:
         normalized = [normalize_cross_language_type(part) for part in parts]
         return " | ".join(normalized) if normalized else "Any"
 
-    if value == "ReturnType" or value.startswith("ReturnType<") or "typeof" in value:
+    # Only TS's ReturnType<...>/typeof syntax falls back to Any, not our own "ReturnType" name.
+    if value.startswith("ReturnType<") or "typeof" in value:
         return "Any"
 
     return primitive_map.get(value, value)
@@ -220,8 +221,12 @@ def get_type_and_def(  # noqa: C901
                 return "List", ""
             elif title and title == "ReturnType" and schema.get("type"):
                 assert isinstance(title, str)
-                schema_type = schema.get("type", "Any")
-                root_type, generated_code = wrapped_generate_schema_types(schema, schema_type, "Dict")  # type: ignore
+                # Use `title` as the class name, not schema["type"] (e.g. "object" collides with dict).
+                root_type, generated_code = wrapped_generate_schema_types(schema, title, "Dict")  # type: ignore
+                if f"class {root_type}(" not in generated_code:
+                    # A property-less object schema (e.g. bare {"type": "object"}) generates no
+                    # class at all, so root_type would reference a name that doesn't exist.
+                    return "Dict", ""
                 return (map_primitive_types(root_type), "") if is_primitive(root_type) else (root_type, generated_code)  # type: ignore
             elif title:
                 assert isinstance(title, str)
