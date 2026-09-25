@@ -151,8 +151,9 @@ class T(unittest.TestCase):
 #         self.assertIn(expected_return_type, func_str)
 
 
-    def test_render_function_return_type_name_collision_does_not_reference_module_attr(self):
+    def test_render_function_return_type_name_collision_uses_qualified_reference(self):
         return_type = RETURN_TYPE_NAMED_RETURN_TYPE["function"]["returnType"]
+        name = RETURN_TYPE_NAMED_RETURN_TYPE["name"]
         func_str, func_type_defs = render_server_function(
             RETURN_TYPE_NAMED_RETURN_TYPE["type"],
             RETURN_TYPE_NAMED_RETURN_TYPE["name"],
@@ -161,9 +162,10 @@ class T(unittest.TestCase):
             RETURN_TYPE_NAMED_RETURN_TYPE["function"]["arguments"],
             return_type,
         )
-        self.assertIn("-> dict", func_str)
-        self.assertNotIn(".returnType", func_str)
-        self.assertNotIn(".ReturnType", func_str)
+        # The real "ReturnType" class must be generated and referenced via its
+        # qualified module alias, not collapsed to a generic "dict".
+        self.assertIn(f"-> {to_type_module_alias(name)}.ReturnType", func_str)
+        self.assertIn("class ReturnType(", func_type_defs)
 
     def test_render_function_string_union_returns_text(self):
         function_name = "getMaybeName"
