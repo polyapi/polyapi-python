@@ -1,7 +1,7 @@
 import os
 import sys
 import subprocess
-from typing import List, Tuple, Literal
+from typing import Any, Dict, List, Tuple, Literal, TypeGuard
 from polyapi import http_client
 from polyapi.utils import get_auth_headers
 from polyapi.config import get_api_key_and_url
@@ -10,7 +10,7 @@ from polyapi.deployables import (
     prepare_deployable_directory, write_cache_revision,
     save_deployable_records, get_all_deployable_files,
     is_cache_up_to_date, get_git_revision,
-    write_updated_deployable, DeployableRecord
+    write_updated_deployable, DeployableRecord, PolyDeployConfig
 )
 
 class FunctionArgumentDto:
@@ -19,7 +19,15 @@ class FunctionArgumentDto:
         self.type = type
         self.description = description
 
-def get_function_description(deploy_type: Literal["server-function", "client-function"], description: str, arguments, code: str) -> str:
+
+FunctionDeployType = Literal["server-function", "client-function"]
+
+
+def _is_function_deploy_type(deploy_type: str) -> TypeGuard[FunctionDeployType]:
+    return deploy_type in ("server-function", "client-function")
+
+
+def get_function_description(deploy_type: FunctionDeployType, description: str, arguments, code: str) -> Dict[str, Any]:
     if deploy_type == "server-function":
         return get_server_function_description(description, arguments, code)
     elif deploy_type == "client-function":
@@ -27,14 +35,14 @@ def get_function_description(deploy_type: Literal["server-function", "client-fun
     else:
         raise ValueError("Unsupported deployable type")
 
-def get_server_function_description(description: str, arguments, code: str) -> str:
+def get_server_function_description(description: str, arguments, code: str) -> Dict[str, Any]:
     api_key, api_url = get_api_key_and_url()
     headers = get_auth_headers(api_key)
     data = {"description": description, "arguments": arguments, "code": code}
     response = http_client.post(f"{api_url}/functions/server/description-generation", headers=headers, json=data)
     return response.json()
 
-def get_client_function_description(description: str, arguments, code: str) -> str:
+def get_client_function_description(description: str, arguments, code: str) -> Dict[str, Any]:
     api_key, api_url = get_api_key_and_url()
     headers = get_auth_headers(api_key)
     # Simulated API call to generate client function descriptions
@@ -50,8 +58,12 @@ def fill_in_missing_function_details(deployable: DeployableRecord, code: str) ->
     )
     if is_missing_descriptions:
         try:
+            deploy_type = deployable["type"]
+            if not _is_function_deploy_type(deploy_type):
+                raise ValueError(f'Unsupported deployable type: "{deploy_type}"')
+
             ai_generated = get_function_description(
-                deployable["type"],
+                deploy_type,
                 deployable["types"]["description"], 
                 [{"name": p["name"], "type": p["type"], "description": p.get("description")} for p in deployable["types"]["params"]],
                 code
@@ -84,7 +96,13 @@ def get_base_url() -> str:
 def get_all_deployables(disable_docs: bool, disable_ai: bool, git_revision: str) -> List[DeployableRecord]:
     print("Searching for poly deployables.")
     base_url = get_base_url() or "."
-    possible_deployables = get_all_deployable_files({"includeDirs": [base_url]})
+    deployable_search_config: PolyDeployConfig = {
+        "type_names": [],
+        "include_dirs": [base_url],
+        "include_files_or_extensions": [],
+        "exclude_dirs": [],
+    }
+    possible_deployables = get_all_deployable_files(deployable_search_config)
     print(f'Found {len(possible_deployables)} possible deployable file{"s" if len(possible_deployables) != 1 else ""}.')
 
     found = {}

@@ -118,14 +118,16 @@ def render_variable(variable: VariableSpecDto):
 def _get_variable_type(type_spec: PropertyType) -> str:
     # simplified version of _get_type from api.py
     if type_spec["kind"] == "plain":
-        value = type_spec["value"]
-        if value.endswith("[]"):
+        value = type_spec.get("value")
+        if value and value.endswith("[]"):
             primitive = map_primitive_types(value[:-2])
             return f"List[{primitive}]"
-        else:
+        elif value:
             return map_primitive_types(value)
+        else:
+            return "Any"
     elif type_spec["kind"] == "primitive":
-        return map_primitive_types(type_spec["type"])
+        return map_primitive_types(type_spec.get("type", "not gonna find this so it will fallback to any"))
     elif type_spec["kind"] == "array":
         return "List"
     elif type_spec["kind"] == "void":

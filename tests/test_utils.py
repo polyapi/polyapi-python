@@ -1,4 +1,6 @@
 import unittest
+from typing import cast
+from polyapi.typedefs import PropertyType
 from polyapi.utils import add_type_import_path, get_type_and_def, rewrite_reserved
 
 OPENAPI_FUNCTION = {
@@ -75,7 +77,7 @@ OPENAPI_FUNCTION = {
 
 class T(unittest.TestCase):
     def test_get_type_and_def(self):
-        arg_type, arg_def = get_type_and_def(OPENAPI_FUNCTION)
+        arg_type, arg_def = get_type_and_def(cast(PropertyType, OPENAPI_FUNCTION))
         self.assertEqual(
             arg_type,
             "Callable[[List[WebhookEventTypeElement], Dict, Dict, Dict], None]",
