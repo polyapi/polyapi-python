@@ -216,6 +216,7 @@ class T(unittest.TestCase):
         })
         self.assertEqual(deployable["types"]["returns"], {
             "type": "Any",
+            "typeSchema": None,
             "description": "import number please keep handy"
         })
 
