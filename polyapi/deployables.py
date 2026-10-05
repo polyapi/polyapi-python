@@ -51,7 +51,7 @@ class DeployableFunctionTypes(TypedDict):
     params: List[DeployableFunctionParam]
     returns: DeployableFunctionParamBase
 
-class DeployableRecord(ParsedDeployableConfig, total=False):
+class DeployableRecord(ParsedDeployableConfig):
     gitRevision: str
     fileRevision: str
     file: str
@@ -64,7 +64,7 @@ class DeployableRecord(ParsedDeployableConfig, total=False):
     docEndIndex: int
     dirty: Optional[bool]
 
-class SyncDeployment(TypedDict, total=False):
+class SyncDeployment(TypedDict):
     context: str
     name: str
     description: str
@@ -196,28 +196,10 @@ def write_cache_revision(git_revision: Optional[str] = None) -> None:
         file.write(git_revision)
 
 def is_cache_up_to_date() -> bool:
-    if not Path(CACHE_VERSION_FILE).exists():
-        return False
-    with open(CACHE_VERSION_FILE, 'r', encoding='utf-8') as file:
-        cached_revision = file.read().strip()
-    git_revision = get_git_revision()
-    return cached_revision == git_revision
-
-def is_cache_up_to_date() -> bool:
     """Check if the cached revision matches the current Git revision."""
     cached_revision = get_cache_deployments_revision()
     git_revision = get_git_revision()  # This function needs to be defined or imported
     return cached_revision == git_revision
-
-def write_deploy_comments(deployments: List[Dict]) -> str:
-    """Generate a string of deployment comments for each deployment."""
-    canopy_path = 'polyui/collections' if 'localhost' in os.getenv('POLY_API_BASE_URL', '') else 'canopy/polyui/collections'
-    comments = []
-    for d in deployments:
-        instance_url = d['instance'].replace(':8000', ':3000') if d['instance'].endswith(':8000') else d['instance']
-        comment = f"# Poly deployed @ {d['deployed']} - {d['context']}.{d['name']} - {instance_url}/{canopy_path}/{d['type']}s/{d['id']} - {d['fileRevision']}"
-        comments.append(comment)
-    return '\n'.join(comments)
 
 def print_docstring_function_comment(description: str, args: list, returns: dict) -> str:
     docstring = f'"""{description}\n\n'
@@ -243,7 +225,7 @@ def print_docstring_function_comment(description: str, args: list, returns: dict
     return docstring
 
 
-def update_deployment_comments(file_content: str, deployable: dict) -> str:
+def update_deployment_comments(file_content: str, deployable: DeployableRecord) -> str:
     """
     Remove old deployment comments based on the provided ranges and add new ones.
     """
@@ -255,7 +237,7 @@ def update_deployment_comments(file_content: str, deployable: dict) -> str:
         file_content = f"{deployment_comments}\n{file_content}"
     return file_content
 
-def update_deployable_function_comments(file_content: str, deployable: dict, disable_docs: bool = False) -> str:
+def update_deployable_function_comments(file_content: str, deployable: DeployableRecord, disable_docs: bool = False) -> str:
     """
     Update the docstring in the file content based on the deployable's documentation data.
     """
@@ -263,7 +245,7 @@ def update_deployable_function_comments(file_content: str, deployable: dict, dis
         docstring = print_docstring_function_comment(
             deployable['types']['description'],
             deployable['types']['params'],
-            deployable['types']['returns']
+            deployable['types']['returns'] # pyright: ignore[reportArgumentType]
         )
         if deployable["docStartIndex"] == deployable["docEndIndex"]:
             # Function doesn't yet have any docstrings so we need to add additional whitespace
@@ -272,7 +254,7 @@ def update_deployable_function_comments(file_content: str, deployable: dict, dis
         return f"{file_content[:deployable['docStartIndex']]}{docstring}{file_content[deployable['docEndIndex']:]}"
     return file_content
 
-def write_updated_deployable(deployable: dict, disable_docs: bool = False) -> dict:
+def write_updated_deployable(deployable: DeployableRecord, disable_docs: bool = False) -> DeployableRecord:
     """
     Read the deployable's file, update its comments and docstring, and write back to the file.
     """

@@ -9,7 +9,6 @@ from .cli_constants import CLI_COMMANDS
 from .config import initialize_config, set_api_key_and_url
 from .generate import generate, clear
 from .function_cli import function_add_or_update, function_execute
-from .rendered_spec import get_and_update_rendered_spec
 from .prepare import prepare_deployables
 from .sync import sync_deployables
 
@@ -194,22 +193,6 @@ def execute_from_cli():
         clear()
 
     clear_parser.set_defaults(command=clear_command)
-
-
-    ###########################################################################
-    # Update rendered spec command
-    update_spec_parser = subparsers.add_parser("update_rendered_spec", help="Update the rendered spec file")
-    update_spec_parser.add_argument("spec", help="Specification file to update")
-
-    def update_rendered_spec(args):
-        updated = get_and_update_rendered_spec(args.spec)
-        if updated:
-            print("Updated rendered spec!")
-        else:
-            print("Failed to update rendered spec!")
-            exit(1)
-
-    update_spec_parser.set_defaults(command=update_rendered_spec)
 
 
     ###########################################################################

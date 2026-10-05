@@ -1,7 +1,12 @@
 import unittest
+from typing import cast
 
 from polyapi.parser import parse_function_code
-from polyapi.deployables import update_deployable_function_comments, update_deployment_comments
+from polyapi.deployables import (
+    DeployableRecord,
+    update_deployable_function_comments,
+    update_deployment_comments,
+)
 
 
 INITIAL_SERVER_FN_DEPLOYMENTS = """
@@ -110,7 +115,10 @@ class T(unittest.TestCase):
             ],
             "deploymentCommentRanges": [[0, 177]]
         }
-        updated_file_contents = update_deployment_comments(INITIAL_SERVER_FN_DEPLOYMENTS, test_deployable)
+        updated_file_contents = update_deployment_comments(
+            INITIAL_SERVER_FN_DEPLOYMENTS,
+            cast(DeployableRecord, test_deployable),
+        )
         self.assertEqual(updated_file_contents, EXPECTED_SERVER_FN_DEPLOYMENTS)
 
     def test_parse_and_write_deployable_docstring(self):
