@@ -8,13 +8,13 @@ version = "0.3.21.dev0"
 description = "The Python SDK for the integration platform PolyAPI"
 authors = [{ name = "PolyAPI", email = "support@polyapi.io" }]
 dependencies = [
-    "requests==2.32.3",
+    "requests==2.33.0",
     "typing_extensions==4.15.0",
     "jsonschema-gentypes==2.13.0",
     "pydantic==2.13.4",
     "stdlib_list==0.11.1",
     "colorama==0.4.4",
-    "python-socketio[asyncio_client]==5.11.1",
+    "python-socketio[asyncio_client]==5.16.2",
     "truststore==0.9.1",
     "httpx==0.28.1"
 ]
@@ -26,10 +26,11 @@ requires-python = ">=3.10"
 dev = [
     "mock==5.2.0",
     "pytest",
-    "flask==3.0.3",
+    "flask==3.1.3",
     "mypy",
     "types-requests",
     "types-colorama",
+    "pip-audit",
 ]
 
 [project.urls]
