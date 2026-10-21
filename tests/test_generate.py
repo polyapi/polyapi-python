@@ -1,12 +1,14 @@
 import unittest
 import copy
+import asyncio
 import os
 import shutil
 import importlib.util
 import subprocess
 import sys
 import tempfile
-from typing import List, cast
+from pathlib import Path
+from typing import Dict, List, cast
 from unittest.mock import patch, MagicMock
 from polyapi.typedefs import (
     PropertyType,
@@ -15,7 +17,7 @@ from polyapi.typedefs import (
     VariableSpecDto,
 )
 from polyapi.utils import get_type_and_def, rewrite_reserved, to_type_module_alias
-from polyapi.generate import render_spec, create_empty_schemas_module, generate_functions, create_function, add_function_file, get_specs
+from polyapi.generate import render_spec, create_empty_schemas_module, generate_functions, create_function, add_function_file, generate, get_specs
 from polyapi.poly_schemas import generate_schemas, create_schema
 from polyapi.variables import generate_variables, create_variable
 
@@ -111,6 +113,60 @@ MINIMAL_FUNCTION_SPEC = {
         # Note: no "arguments" or "returnType" fields
     }
 }
+
+GENERATION_SPECS = [
+    {
+        "id": "synthetic-function",
+        "type": "serverFunction",
+        "context": "synthetic",
+        "name": "lookup",
+        "description": "Synthetic generation fixture",
+        "language": "python",
+        "function": {
+            "arguments": [
+                {
+                    "name": "payload",
+                    "description": "",
+                    "required": True,
+                    "type": {
+                        "kind": "object",
+                        "schema": {
+                            "type": "object",
+                            "properties": {"value": {"type": "string"}},
+                            "required": ["value"],
+                        },
+                    },
+                },
+                {
+                    "name": "limit",
+                    "description": "",
+                    "required": False,
+                    "type": {"kind": "primitive", "type": "number"},
+                },
+            ],
+            "returnType": {
+                "kind": "object",
+                "schema": {
+                    "type": "object",
+                    "properties": {"found": {"type": "boolean"}},
+                    "required": ["found"],
+                },
+            },
+        },
+    },
+    {
+        "id": "synthetic-schema",
+        "type": "schema",
+        "context": "synthetic",
+        "name": "Record",
+        "contextName": "synthetic.Record",
+        "definition": {
+            "type": "object",
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+        },
+    },
+]
 
 MEWS_HEADERS_SPECS = [
     (
@@ -252,6 +308,118 @@ MEWS_HEADERS_SPECS = [
 
 
 class T(unittest.TestCase):
+    def _generate_fixture(self, no_types: bool, injected: bool) -> Dict[str, str]:
+        specs = [NO_TYPES_SPEC] if no_types else GENERATION_SPECS
+        loader = MagicMock(return_value=copy.deepcopy(specs))
+        contexts, names, ids = ["synthetic"], ["lookup"], ["synthetic-function"]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            package_file = os.path.join(temp_dir, "generate.py")
+            with (
+                patch("polyapi.generate.__file__", package_file),
+                patch("polyapi.poly_schemas.__file__", package_file),
+                patch("polyapi.generate.os.getcwd", return_value=temp_dir),
+                patch("polyapi.generate.uuid.uuid4", return_value=MagicMock(hex="synthetic")),
+                patch("polyapi.generate.get_specs", side_effect=AssertionError("default loader called")) as default_loader,
+                patch("polyapi.generate.get_api_key_and_url", side_effect=AssertionError("auth requested")),
+                patch("polyapi.generate.get_direct_execute_config", side_effect=AssertionError("config requested")),
+                patch("polyapi.generate.get_cached_generate_args", side_effect=AssertionError("cached config requested")),
+                patch("polyapi.config.get_config_file_path", side_effect=AssertionError("config file requested")),
+                patch("polyapi.generate.http_client.get", side_effect=AssertionError("HTTP requested")),
+                patch("builtins.input", side_effect=AssertionError("interactive auth requested")),
+            ):
+                if injected:
+                    generate(contexts, names, ids, no_types, specs_loader=loader)
+                    default_loader.assert_not_called()
+                else:
+                    default_loader.side_effect = loader
+                    generate(contexts, names, ids, no_types)
+                loader.assert_called_once_with(contexts=contexts, names=names, ids=ids, no_types=no_types)
+
+            return {
+                path.relative_to(temp_dir).as_posix(): path.read_text()
+                for path in Path(temp_dir).rglob("*") if path.is_file()
+            }
+
+    def test_injected_specs_preserve_typed_generation(self):
+        generated = self._generate_fixture(no_types=False, injected=True)
+
+        self.assertEqual(generated, self._generate_fixture(no_types=False, injected=False))
+        self.assertIn("'payload': payload, 'limit': limit", generated["poly/synthetic/__init__.py"])
+        self.assertIn("value: Required[str]", generated["poly/synthetic/Lookup.py"])
+        self.assertIn("found: Required[bool]", generated["poly/synthetic/Lookup.py"])
+        self.assertIn("class Record", generated["schemas/synthetic/_Record.py"])
+        self.assertIn(".polyapi-python", generated)
+        for path, source in generated.items():
+            if path.endswith(".py"):
+                compile(source, path, "exec")
+
+    def test_injected_specs_preserve_no_types_generation(self):
+        generated = self._generate_fixture(no_types=True, injected=True)
+
+        self.assertEqual(generated, self._generate_fixture(no_types=True, injected=False))
+        self.assertIn("Empty schemas module for no-types mode", generated["schemas/__init__.py"])
+        self.assertIn("def testFunction(", generated["poly/test/__init__.py"])
+
+    def test_injected_specs_propagate_failure_and_cancellation(self):
+        for error in (RuntimeError("loader failed"), asyncio.CancelledError(), KeyboardInterrupt()):
+            with self.subTest(error=type(error).__name__), tempfile.TemporaryDirectory() as temp_dir:
+                loader = MagicMock(side_effect=error)
+                with (
+                    patch("polyapi.generate.__file__", os.path.join(temp_dir, "generate.py")),
+                    patch("polyapi.generate.get_specs", side_effect=AssertionError("default loader called")) as default_loader,
+                    patch("polyapi.generate.cache_specs") as cache,
+                    self.assertRaises(type(error)) as raised,
+                ):
+                    generate(specs_loader=loader)
+                self.assertIs(raised.exception, error)
+                default_loader.assert_not_called()
+                cache.assert_not_called()
+                self.assertEqual(os.listdir(temp_dir), [])
+
+    def test_injected_generation_and_import_do_not_acquire_credentials(self):
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = subprocess.run(
+                [sys.executable, "-B", "-c", """
+import os
+import sys
+from unittest.mock import patch
+
+def reject_credentials(event, args):
+    if event == "open" and isinstance(args[0], (str, bytes, os.PathLike)):
+        if os.path.basename(os.fsdecode(args[0])) in (".config.env", ".env"):
+            raise AssertionError("config file accessed")
+    if event in ("socket.connect", "socket.getaddrinfo"):
+        raise AssertionError("network accessed")
+
+sys.addaudithook(reject_credentials)
+original_get = os.environ.get
+
+def checked_get(key, default=None):
+    if key in ("POLY_API_KEY", "POLY_API_BASE_URL"):
+        raise AssertionError("credential environment accessed")
+    return original_get(key, default)
+
+with patch.object(os.environ, "get", side_effect=checked_get):
+    from polyapi.generate import generate
+
+    def load_specs(**kwargs):
+        return [{"id": "synthetic", "type": "serverFunction", "context": "synthetic",
+                 "name": "lookup", "description": "Synthetic fixture"}]
+
+    with patch("polyapi.generate.__file__", os.path.join(os.getcwd(), "generate.py")):
+        generate(no_types=True, specs_loader=load_specs)
+    import poly
+    assert callable(poly.synthetic.lookup)
+"""],
+                cwd=temp_dir,
+                env={"PYTHONPATH": repo_root},
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     @patch("polyapi.generate.get_direct_execute_config", return_value=False)
     @patch("polyapi.generate.get_auth_headers", return_value={"Authorization": "Bearer api-key"})
     @patch("polyapi.generate.get_api_key_and_url", return_value=("api-key", "https://api.example.com"))

@@ -7,7 +7,7 @@ import tempfile
 import stat
 
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Protocol, Tuple, cast
 
 from .auth import render_auth_function
 from .client import render_client_function
@@ -43,6 +43,18 @@ x-poly-ref:
 X_POLY_REF_BETTER_WARNING = '''"""
 Unresolved schema, please add the following schema to complete it:
   path:'''
+
+
+class SpecsLoader(Protocol):
+    def __call__(
+        self,
+        *,
+        contexts: Optional[List[str]] = None,
+        names: Optional[List[str]] = None,
+        ids: Optional[List[str]] = None,
+        no_types: bool = False,
+    ) -> List[SpecificationDto]:
+        ...
 
 
 def get_specs(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, ids: Optional[List[str]] = None, no_types: bool = False) -> List:
@@ -361,12 +373,20 @@ def normalize_args_schema(
     return spec
 
 
-def generate(contexts: Optional[List[str]] = None, names: Optional[List[str]] = None, ids: Optional[List[str]] = None, no_types: bool = False) -> None:
+def generate(
+    contexts: Optional[List[str]] = None,
+    names: Optional[List[str]] = None,
+    ids: Optional[List[str]] = None,
+    no_types: bool = False,
+    *,
+    specs_loader: Optional[SpecsLoader] = None,
+) -> None:
     generate_msg = f"Generating Poly Python SDK for contexts ${contexts}..." if contexts else "Generating Poly Python SDK..."
     print(generate_msg, end="", flush=True)
     remove_old_library()
 
-    specs = get_specs(contexts=contexts, names=names, ids=ids, no_types=no_types)
+    load_specs = get_specs if specs_loader is None else specs_loader
+    specs = load_specs(contexts=contexts, names=names, ids=ids, no_types=no_types)
     cache_specs(specs)
 
     limit_ids: List[str] = []  # useful for narrowing down generation to a single function to debug
