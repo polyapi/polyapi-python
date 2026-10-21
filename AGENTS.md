@@ -2,7 +2,7 @@ The PolyAPI Python SDK lets you use and define PolyAPI functions using Python.
 
 # Commands:
 
-* install local environment: pip install -r dev_requirements.txt
+* install local environment: pip install -e ".[dev]"
 * tests: python -m unittest discover
 * lint: flake8 --config=.flake8
 * mypy: ./check_mypy.sh
