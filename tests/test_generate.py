@@ -6,9 +6,14 @@ import importlib.util
 import subprocess
 import sys
 import tempfile
-from typing import cast
+from typing import List, cast
 from unittest.mock import patch, MagicMock
-from polyapi.typedefs import SpecificationDto
+from polyapi.typedefs import (
+    PropertyType,
+    SchemaSpecDto,
+    SpecificationDto,
+    VariableSpecDto,
+)
 from polyapi.utils import get_type_and_def, rewrite_reserved, to_type_module_alias
 from polyapi.generate import render_spec, create_empty_schemas_module, generate_functions, create_function, add_function_file, get_specs
 from polyapi.poly_schemas import generate_schemas, create_schema
@@ -268,7 +273,7 @@ class T(unittest.TestCase):
         self.assertEqual(params["contexts"], ",".join(contexts))
 
     def test_get_type_and_def(self):
-        arg_type, arg_def = get_type_and_def(OPENAPI_FUNCTION)
+        arg_type, arg_def = get_type_and_def(cast(PropertyType, OPENAPI_FUNCTION))
         self.assertEqual(arg_type, "Callable[[List[WebhookEventTypeElement], Dict, Dict, Dict], None]")
 
     def test_rewrite_reserved(self):
@@ -277,7 +282,7 @@ class T(unittest.TestCase):
 
     def test_render_spec_no_function_data(self):
         """Test that render_spec handles specs with no function data gracefully"""
-        func_str, func_type_defs = render_spec(NO_TYPES_SPEC)
+        func_str, func_type_defs = render_spec(cast(SpecificationDto, NO_TYPES_SPEC))
         
         # Should generate a function even without function data
         self.assertIsNotNone(func_str)
@@ -287,7 +292,7 @@ class T(unittest.TestCase):
 
     def test_render_spec_minimal_function_data(self):
         """Test that render_spec handles specs with minimal function data"""
-        func_str, func_type_defs = render_spec(MINIMAL_FUNCTION_SPEC)
+        func_str, func_type_defs = render_spec(cast(SpecificationDto, MINIMAL_FUNCTION_SPEC))
         
         # Should generate a function with fallback types
         self.assertIsNotNone(func_str)
@@ -482,7 +487,7 @@ def test_nested_function() -> schemas.api.v1.user.profile:
             
             # Capture logging output
             with patch('polyapi.generate.logging.warning') as mock_warning:
-                generate_functions(specs)
+                generate_functions(cast(List[SpecificationDto], specs))
                 
                 # Verify that create_function was called twice (once for each spec)
                 self.assertEqual(mock_create.call_count, 2)
@@ -522,7 +527,7 @@ def test_nested_function() -> schemas.api.v1.user.profile:
             
             # Capture logging output
             with patch('polyapi.poly_schemas.logging.warning') as mock_warning:
-                generate_schemas(specs)
+                generate_schemas(cast(List[SchemaSpecDto], specs))
                 
                 # Verify that create_schema was called twice (once for each spec)
                 self.assertEqual(mock_create.call_count, 2)
@@ -568,7 +573,7 @@ def test_nested_function() -> schemas.api.v1.user.profile:
             
             # Capture logging output
             with patch('polyapi.variables.logging.warning') as mock_warning:
-                generate_variables(specs)
+                generate_variables(cast(List[VariableSpecDto], specs))
                 
                 # Verify that create_variable was called twice (once for each spec)
                 self.assertEqual(mock_create.call_count, 2)
@@ -625,7 +630,11 @@ def test_nested_function() -> schemas.api.v1.user.profile:
                 
                 # Verify that the function generation fails
                 with self.assertRaises(Exception):
-                    add_function_file(temp_dir, "failingFunction", failing_spec)
+                    add_function_file(
+                        temp_dir,
+                        "failingFunction",
+                        cast(SpecificationDto, failing_spec),
+                    )
                 
                 # Verify no partial files were left behind
                 files_in_dir = os.listdir(temp_dir)
@@ -666,7 +675,10 @@ def test_nested_function() -> schemas.api.v1.user.profile:
                 
                 # Verify that the variable generation fails
                 with self.assertRaises(Exception):
-                    add_variable_to_init(temp_dir, failing_spec)
+                    add_variable_to_init(
+                        temp_dir,
+                        cast(VariableSpecDto, failing_spec),
+                    )
                 
                 # Verify no partial files were left behind and __init__.py wasn't corrupted
                 init_path = os.path.join(temp_dir, "__init__.py")
@@ -695,7 +707,7 @@ def test_nested_function() -> schemas.api.v1.user.profile:
                             "definition": {"type": "object", "properties": {"test": {"type": "string"}}}
                         }
                     ]
-                    generate_schemas(schemas)
+                    generate_schemas(cast(List[SchemaSpecDto], schemas))
                     
                     # Should have logged a warning about the failed schema
                     mock_warning.assert_called()
@@ -742,7 +754,7 @@ def test_nested_function() -> schemas.api.v1.user.profile:
                         
                         # This should fail gracefully 
                         try:
-                            generate.create_function(spec)
+                            generate.create_function(cast(SpecificationDto, spec))
                         except:
                             pass  # Expected to fail
                         
@@ -808,7 +820,7 @@ def test_nested_function() -> schemas.api.v1.user.profile:
                     
                     # This should fail but handle cleanup gracefully
                     try:
-                        generate.create_function(spec)
+                        generate.create_function(cast(SpecificationDto, spec))
                     except:
                         pass  # Expected to fail
                     

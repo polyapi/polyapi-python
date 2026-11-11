@@ -2,12 +2,11 @@ The PolyAPI Python SDK lets you use and define PolyAPI functions using Python.
 
 # Commands:
 
-* install local environment: pip install -r dev_requirements.txt
+* install local environment: pip install -e ".[dev]"
 * tests: python -m unittest discover
 * lint: flake8 --config=.flake8
 * mypy: ./check_mypy.sh
 * generate the `polyapi` library: python -m polyapi generate
-* whenever you make a change be sure to increment the version in pyproject.toml like `0.3.19.dev2` -> `03.19.dev3`
 
 tests+lint+mypy+generate should all pass after any change
 

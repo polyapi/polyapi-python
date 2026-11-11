@@ -42,7 +42,8 @@ async def unregister_all():
     _, base_url = get_api_key_and_url()
     # need to reconnect because maybe socketio client disconnected after Ctrl+C?
     try:
-        await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
+        if client:
+            await client.connect(base_url, transports=["websocket"], namespaces=["/events"])
     except ConnectionError:
         pass
     await asyncio.gather(*[unregister(handler) for handler in active_handlers])
@@ -63,10 +64,11 @@ async def on(
     data["apiKey"] = api_key
 
     def registerCallback(id: int):
-        nonlocal handler_id
-        handler_id = id
-        client.on(f"handleError:{handler_id}", callback, namespace="/events")
-        active_handlers.append({"path": path, "id": handler_id, "apiKey": api_key})
+        if client:
+            nonlocal handler_id
+            handler_id = id
+            client.on(f"handleError:{handler_id}", callback, namespace="/events")
+            active_handlers.append({"path": path, "id": handler_id, "apiKey": api_key})
 
     await client.emit("registerErrorHandler", data, "/events", registerCallback)
 
